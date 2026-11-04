@@ -19,6 +19,7 @@ import com.example.navisarthi.dash.map.Mercator
 import com.example.navisarthi.dash.map.TileProvider
 import com.example.navisarthi.dash.nav.GeoPoint
 import com.example.navisarthi.dash.nav.Route
+import com.example.navisarthi.dash.nav.RouteMode
 import com.example.navisarthi.dash.nav.Router
 import com.example.navisarthi.dash.protocol.DashCommands
 import com.example.navisarthi.dash.video.DashEncoder
@@ -58,6 +59,8 @@ data class DashUiState(
     val offRoute: Boolean = false,
     val recalculating: Boolean = false, // off-route long enough / actively rerouting → ETA frozen, pill shows "Recalculating"
     val headingUp: Boolean = true,
+    val perspective: Boolean = false,
+    val mapStyle: MapRenderer.Style = MapRenderer.Style.Light,
     val followMode: Boolean = true,
     val thermal: String = "OK",
     val needsWifiOn: Boolean = false,   // Wi‑Fi radio is off → UI prompts to enable it
@@ -122,6 +125,18 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile private var panY = 0f
     @Volatile private var zoom = 19          // nav-level zoom on the dash (street-level default)
     @Volatile private var headingUp = true
+    @Volatile private var displayRoute: List<GeoPoint> = emptyList()
+    @Volatile private var arrived = false
+
+    fun setPerspective(enabled: Boolean) {
+        _ui.update { it.copy(perspective = enabled) }
+        lastSignature = ""
+    }
+
+    fun setMapStyle(style: MapRenderer.Style) {
+        _ui.update { it.copy(mapStyle = style) }
+        lastSignature = ""
+    }
     @Volatile private var followMode = true
     @Volatile private var lastManualPanAt = 0L
 
@@ -398,8 +413,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 active  && code == BTN_REJECT -> { endCall(call!!);    "Call ended" }
                 // Map/media controls run whenever a call ISN'T ringing (still usable during an active
                 // call — only DOWN is reserved for hang-up, and that's not a map/media code anyway).
-                !ringing && code == BTN_MAP_ZOOM_IN  -> { zoomIn();  "Zoom in (map)" }
-                !ringing && code == BTN_MAP_ZOOM_OUT -> { zoomOut(); "Zoom out (map)" }
+                !ringing && code == BTN_MAP_ZOOM_IN  -> { zoomOut(); "Zoom out (map)" }
+                !ringing && code == BTN_MAP_ZOOM_OUT -> { zoomIn(); "Zoom in (map)" }
                 !ringing && code == BTN_MEDIA_NEXT -> { mediaInfo.skipNext(); "Next track" }
                 !ringing && code == BTN_MEDIA_PREV -> { mediaInfo.skipPrevious(); "Previous track" }
                 else -> "code 0x${code.toString(16).uppercase()}"
@@ -614,7 +629,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     private var routeFetchJob: Job? = null
     private var lastRouteAttemptMs = 0L
 
-    fun setDestination(name: String, lat: Double?, lng: Double?) {
+    @Volatile private var routeMode = RouteMode.Car
+
+    fun setDestination(name: String, lat: Double?, lng: Double?, mode: RouteMode = RouteMode.Car, previewRoute: Route? = null) {
+        routeMode = mode
         routeFetchJob?.cancel()
         lastRouteAttemptMs = 0L
         _ui.update { it.copy(
@@ -624,7 +642,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         ) }
         destLat = lat
         destLng = lng
-        route = null
+        route = previewRoute
+        arrived = false
+        displayRoute = emptyList()
         progressM = 0.0
         smoothEtaSec = 0.0; etaArrivalMs = 0L; displayedEtaMin = null   // fresh ETA for the new route
         voice.resetTrip()   // fresh announcements for the new route
@@ -632,7 +652,11 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         if (lat != null && lng != null) {
             val loc = location.lastKnown()
             tiles.prefetch(lat, lng, loc?.latitude, loc?.longitude)
-            fetchRoute(lat, lng)
+            if (previewRoute == null) fetchRoute(lat, lng)
+            else {
+                tiles.prefetchRoute(previewRoute.geometry)
+                _ui.update { it.copy(hasRoute = true, routePoints = previewRoute.geometry) }
+            }
         }
     }
 
@@ -642,6 +666,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         destLat = null
         destLng = null
         route = null
+        arrived = false
+        displayRoute = emptyList()
         progressM = 0.0
         offRouteSince = 0L
         panX = 0f; panY = 0f; followMode = true
@@ -672,7 +698,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         routeFetchJob?.cancel()
         lastRouteAttemptMs = SystemClock.elapsedRealtime()
         routeFetchJob = viewModelScope.launch {
-            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(destLatV, destLngV))
+            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(destLatV, destLngV), routeMode)
             ensureActive()
             if (r != null && destLat == destLatV && destLng == destLngV) {
                 route = r
@@ -863,7 +889,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         val dLat = destLat; val dLng = destLng
         // A cached origin may correctly have been rejected while GPS warmed up.
         // Retry from a fresh fix rather than leaving the destination permanently unrouted.
-        if (r == null && navigationFixValid && dLat != null && dLng != null &&
+        if (!arrived && r == null && navigationFixValid && dLat != null && dLng != null &&
             routeFetchJob?.isActive != true && SystemClock.elapsedRealtime() - lastRouteAttemptMs >= 6_000L) {
             fetchRoute(dLat, dLng)
         }
@@ -872,6 +898,15 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         matchedLat = loc?.latitude
         matchedLng = loc?.longitude
 
+        displayRoute = if (arrived) emptyList() else r?.geometry.orEmpty()
+        var routeMatch: GeoPoint? = null
+        if (!arrived && navigationFixValid && loc != null && dLat != null && dLng != null &&
+            GeoPoint.distMeters(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)) <= 5.0) {
+            arrived = true
+            displayRoute = emptyList()
+            session.updateNavInfo(0x3C, 0, DashCommands.NAV_UNIT_METERS, 0, DashCommands.NAV_UNIT_METERS)
+        }
+        var maneuverCue: String? = null
         var remainingM: Double? = null
         var etaSec: Double? = null
         // Heading-up direction. GPS bearing is trustworthy ONLY while genuinely moving — at a
@@ -887,9 +922,14 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         var offRoute = false
         var recalculating = false
 
-        if (r != null && loc != null && navigationFixValid) {
+        if (r != null && loc != null && navigationFixValid && !arrived) {
             val ns = trackProgress(r, GeoPoint(loc.latitude, loc.longitude))
             remainingM = ns.remainingM
+            maneuverCue = ns.nextManeuver?.let {
+                val distance = if (ns.nextTurnM < 1000) "${ns.nextTurnM.toInt()} m"
+                    else "%.1f km".format(ns.nextTurnM / 1000)
+                "${it.cue}  /  $distance"
+            }
             // Heading-aware off-route. A flyover (or its service road) runs PARALLEL to and almost
             // on top of the route, so flat GPS can sit well past the lateral threshold while the
             // rider is still effectively on the line. Distance alone then cries "off-route" and
@@ -904,12 +944,19 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 ns.snapDist > 70.0  -> headingOff // parallel/flyover band: off ONLY if heading diverges
                 else -> false                     // (stopped here → not off-route; decide once moving)
             }
-            // NOTE: no marker snapping. Raw GPS is accurate; snapping to the route
-            // polyline pinned the rider onto a parallel road in dense areas (showed
-            // "Indira Enclave" when actually at "Isha"). trackProgress is still used
-            // for nav distances + off-route/reroute detection, just not to move the marker.
-            // (Heading is handled above — held steady at low speed, not snapped to the route
-            // segment, so a stop doesn't rotate the map.)
+            val directionAgrees = if (headingKnown) angleDelta(loc.bearing, ns.heading) <= 40f
+                else loc.speed < BEARING_MIN_SPEED
+            if (!offRoute && directionAgrees && loc.accuracy <= 25f &&
+                ns.snapDist <= loc.accuracy.toDouble().coerceIn(6.0, 15.0)) {
+                routeMatch = ns.snapped
+                matchedLat = ns.snapped.lat
+                matchedLng = ns.snapped.lng
+                val next = r.cumulative.binarySearch(ns.matchedMeters).let { if (it >= 0) it + 1 else -it - 1 }
+                displayRoute = object : AbstractList<GeoPoint>() {
+                    override val size = 1 + r.geometry.size - next
+                    override fun get(index: Int) = if (index == 0) ns.snapped else r.geometry[next + index - 1]
+                }
+            }
             val nowMs = System.currentTimeMillis()
 
             // "Recalculating" = off the line for >0.8 s (ignores a 1-frame GPS blip), OR a reroute
@@ -944,18 +991,17 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             }
             etaSec = if (smoothEtaSec > 0.0) smoothEtaSec else null
             // Feed the dash's own turn-by-turn widget with CORRECT distances (next-turn
-            // + total remaining) and the (held) arrival time. Glyph stays CONTINUE until
-            // other codes are verified.
+            // + total remaining) and the held arrival time.
             val (pv, pu) = toDashDistance(ns.nextTurnM)
             val (tv, tu) = toDashDistance(ns.remainingM)
             val etaHHMM = etaSec?.let {
                 val arrival = java.util.Calendar.getInstance().apply { add(java.util.Calendar.SECOND, it.toInt()) }
                 "%02d%02d".format(arrival.get(java.util.Calendar.HOUR_OF_DAY), arrival.get(java.util.Calendar.MINUTE))
             }
-            session.updateNavInfo(DashCommands.NAV_MANEUVER_CONTINUE, pv, pu, tv, tu, etaHHMM)
+            session.updateNavInfo(ns.nextManeuver?.dashCode ?: DashCommands.NAV_MANEUVER_CONTINUE, pv, pu, tv, tu, etaHHMM)
             // Spoken/chime turn guidance (no-op when voice mode is OFF).
             voice.maybeAnnounce(ns.nextManeuver, ns.nextTurnM, ns.remainingM)
-        } else if (loc != null && dLat != null && dLng != null) {
+        } else if (!arrived && loc != null && dLat != null && dLng != null) {
             remainingM = GeoPoint.distMeters(
                 GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)
             )
@@ -981,7 +1027,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             riderBearing = heading,
             remainingKm = remainingM?.let { d -> d / 1000.0 },
             etaMinutes = if (etaSec != null) displayedEtaMin else null,
-            maneuver = null,
+            maneuver = maneuverCue,
             offRoute = offRoute,
             recalculating = recalculating,
         ) }
@@ -1027,6 +1073,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // doesn't trail the bike between 1 Hz fixes. Only predict while genuinely moving.
         val rider: Pair<Double, Double>? = when {
             loc == null -> null
+            routeMatch != null -> routeMatch.lat to routeMatch.lng
             navigationFixValid && loc.hasBearing() && fixSpeed > 0.5f -> {
                 // Dead-reckon forward from the last fix so the camera keeps GLIDING through GPS
                 // gaps instead of freezing then snapping ("stuck then jump"). predictedDistance
@@ -1097,8 +1144,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         // Lock the dash marker to the smoothed centre (map slides under it).
-        frameRiderLat = if (rider != null) camLat else null
-        frameRiderLng = if (rider != null) camLng else null
+        frameRiderLat = routeMatch?.lat ?: if (rider != null) camLat else null
+        frameRiderLng = routeMatch?.lng ?: if (rider != null) camLng else null
 
         val centerLat = if (haveTarget) camLat else 0.0
         val centerLng = if (haveTarget) camLng else 0.0
@@ -1109,6 +1156,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             // for buttery motion. Safe from standstill jitter because the camera is fed the
             // SMOOTHED position (which settles and stops), not raw GPS.
             append("%.6f".format(centerLat)); append("%.6f".format(centerLng))
+            append(maneuverCue); append(arrived); append(routeMatch); append(displayRoute.size)
+            append(_ui.value.mapStyle); append(_ui.value.perspective)
             append(zoom); append(panX.toInt()); append(panY.toInt())
             append(if (headingUp) (camHeading * 10).toInt() else 0)
             append(remainingM?.let { (it / 100).toInt() } ?: -1) // 100 m resolution to avoid jitter
@@ -1149,7 +1198,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         com.example.navisarthi.data.RideDiagnostics.log("reroute", "off-route ${offSec}s → requesting new route")
         val startMs = System.currentTimeMillis()
         viewModelScope.launch {
-            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng))
+            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng), routeMode)
             val took = System.currentTimeMillis() - startMs
             if (r != null) {
                 route = r
@@ -1198,20 +1247,19 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             zoom = zoom,
             panX = panX,
             panY = panY,
-            headingUp = headingUp && (loc != null),
+            headingUp = (headingUp || _ui.value.perspective) && loc != null,
             heading = heading,
             riderLat = frameRiderLat,
             riderLng = frameRiderLng,
             destLat = destLat,
             destLng = destLng,
             destName = _ui.value.destinationName,
-            route = route?.geometry ?: emptyList(),
-            maneuverText = null, // turn-by-turn maneuver banner removed
+            route = displayRoute,
+            maneuverText = _ui.value.maneuver,
             remainingText = remainingM?.let { fmtDist(it) },
-            // Top-down (heading-up) nav view. The 3D perspective tilt is DISABLED: warping
-            // flat raster tiles via setPolyToPoly stretches the baked-in map labels and
-            // skews the angle (you can't get true Google-Maps 3D without vector tiles).
-            tilt3d = false,
+            tilt3d = _ui.value.perspective && destLat != null && !arrived,
+            style = _ui.value.mapStyle,
+            arrived = arrived,
             etaPrimary = etaPrimary,
             etaSecondary = etaSecondary,
             gpsWeak = gpsStatus == GpsStatus.WEAK,
@@ -1279,7 +1327,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
 
     private data class NavState(
         val remainingM: Double, val nextTurnM: Double, val heading: Float, val offRoute: Boolean,
-        val snapped: GeoPoint, val snapDist: Double,
+        val snapped: GeoPoint, val snapDist: Double, val matchedMeters: Double,
         val nextManeuver: com.example.navisarthi.dash.nav.Maneuver?,
     )
 
@@ -1317,7 +1365,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             it.cumulativeMeters > progressM + 1.0 && it.type != com.example.navisarthi.dash.nav.ManeuverType.DEPART
         }
         val nextTurn = nextMan?.let { (it.cumulativeMeters - progressM).coerceAtLeast(0.0) } ?: remaining
-        return NavState(remaining, nextTurn, m.bearing, m.dist > 70.0, m.proj, m.dist, nextMan)
+        return NavState(remaining, nextTurn, m.bearing, m.dist > 70.0, m.proj, m.dist, m.cum, nextMan)
     }
 
     private fun updateThermal() {

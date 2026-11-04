@@ -263,6 +263,17 @@ fun RouteScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp),
             )
 
+            Eyebrow("Route type", Modifier.padding(bottom = 6.dp))
+            NaviSarthiSegmented(
+                options = listOf("Car", "Bike"),
+                selected = routeState.mode.name,
+                onSelect = { routeViewModel.setRouteMode(com.example.navisarthi.dash.nav.RouteMode.valueOf(it)) },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            )
+            if (routeState.routingError) {
+                Text("Could not find a ${routeState.mode.name.lowercase()} route. Check your connection and retry.", color = TextLo)
+            }
+
             val canStart = dest?.lat != null && dest.lng != null && !routeState.isResolving
             NaviSarthiBtn(
                 label = when {

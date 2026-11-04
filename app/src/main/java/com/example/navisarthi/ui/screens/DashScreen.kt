@@ -470,6 +470,20 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             }
             NaviSarthiToggle(on = ui.headingUp, onChange = { vm.toggleHeadingUp() })
         }
+        Eyebrow("Map angle", Modifier.padding(top = 10.dp, bottom = 6.dp))
+        NaviSarthiSegmented(
+            options = listOf("TDV", "POV"),
+            selected = if (ui.perspective) "POV" else "TDV",
+            onSelect = { vm.setPerspective(it == "POV") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Eyebrow("Map colour theme", Modifier.padding(top = 10.dp, bottom = 6.dp))
+        NaviSarthiSegmented(
+            options = listOf("Light", "Dark", "Black"),
+            selected = ui.mapStyle.name,
+            onSelect = { vm.setMapStyle(com.example.navisarthi.dash.map.MapRenderer.Style.valueOf(it)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Spacer(Modifier.height(16.dp))
 

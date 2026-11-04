@@ -186,6 +186,8 @@ fun AppNavigation(
                                 name = destName,
                                 lat  = routeState.destination?.lat,
                                 lng  = routeState.destination?.lng,
+                                mode = routeState.mode,
+                                previewRoute = routeState.route,
                             )
                             // Start navigation: open the dash view and begin the
                             // WiFi → auth → stream flow (no-op if already streaming).

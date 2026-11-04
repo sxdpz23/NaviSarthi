@@ -21,6 +21,8 @@ import com.example.navisarthi.dash.nav.GeoPoint
  */
 class MapRenderer(private val tiles: TileProvider) {
 
+    enum class Style { Light, Dark, Black }
+
     data class Frame(
         val centerLat: Double,
         val centerLng: Double,
@@ -37,6 +39,8 @@ class MapRenderer(private val tiles: TileProvider) {
         val route: List<GeoPoint> = emptyList(),
         val maneuverText: String? = null,  // e.g. "Turn left · 400 m"
         val remainingText: String? = null, // e.g. "186 km"
+        val style: Style = Style.Light,
+        val arrived: Boolean = false,
         val tilt3d: Boolean = false,       // perspective 3D view (nav heading-up only)
         val etaPrimary: String? = null,    // big glance value, e.g. "24 min" (nav only)
         val etaSecondary: String? = null,  // smaller line, e.g. "18 km · 13:32"
@@ -88,10 +92,31 @@ class MapRenderer(private val tiles: TileProvider) {
     private val tiltSrc = FloatArray(8)
     private val tiltDst = FloatArray(8)
 
+    private val lightFilter = tilePaint.colorFilter
+    private fun nightFilter(red: Float, green: Float, blue: Float) = ColorMatrixColorFilter(floatArrayOf(
+        -.21f, -.72f, -.07f, 0f, red,
+        -.21f, -.72f, -.07f, 0f, green,
+        -.21f, -.72f, -.07f, 0f, blue,
+        0f, 0f, 0f, 1f, 0f,
+    ))
+    private val darkFilter = nightFilter(247f, 265f, 295f)
+    private val blackFilter = nightFilter(224f, 224f, 224f)
+
     fun draw(canvas: Canvas, f: Frame) {
         val w = canvas.width
         val h = canvas.height
-        canvas.drawColor(bgColor)
+        canvas.drawColor(when (f.style) {
+            Style.Light -> bgColor
+            Style.Dark -> Color.rgb(24, 43, 73)
+            Style.Black -> Color.BLACK
+        })
+        tilePaint.colorFilter = when (f.style) {
+            Style.Light -> lightFilter
+            Style.Dark -> darkFilter
+            Style.Black -> blackFilter
+        }
+        routePaint.color = if (f.style == Style.Light) routeBlue else Color.rgb(98, 200, 255)
+        routeCasing.color = if (f.style == Style.Light) Color.WHITE else Color.rgb(16, 37, 56)
 
         val rotate = f.headingUp
         val tilt = rotate && f.tilt3d
@@ -163,7 +188,7 @@ class MapRenderer(private val tiles: TileProvider) {
         }
 
         // ── Rider marker — colour tracks GPS health (blue good, amber weak, grey lost) ──
-        if (f.riderLat != null && f.riderLng != null) {
+        if (!f.arrived && f.riderLat != null && f.riderLng != null) {
             val rx = sx(f.riderLng); val ry = sy(f.riderLat)
             val markerColor = when {
                 f.gpsLost -> Color.rgb(150, 154, 160)  // grey: position is stale
@@ -175,12 +200,13 @@ class MapRenderer(private val tiles: TileProvider) {
             if (rotate) {
                 // Heading-up: chevron pointing up (travel direction)
                 riderPath.reset()
-                riderPath.moveTo(rx, ry - 11f)
-                riderPath.lineTo(rx - 7f, ry + 7f)
-                riderPath.lineTo(rx + 7f, ry + 7f)
+                riderPath.moveTo(rx, ry - 16f)
+                riderPath.lineTo(rx - 11f, ry + 10f)
+                riderPath.lineTo(rx, ry + 5f)
+                riderPath.lineTo(rx + 11f, ry + 10f)
                 riderPath.close()
                 canvas.save(); canvas.rotate(f.heading, rx, ry)
-                dotPaint.color = Color.WHITE; canvas.drawCircle(rx, ry, 9f, dotPaint)
+                dotPaint.color = Color.WHITE; canvas.drawCircle(rx, ry, 13f, dotPaint)
                 dotPaint.color = markerColor; canvas.drawPath(riderPath, dotPaint)
                 canvas.restore()
             } else {
@@ -194,7 +220,7 @@ class MapRenderer(private val tiles: TileProvider) {
         // ── ETA pill (screen-space so it stays upright; bottom-centre safe zone) ──
         // The dash is round, so it's kept narrow and centred. Shows ETA only (time +
         // arrival clock) — distance lives on the dash's own widget.
-        f.etaPrimary?.let { primary ->
+        f.etaPrimary?.takeUnless { f.arrived }?.let { primary ->
             val secondary = f.etaSecondary
             val padH = 18f; val padV = 8f; val gap = 1f
             val bigFm = etaBigPaint.fontMetrics
@@ -238,8 +264,30 @@ class MapRenderer(private val tiles: TileProvider) {
             canvas.drawText(label, cxp, top + padV - fm.ascent, gpsPillText)
         }
 
-        // No other on-map text overlays — the dash's own widgets show name/turn, and the
-        // round bezel clips anything near the top edge.
+        f.maneuverText?.let { cue ->
+            val center = w / 2f
+            val halfWidth = etaSmallPaint.measureText(cue) / 2f + 13f
+            pillRect.set(center - halfWidth, 47f, center + halfWidth, 76f)
+            canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
+            canvas.drawText(cue, center, 66f, etaSmallPaint)
+        }
+
+        if (f.arrived) {
+            val cx = w / 2f
+            dotPaint.color = Color.WHITE
+            canvas.drawCircle(cx, h * .49f, 28f, dotPaint)
+            dotPaint.color = googleRed
+            canvas.drawCircle(cx, h * .49f, 11f, dotPaint)
+            val message = "You have reached your location!!"
+            val half = etaSmallPaint.measureText(message) / 2f + 14f
+            pillRect.set(cx - half, h * .63f, cx + half, h * .63f + 30f)
+            canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
+            canvas.drawText(message, cx, pillRect.top + 20f, etaSmallPaint)
+        }
+
+        pillRect.set(w * .70f, h - 29f, w * .90f, h - 7f)
+        canvas.drawRoundRect(pillRect, 10f, 10f, etaBgPaint)
+        canvas.drawText("−  ZOOM  +", pillRect.centerX(), h - 14f, etaSmallPaint)
 
         // ── Standby when nothing to show (dark text on the light map bg) ──
         if (f.riderLat == null && f.destLat == null) {

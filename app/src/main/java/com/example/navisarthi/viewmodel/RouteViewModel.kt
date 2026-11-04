@@ -14,6 +14,7 @@ import com.example.navisarthi.dash.nav.Route
 import com.example.navisarthi.dash.nav.Router
 import com.example.navisarthi.util.Dbg
 import com.example.navisarthi.util.LocationParser
+import com.example.navisarthi.dash.nav.RouteMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,8 @@ data class RouteState(
     val pendingNavigate: Boolean = false,
     // Real routing results
     val route: Route? = null,
+    val mode: RouteMode = RouteMode.Car,
+    val routingError: Boolean = false,
     val routing: Boolean = false,
     val distanceText: String? = null,   // "218 km"
     val durationText: String? = null,   // "4h 50m"
@@ -73,7 +76,9 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Load a saved destination into the route preview (compute route; stay on the page). */
     fun selectSaved(loc: com.example.navisarthi.data.SavedLocation) {
+        routeRequest?.cancel()
         _state.value = RouteState(
+            mode = _state.value.mode,
             destination = SharedLocation(name = loc.name, lat = loc.lat, lng = loc.lng),
             isResolving = false,
             pendingNavigate = false,
@@ -82,8 +87,10 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun handleSharedText(text: String) {
+        routeRequest?.cancel()
         val loc = LocationParser.parse(text)
         _state.value = RouteState(
+            mode = _state.value.mode,
             destination = loc,
             isResolving = loc.needsExpansion,
             pendingNavigate = true,
@@ -105,6 +112,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 val resolved = loc.copy(
                     name = name, lat = coords?.first, lng = coords?.second, needsExpansion = false,
                 )
+                if (_state.value.destination !== loc) return@launch
                 _state.value = _state.value.copy(destination = resolved, isResolving = false)
                 if (coords != null) computeRoute(coords.first, coords.second)
                 else Log.w(TAG, "No coords for '$name' (url+geocode both empty)")
@@ -133,6 +141,17 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private var routeRequest: kotlinx.coroutines.Job? = null
+
+    fun setRouteMode(mode: RouteMode) {
+        if (mode == _state.value.mode) return
+        routeRequest?.cancel()
+        _state.value = _state.value.copy(mode = mode, route = null, routing = false, routingError = false,
+            distanceText = null, durationText = null, etaText = null)
+        val dest = _state.value.destination
+        if (dest?.lat != null && dest.lng != null) computeRoute(dest.lat, dest.lng)
+    }
+
     @SuppressLint("MissingPermission")
     private fun computeRoute(destLat: Double, destLng: Double) {
         val origin = runCatching {
@@ -140,11 +159,14 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         }.getOrNull() ?: return
 
-        _state.value = _state.value.copy(routing = true)
-        viewModelScope.launch {
+        routeRequest?.cancel()
+        val mode = _state.value.mode
+        _state.value = _state.value.copy(routing = true, routingError = false)
+        routeRequest = viewModelScope.launch {
             val r = Router.route(
                 GeoPoint(origin.latitude, origin.longitude),
                 GeoPoint(destLat, destLng),
+                mode,
             )
             _state.value = if (r != null) _state.value.copy(
                 route = r,
@@ -152,12 +174,12 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 distanceText = fmtKm(r.totalMeters),
                 durationText = fmtDuration(r.totalSeconds),
                 etaText = fmtEta(r.totalSeconds),
-            ) else _state.value.copy(routing = false)
+            ) else _state.value.copy(routing = false, routingError = true)
         }
     }
 
     fun onNavigated() { _state.value = _state.value.copy(pendingNavigate = false) }
-    fun clear() { _state.value = RouteState() }
+    fun clear() { routeRequest?.cancel(); _state.value = RouteState(mode = _state.value.mode) }
 
     private fun fmtKm(m: Double) = "%.0f km".format(m / 1000.0)
     private fun fmtDuration(sec: Double): String {

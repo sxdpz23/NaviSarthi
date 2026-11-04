@@ -164,6 +164,27 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
+        val mapsContext = LocalContext.current
+        NaviSarthiBtn(
+            "Open Google Maps",
+            onClick = {
+                val uri = android.net.Uri.parse("https://maps.google.com/")
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                try {
+                    mapsContext.startActivity(android.content.Intent(intent).setPackage("com.google.android.apps.maps"))
+                } catch (_: android.content.ActivityNotFoundException) {
+                    try {
+                        mapsContext.startActivity(intent)
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        android.widget.Toast.makeText(mapsContext, "Google Maps is unavailable", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            icon = NaviSarthiIcons.Pin, variant = BtnVariant.Secondary, size = BtnSize.Md,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+
         Eyebrow("Saved destinations", Modifier.padding(bottom = 6.dp, start = 4.dp))
 
         if (saved.isEmpty()) {

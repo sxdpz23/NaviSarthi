@@ -1,8 +1,5 @@
 package com.example.navisarthi.dash.nav
 
-/** Maneuver glyphs the dash understands. Only CONTINUE (0x0B) is hardware-verified;
- *  the rest are best-effort guesses and must be checked on fw 11.63. Until then
- *  [Maneuver.dashCode] falls back to CONTINUE so the dash never shows a wrong arrow. */
 enum class ManeuverType { CONTINUE, TURN_LEFT, TURN_RIGHT, SLIGHT_LEFT, SLIGHT_RIGHT,
     SHARP_LEFT, SHARP_RIGHT, UTURN, ROUNDABOUT, DEPART, ARRIVE;
 
@@ -35,9 +32,39 @@ data class Maneuver(
     val location: GeoPoint,
     /** Cumulative distance (m) from the route start to this maneuver's location. */
     val cumulativeMeters: Double,
+    val roundaboutExit: Int? = null,
+    val rightUTurn: Boolean = false,
 ) {
-    /** Dash maneuver glyph byte. CONTINUE (0x0B) is the only verified value. */
-    val dashCode: Int get() = 0x0B // TODO: verify other glyph codes on fw 11.63
+    val cue: String get() = when (type) {
+        ManeuverType.TURN_LEFT -> "Turn left"
+        ManeuverType.TURN_RIGHT -> "Turn right"
+        ManeuverType.SLIGHT_LEFT -> "Slight left"
+        ManeuverType.SLIGHT_RIGHT -> "Slight right"
+        ManeuverType.SHARP_LEFT -> "Sharp left"
+        ManeuverType.SHARP_RIGHT -> "Sharp right"
+        ManeuverType.UTURN -> "U-turn"
+        ManeuverType.ROUNDABOUT -> roundaboutExit?.let { "Roundabout: exit $it" } ?: "Roundabout"
+        ManeuverType.ARRIVE -> "Destination ahead"
+        else -> "Continue straight"
+    }
+
+    // Empirical K1G catalog: TripperDashPlusPlus/docs/maneuver-glyphs.
+    val dashCode: Int get() = when (type) {
+        ManeuverType.TURN_LEFT -> 0x14
+        ManeuverType.TURN_RIGHT -> 0x15
+        ManeuverType.SHARP_LEFT -> 0x16
+        ManeuverType.SHARP_RIGHT -> 0x17
+        ManeuverType.SLIGHT_LEFT -> 0x18
+        ManeuverType.SLIGHT_RIGHT -> 0x19
+        ManeuverType.UTURN -> if (rightUTurn) 0x1A else 0x3D
+        ManeuverType.ARRIVE -> 0x3C
+        ManeuverType.ROUNDABOUT -> when (val exit = roundaboutExit ?: 0) {
+            in 1..9 -> 0x31 + exit
+            in 10..19 -> 0x46 + exit - 10
+            else -> 0x31
+        }
+        else -> 0x09
+    }
 }
 
 /** A computed road route from origin to destination. */

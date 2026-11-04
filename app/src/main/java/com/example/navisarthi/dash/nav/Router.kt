@@ -10,14 +10,17 @@ import java.net.URL
 /**
  * Fetches a road route from the public OSRM demo server. Called at planning time
  * (destination shared) while the phone still has internet — the result is cached
- * so riding can proceed offline. Driving profile suits the Himalayan fine.
+ * so a route can be followed during a temporary loss of mobile data.
  */
+enum class RouteMode { Car, Bike }
+
 object Router {
     private const val TAG = "Router"
     private const val BASE = "https://router.project-osrm.org/route/v1/driving"
     private const val UA = "NaviSarthi/1.0 (personal motorcycle nav; single user)"
 
-    suspend fun route(from: GeoPoint, to: GeoPoint): Route? = withContext(Dispatchers.IO) {
+    suspend fun route(from: GeoPoint, to: GeoPoint, mode: RouteMode = RouteMode.Car): Route? = withContext(Dispatchers.IO) {
+        if (mode == RouteMode.Bike) return@withContext motorcycleRoute(from, to)
         val url = "$BASE/${from.lng},${from.lat};${to.lng},${to.lat}" +
                 "?overview=full&geometries=polyline&steps=true&annotations=false"
         try {
@@ -33,6 +36,66 @@ object Router {
             Log.w(TAG, "route() failed: ${e.message}")
             null
         }
+    }
+
+    private fun motorcycleRoute(from: GeoPoint, to: GeoPoint): Route? {
+        val request = JSONObject()
+            .put("costing", "motorcycle")
+            .put("units", "kilometers")
+            .put("locations", org.json.JSONArray(listOf(
+                JSONObject().put("lat", from.lat).put("lon", from.lng),
+                JSONObject().put("lat", to.lat).put("lon", to.lng),
+            )))
+        val query = java.net.URLEncoder.encode(request.toString(), "UTF-8")
+        return try {
+            val conn = (URL("https://valhalla1.openstreetmap.de/route?json=$query").openConnection() as HttpURLConnection)
+            try {
+                conn.setRequestProperty("User-Agent", UA)
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                val response = conn.inputStream.bufferedReader().use { it.readText() }
+                parseMotorcycle(response)
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Motorcycle routing failed", e)
+            null
+        }
+    }
+
+    private fun parseMotorcycle(response: String): Route? {
+        val trip = JSONObject(response).getJSONObject("trip")
+        val leg = trip.getJSONArray("legs").getJSONObject(0)
+        val geometry = PolylineCodec.decode(leg.getString("shape"), precision = 6)
+        if (geometry.size < 2) return null
+        val cumulative = DoubleArray(geometry.size)
+        for (i in 1 until geometry.size) {
+            cumulative[i] = cumulative[i - 1] + GeoPoint.distMeters(geometry[i - 1], geometry[i])
+        }
+        val steps = leg.getJSONArray("maneuvers")
+        val maneuvers = (0 until steps.length()).mapNotNull { i ->
+            val step = steps.getJSONObject(i)
+            val index = step.optInt("begin_shape_index", -1)
+            val point = geometry.getOrNull(index) ?: return@mapNotNull null
+            val code = step.getInt("type")
+            val type = when (code) {
+                in 1..3 -> ManeuverType.DEPART
+                in 4..6 -> ManeuverType.ARRIVE
+                9, 18, 20, 23, 37 -> ManeuverType.SLIGHT_RIGHT
+                10 -> ManeuverType.TURN_RIGHT
+                11 -> ManeuverType.SHARP_RIGHT
+                12, 13 -> ManeuverType.UTURN
+                14 -> ManeuverType.SHARP_LEFT
+                15 -> ManeuverType.TURN_LEFT
+                16, 19, 21, 24, 38 -> ManeuverType.SLIGHT_LEFT
+                26, 27 -> ManeuverType.ROUNDABOUT
+                else -> ManeuverType.CONTINUE
+            }
+            Maneuver(type, step.optString("instruction"), point, cumulative[index],
+                step.optInt("roundabout_exit_count").takeIf { it > 0 }, rightUTurn = code == 12)
+        }
+        return Route(geometry, maneuvers, cumulative.last(), trip.getJSONObject("summary").getDouble("time"), cumulative)
     }
 
     private fun parse(json: String): Route? {
@@ -67,10 +130,12 @@ object Router {
                     val p = GeoPoint(loc.getDouble(1), loc.getDouble(0))
                     val type = ManeuverType.fromOsrm(man.optString("type"), man.optString("modifier"))
                     val name = step.optString("name").ifBlank { "road" }
+                    val exit = man.optInt("exit").takeIf { type == ManeuverType.ROUNDABOUT && it > 0 }
                     maneuvers.add(
                         Maneuver(
                             type = type,
-                            instruction = buildInstruction(type, name),
+                            instruction = exit?.let { "At the roundabout, take exit $it onto $name" } ?: buildInstruction(type, name),
+                            roundaboutExit = exit,
                             location = p,
                             cumulativeMeters = nearestCumulative(p, geometry, cum),
                         )
