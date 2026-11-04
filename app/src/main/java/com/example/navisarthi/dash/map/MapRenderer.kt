@@ -1,5 +1,6 @@
 package com.example.navisarthi.dash.map
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
@@ -19,7 +20,7 @@ import com.example.navisarthi.dash.nav.GeoPoint
  * Optional heading-up rotation. Paint/Path/Rect objects are reused across frames
  * to avoid per-frame allocation churn.
  */
-class MapRenderer(private val tiles: TileProvider) {
+class MapRenderer internal constructor(private val tiles: TileProvider, private val trafficTiles: TrafficTiles? = null) {
 
     enum class Style { Light, Dark, Black }
 
@@ -41,6 +42,9 @@ class MapRenderer(private val tiles: TileProvider) {
         val remainingText: String? = null, // e.g. "186 km"
         val style: Style = Style.Light,
         val arrived: Boolean = false,
+        val arrivalDuration: String? = null,
+        val goldenRoute: Boolean = false,
+        val traffic: Boolean = false,
         val tilt3d: Boolean = false,       // perspective 3D view (nav heading-up only)
         val etaPrimary: String? = null,    // big glance value, e.g. "24 min" (nav only)
         val etaSecondary: String? = null,  // smaller line, e.g. "18 km · 13:32"
@@ -81,6 +85,45 @@ class MapRenderer(private val tiles: TileProvider) {
     private val gpsPillText    = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 13f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
 
     // Reused across frames
+    private val trafficClip = Path()
+    private val arrivalMessagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 26f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    private val trafficMessagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 15f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    private fun hasSlowTraffic(bitmap: Bitmap, x: Int, y: Int, radius: Int): Boolean {
+        var matches = 0
+        for (row in maxOf(0, y - radius)..minOf(bitmap.height - 1, y + radius)) {
+            for (column in maxOf(0, x - radius)..minOf(bitmap.width - 1, x + radius)) {
+                val pixel = bitmap.getPixel(column, row)
+                if (Color.alpha(pixel) < 200) continue
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                val orange = kotlin.math.abs(red - 241) <= 10 && kotlin.math.abs(green - 130) <= 10 &&
+                    kotlin.math.abs(blue - 55) <= 10
+                val severe = kotlin.math.abs(red - 231) <= 10 && green <= 17 && blue <= 14
+                if ((orange || severe) && ++matches >= 3) return true
+            }
+        }
+        return false
+    }
+    private val trafficPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val trafficStroke = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 16f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val routePath = Path()
     private val riderPath = Path()
     private val tmpRect = RectF()
@@ -89,8 +132,6 @@ class MapRenderer(private val tiles: TileProvider) {
     private val childDst = RectF()    // quadrant target when scaling children down
     private val textBounds = Rect()
     private val tiltMatrix = Matrix()
-    private val tiltSrc = FloatArray(8)
-    private val tiltDst = FloatArray(8)
 
     private val lightFilter = tilePaint.colorFilter
     private fun nightFilter(red: Float, green: Float, blue: Float) = ColorMatrixColorFilter(floatArrayOf(
@@ -100,7 +141,8 @@ class MapRenderer(private val tiles: TileProvider) {
         0f, 0f, 0f, 1f, 0f,
     ))
     private val darkFilter = nightFilter(247f, 265f, 295f)
-    private val blackFilter = nightFilter(224f, 224f, 224f)
+    private val miniClip = Path()
+    private val perspectiveCamera = android.graphics.Camera()
 
     fun draw(canvas: Canvas, f: Frame) {
         val w = canvas.width
@@ -113,9 +155,23 @@ class MapRenderer(private val tiles: TileProvider) {
         tilePaint.colorFilter = when (f.style) {
             Style.Light -> lightFilter
             Style.Dark -> darkFilter
-            Style.Black -> blackFilter
+            Style.Black -> null
         }
-        routePaint.color = if (f.style == Style.Light) routeBlue else Color.rgb(98, 200, 255)
+        val labelFree = f.style == Style.Black
+        val accent = when {
+            labelFree && f.goldenRoute -> Color.rgb(212, 177, 92)
+            f.style == Style.Light -> routeBlue
+            else -> Color.rgb(80, 198, 250)
+        }
+        routePaint.color = accent
+        if (f.arrived) {
+            canvas.drawColor(Color.BLACK)
+            canvas.save()
+            miniClip.reset()
+            val radius = h * .57f
+            miniClip.addCircle(w / 2f, h.toFloat(), radius, Path.Direction.CW)
+            canvas.clipPath(miniClip)
+        }
         routeCasing.color = if (f.style == Style.Light) Color.WHITE else Color.rgb(16, 37, 56)
 
         val rotate = f.headingUp
@@ -123,7 +179,7 @@ class MapRenderer(private val tiles: TileProvider) {
         // Nav view: bias the rider toward the lower third so the road AHEAD fills the
         // screen (like Google Maps navigation). 3D pushes it lower still. North-up
         // view keeps the rider centred.
-        val pivotY = if (rotate) (if (tilt) h * 0.74f else h * 0.66f) else h / 2f
+        val pivotY = if (f.arrived) h * .73f else if (rotate) (if (tilt) h * 0.70f else h * 0.66f) else h / 2f
 
         val ts = Mercator.TILE_SIZE
         val cx = Mercator.lngToTileX(f.centerLng, f.zoom) * ts + f.panX
@@ -137,20 +193,13 @@ class MapRenderer(private val tiles: TileProvider) {
         if (rotate) {
             canvas.save()
             if (tilt) {
-                // Perspective tilt: warp the flat frame into a trapezoid that converges
-                // toward the top, so the road ahead recedes into the distance (the
-                // Google-Maps 3D look). Near things (rider, bottom) stay ~undistorted;
-                // far things (dest, route ahead) shrink, which is exactly right.
-                val inset = w * 0.18f
-                tiltSrc[0] = 0f;          tiltSrc[1] = 0f
-                tiltSrc[2] = w.toFloat(); tiltSrc[3] = 0f
-                tiltSrc[4] = w.toFloat(); tiltSrc[5] = h.toFloat()
-                tiltSrc[6] = 0f;          tiltSrc[7] = h.toFloat()
-                tiltDst[0] = inset;          tiltDst[1] = 0f
-                tiltDst[2] = w - inset;      tiltDst[3] = 0f
-                tiltDst[4] = w.toFloat();    tiltDst[5] = h.toFloat()
-                tiltDst[6] = 0f;             tiltDst[7] = h.toFloat()
-                tiltMatrix.setPolyToPoly(tiltSrc, 0, tiltDst, 0, 4)
+                perspectiveCamera.save()
+                perspectiveCamera.setLocation(0f, 0f, -14f)
+                perspectiveCamera.rotateX(28f)
+                perspectiveCamera.getMatrix(tiltMatrix)
+                perspectiveCamera.restore()
+                tiltMatrix.preTranslate(-w / 2f, -pivotY)
+                tiltMatrix.postTranslate(w / 2f, pivotY)
                 canvas.concat(tiltMatrix)
             }
             canvas.rotate(-f.heading, w / 2f, pivotY)
@@ -166,16 +215,58 @@ class MapRenderer(private val tiles: TileProvider) {
             val dstL = (tx * ts - left).toFloat()
             val dstT = (ty * ts - top).toFloat()
             tmpRect.set(dstL, dstT, dstL + ts, dstT + ts)
-            drawTileBestEffort(canvas, f.zoom, tx, ty, tmpRect)
+            drawTileBestEffort(canvas, f.zoom, tx, ty, tmpRect, labelFree)
         }
 
+        var congestionNearRider = false
         // ── Road route polyline ──
-        if (f.route.size >= 2) {
+        if (!f.arrived && f.route.size >= 2) {
             routePath.reset()
             routePath.moveTo(sx(f.route[0].lng), sy(f.route[0].lat))
-            for (i in 1 until f.route.size) routePath.lineTo(sx(f.route[i].lng), sy(f.route[i].lat))
+            for (i in 1 until f.route.lastIndex) {
+                val prev = f.route[i - 1]
+                val point = f.route[i]
+                val next = f.route[i + 1]
+                val x = sx(point.lng); val y = sy(point.lat)
+                val dx1 = sx(prev.lng) - x; val dy1 = sy(prev.lat) - y
+                val dx2 = sx(next.lng) - x; val dy2 = sy(next.lat) - y
+                val a = (4f / kotlin.math.hypot(dx1, dy1).coerceAtLeast(1f)).coerceAtMost(.25f)
+                val b = (4f / kotlin.math.hypot(dx2, dy2).coerceAtLeast(1f)).coerceAtMost(.25f)
+                routePath.lineTo(x + dx1 * a, y + dy1 * a)
+                routePath.quadTo(x, y, x + dx2 * b, y + dy2 * b)
+            }
+            routePath.lineTo(sx(f.route.last().lng), sy(f.route.last().lat))
             canvas.drawPath(routePath, routeCasing)
             canvas.drawPath(routePath, routePaint)
+            if (f.traffic && trafficTiles != null) {
+                trafficStroke.getFillPath(routePath, trafficClip)
+                canvas.save()
+                if (canvas.clipPath(trafficClip)) {
+                    val zoom = f.zoom.coerceAtMost(19)
+                    val scale = 1 shl (f.zoom - zoom)
+                    val span = ts * scale
+                    val riderX = f.riderLng?.let(::sx)
+                    val riderY = f.riderLat?.let(::sy)
+                    for (x in Math.floorDiv(txMin, scale)..Math.floorDiv(txMax, scale)) {
+                        for (y in Math.floorDiv(tyMin, scale)..Math.floorDiv(tyMax, scale)) {
+                            val tileX = (x * span - left).toFloat()
+                            val tileY = (y * span - top).toFloat()
+                            tmpRect.set(tileX, tileY, tileX + span, tileY + span)
+                            if (canvas.quickReject(tmpRect)) continue
+                            trafficTiles.get(zoom, x, y)?.let { tile ->
+                                canvas.drawBitmap(tile, null, tmpRect, trafficPaint)
+                                if (!congestionNearRider && !f.gpsLost && !f.gpsWeak && riderX != null &&
+                                    riderY != null && tmpRect.contains(riderX, riderY)) {
+                                    val px = ((riderX - tileX) * tile.width / span).toInt()
+                                    val py = ((riderY - tileY) * tile.height / span).toInt()
+                                    congestionNearRider = hasSlowTraffic(tile, px, py, (7 * tile.width / span).coerceAtLeast(1))
+                                }
+                            }
+                        }
+                    }
+                }
+                canvas.restore()
+            }
         }
 
         // ── Destination pin ──
@@ -193,7 +284,7 @@ class MapRenderer(private val tiles: TileProvider) {
             val markerColor = when {
                 f.gpsLost -> Color.rgb(150, 154, 160)  // grey: position is stale
                 f.gpsWeak -> Color.rgb(251, 188, 5)    // amber: imprecise
-                else      -> routeBlue                  // blue: good
+                else      -> accent                  // blue: good
             }
             val haloColor = Color.argb(60, Color.red(markerColor), Color.green(markerColor), Color.blue(markerColor))
             dotPaint.color = haloColor; canvas.drawCircle(rx, ry, 17f, dotPaint)
@@ -206,8 +297,8 @@ class MapRenderer(private val tiles: TileProvider) {
                 riderPath.lineTo(rx + 11f, ry + 10f)
                 riderPath.close()
                 canvas.save(); canvas.rotate(f.heading, rx, ry)
-                dotPaint.color = Color.WHITE; canvas.drawCircle(rx, ry, 13f, dotPaint)
-                dotPaint.color = markerColor; canvas.drawPath(riderPath, dotPaint)
+                dotPaint.color = markerColor; canvas.drawCircle(rx, ry, 18f, dotPaint)
+                dotPaint.color = Color.WHITE; canvas.drawPath(riderPath, dotPaint)
                 canvas.restore()
             } else {
                 dotPaint.color = Color.WHITE; canvas.drawCircle(rx, ry, 8f, dotPaint)
@@ -216,6 +307,16 @@ class MapRenderer(private val tiles: TileProvider) {
         }
 
         if (rotate) canvas.restore()
+        if (f.arrived) canvas.restore()
+        if (f.traffic) {
+            val label = trafficTiles?.status?.ifBlank { "Traffic © TomTom" } ?: "Traffic unavailable"
+            val cx = w / 2f
+            val half = etaSmallPaint.measureText(label) / 2f + 8f
+            pillRect.set(cx - half, h - 23f, cx + half, h - 3f)
+            canvas.drawRoundRect(pillRect, 8f, 8f, etaBgPaint)
+            canvas.drawText(label, cx, h - 9f, etaSmallPaint)
+        }
+        if (labelFree) canvas.drawText("© OpenStreetMap contributors · OpenFreeMap", w / 2f, h - 7f, etaSmallPaint)
 
         // ── ETA pill (screen-space so it stays upright; bottom-centre safe zone) ──
         // The dash is round, so it's kept narrow and centred. Shows ETA only (time +
@@ -264,6 +365,16 @@ class MapRenderer(private val tiles: TileProvider) {
             canvas.drawText(label, cxp, top + padV - fm.ascent, gpsPillText)
         }
 
+        if (congestionNearRider) {
+            val message = "Please be patient, and ensure safety!"
+            val cx = w / 2f
+            val half = trafficMessagePaint.measureText(message) / 2f + 14f
+            pillRect.set(cx - half, 82f, cx + half, 126f)
+            canvas.drawRoundRect(pillRect, 11f, 11f, etaBgPaint)
+            canvas.drawText("One step at a time 🌤️", cx, 99f, etaSmallPaint)
+            canvas.drawText(message, cx, 118f, trafficMessagePaint)
+        }
+
         f.maneuverText?.let { cue ->
             val center = w / 2f
             val halfWidth = etaSmallPaint.measureText(cue) / 2f + 13f
@@ -273,16 +384,11 @@ class MapRenderer(private val tiles: TileProvider) {
         }
 
         if (f.arrived) {
-            val cx = w / 2f
-            dotPaint.color = Color.WHITE
-            canvas.drawCircle(cx, h * .49f, 28f, dotPaint)
-            dotPaint.color = googleRed
-            canvas.drawCircle(cx, h * .49f, 11f, dotPaint)
-            val message = "You have reached your location!!"
-            val half = etaSmallPaint.measureText(message) / 2f + 14f
-            pillRect.set(cx - half, h * .63f, cx + half, h * .63f + 30f)
-            canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
-            canvas.drawText(message, cx, pillRect.top + 20f, etaSmallPaint)
+            arrivalMessagePaint.color = accent
+            canvas.drawText("You have", w / 2f, h * .22f, arrivalMessagePaint)
+            canvas.drawText("Reached Your Destination ❤️", w / 2f, h * .32f, arrivalMessagePaint)
+            f.arrivalDuration?.let { canvas.drawText(it, w / 2f, h * .90f, etaBigPaint) }
+            return
         }
 
         pillRect.set(w * .70f, h - 29f, w * .90f, h - 7f)
@@ -305,12 +411,12 @@ class MapRenderer(private val tiles: TileProvider) {
      *    once the real tile arrives (no blank flash, which is what made zoom feel slow);
      * 3. else scale DOWN the four cached higher-zoom children into quadrants (zoom-OUT case).
      */
-    private fun drawTileBestEffort(canvas: Canvas, z: Int, tx: Int, ty: Int, dst: RectF) {
-        tiles.get(z, tx, ty)?.let { canvas.drawBitmap(it, null, dst, tilePaint); return }
+    private fun drawTileBestEffort(canvas: Canvas, z: Int, tx: Int, ty: Int, dst: RectF, labelFree: Boolean) {
+        tiles.get(z, tx, ty, labelFree)?.let { canvas.drawBitmap(it, null, dst, tilePaint); return }
 
         var up = 1
         while (up <= 4 && z - up >= 0) {
-            val anc = tiles.getCached(z - up, tx shr up, ty shr up)
+            val anc = tiles.getCached(z - up, tx shr up, ty shr up, labelFree)
             if (anc != null) {
                 val cells = 1 shl up
                 // Sub-region in the bitmap's OWN pixel space (512 px for hi-DPI tiles, 256 for any
@@ -328,7 +434,7 @@ class MapRenderer(private val tiles: TileProvider) {
         val halfW = (dst.right - dst.left) / 2f
         val halfH = (dst.bottom - dst.top) / 2f
         for (qx in 0..1) for (qy in 0..1) {
-            val child = tiles.getCached(z + 1, tx * 2 + qx, ty * 2 + qy) ?: continue
+            val child = tiles.getCached(z + 1, tx * 2 + qx, ty * 2 + qy, labelFree) ?: continue
             childDst.set(
                 dst.left + qx * halfW, dst.top + qy * halfH,
                 dst.left + qx * halfW + halfW, dst.top + qy * halfH + halfH,

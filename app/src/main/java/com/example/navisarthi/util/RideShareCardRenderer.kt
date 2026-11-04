@@ -10,7 +10,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.example.navisarthi.data.Ride
 import com.example.navisarthi.dash.nav.PolylineCodec
-import com.example.navisarthi.ui.theme.Gold
+import com.example.navisarthi.ui.theme.VehicleModel
 import com.example.navisarthi.ui.theme.MapBase
 import com.example.navisarthi.ui.theme.TextHi
 import com.example.navisarthi.ui.theme.TextLo
@@ -60,7 +60,7 @@ object RideShareCardRenderer {
                 style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
             }
             val route = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Gold.toArgb(); strokeWidth = 10f
+                color = VehicleModel.Himalayan450.accent.toArgb(); strokeWidth = 10f
                 style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
             }
             val path = Path()
@@ -73,7 +73,7 @@ object RideShareCardRenderer {
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             dotPaint.color = TextHi.toArgb()
             canvas.drawCircle(px(track.first().lng), py(track.first().lat), 14f, dotPaint)
-            dotPaint.color = Gold.toArgb()
+            dotPaint.color = VehicleModel.Himalayan450.accent.toArgb()
             canvas.drawCircle(px(track.last().lng), py(track.last().lat), 14f, dotPaint)
         } else {
             canvas.drawText("No track recorded", pad + 32f, (mapTop + mapBottom) / 2, subPaint)

@@ -29,12 +29,12 @@ val GeistMonoFamily = FontFamily(
     Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Bold),
 )
 
-val Typography = Typography(
+internal fun vehicleTypography(accent: androidx.compose.ui.graphics.Color) = Typography(
     displayLarge = TextStyle(
         fontFamily = GeistMonoFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 38.sp,
-        color = Gold,
+        color = accent,
     ),
     headlineLarge = TextStyle(
         fontFamily = GeistFamily,

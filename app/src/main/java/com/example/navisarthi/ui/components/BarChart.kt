@@ -26,6 +26,7 @@ fun NaviSarthiBarChart(
     if (data.isEmpty()) return
     val maxVal = data.maxOf { it.value } * 1.12f
 
+    val accentGradient = listOf(Gold, GoldDeep)
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Bottom,
@@ -60,7 +61,7 @@ fun NaviSarthiBarChart(
                         .drawBehind {
                             if (best) {
                                 drawRect(
-                                    brush = Brush.verticalGradient(listOf(Gold, GoldDeep)),
+                                    brush = Brush.verticalGradient(accentGradient),
                                 )
                             } else {
                                 drawRect(color = Surf3)

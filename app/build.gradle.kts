@@ -42,8 +42,8 @@ android {
         minSdk = 34
         targetSdk = 36
         // Independent NaviSarthi version sequence.
-        versionCode = 4
-        versionName = "0.2.0-dev03"
+        versionCode = 14
+        versionName = "0.3.0-dev08"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for
@@ -101,6 +101,8 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-auth:21.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

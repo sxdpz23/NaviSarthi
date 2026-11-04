@@ -94,6 +94,7 @@ fun Joystick(
             }
         }
 
+        val knobColors = listOf(GoldBright, GoldDeep)
         // Knob
         Canvas(
             Modifier
@@ -103,7 +104,7 @@ fun Joystick(
             val r = 22.dp.toPx()
             drawCircle(
                 brush = Brush.linearGradient(
-                    listOf(GoldBright, GoldDeep),
+                    knobColors,
                     start = Offset(r * 0.4f, r * 0.4f),
                     end = Offset(r * 1.6f, r * 1.6f),
                 ),

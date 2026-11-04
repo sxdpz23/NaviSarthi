@@ -240,7 +240,7 @@ private fun MaintenanceTab(
 
     // ── Free / scheduled services (manufacturer milestones) ──
     if (ui.scheduled.isNotEmpty()) {
-        Eyebrow("Service schedule", Modifier.padding(bottom = 8.dp, start = 4.dp))
+        ControlSection("Service schedule")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             ui.scheduled.forEachIndexed { i, row ->
                 if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -277,10 +277,11 @@ private fun MaintenanceTab(
         }
         Spacer(Modifier.height(8.dp))
         NaviSarthiBtn("Add scheduled service", onClick = onAddSchedule, icon = NaviSarthiIcons.Plus, variant = BtnVariant.Ghost, size = BtnSize.Sm)
+        ControlHint("Set the next service reminder by date or odometer.")
         Spacer(Modifier.height(18.dp))
     }
 
-    Eyebrow("Service intervals", Modifier.padding(bottom = 8.dp, start = 4.dp))
+    ControlSection("Service intervals")
 
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.maint.isEmpty()) {
@@ -319,7 +320,7 @@ private fun MaintenanceTab(
     // Service log — every visit, with its kind, cost and uploaded invoice.
     if (ui.services.isNotEmpty()) {
         Spacer(Modifier.height(20.dp))
-        Eyebrow("Service log", Modifier.padding(bottom = 8.dp, start = 4.dp))
+        ControlSection("Service log")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             ui.services.take(12).forEachIndexed { i, rec ->
                 if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -386,7 +387,7 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
         }
     }
 
-    Eyebrow("Fill-ups", Modifier.padding(bottom = 8.dp, start = 4.dp))
+    ControlSection("Fill-ups")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.fuel.isEmpty()) {
             Text("No fill-ups yet — add your first below.", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
@@ -413,6 +414,7 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
 
     Spacer(Modifier.height(14.dp))
     NaviSarthiBtn("Add fill-up", onClick = onAdd, icon = NaviSarthiIcons.Plus, variant = BtnVariant.Ghost, size = BtnSize.Md, modifier = Modifier.fillMaxWidth())
+    ControlHint("Record fuel and odometer readings to track mileage.")
 }
 
 // ── Dialogs ──────────────────────────────────────────────────────────────
@@ -629,7 +631,7 @@ private fun GloveboxTab(
     val ctx = LocalContext.current
     val now = System.currentTimeMillis()
 
-    Eyebrow("Documents", Modifier.padding(bottom = 8.dp, start = 4.dp))
+    ControlSection("Documents")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.documents.isEmpty()) {
             Text("No documents yet — add insurance, PUC, RC, licence…", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
@@ -670,7 +672,7 @@ private fun GloveboxTab(
     NaviSarthiBtn("Add document", onClick = onAddDoc, icon = NaviSarthiIcons.Plus, variant = BtnVariant.Ghost, size = BtnSize.Md, modifier = Modifier.fillMaxWidth())
 
     Spacer(Modifier.height(20.dp))
-    Eyebrow("Bike identity", Modifier.padding(bottom = 8.dp, start = 4.dp))
+    ControlSection("Bike identity")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth()) {
         val id = ui.identity
         IdRow("VIN / chassis", id.vin)
@@ -683,7 +685,7 @@ private fun GloveboxTab(
     }
 
     Spacer(Modifier.height(20.dp))
-    Eyebrow("Reference · Himalayan 450", Modifier.padding(bottom = 8.dp, start = 4.dp))
+    ControlSection("Reference · Himalayan 450")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth()) {
         SpecRow("Tyre pressure", "32 psi front & rear")
         SpecRow("Engine oil", "10W40 API SN / JASO MA2 · 2.1 L")

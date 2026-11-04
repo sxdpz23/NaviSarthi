@@ -58,6 +58,7 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    private val blackRoads = BlackRoadTiles()
     private val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     // Cache dir per tile source so a source switch doesn't serve stale tiles. Bumped namespace so
     // the lighter 256 px tiles don't collide with any 512 px tiles a prior build cached.
@@ -71,11 +72,11 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
     @Volatile private var lastFetchAt = 0L
 
     /** Non-blocking: returns the cached tile, else kicks off async load. */
-    fun get(z: Int, x: Int, y: Int): Bitmap? {
+    fun get(z: Int, x: Int, y: Int, labelFree: Boolean = false): Bitmap? {
         val max = 1 shl z
         if (y < 0 || y >= max) return null
         val xw = ((x % max) + max) % max
-        val key = "$z/$xw/$y"
+        val key = if (labelFree) "black-roads-v1/$z/$xw/$y" else "$z/$xw/$y"
 
         memory.get(key)?.let { return it }
 
@@ -97,11 +98,11 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
      * Memory-cache-only peek — render-thread safe and never triggers a load. Used by the
      * renderer to substitute a cached neighbouring-zoom tile while the exact one loads.
      */
-    fun getCached(z: Int, x: Int, y: Int): Bitmap? {
+    fun getCached(z: Int, x: Int, y: Int, labelFree: Boolean = false): Bitmap? {
         val max = 1 shl z
         if (y < 0 || y >= max) return null
         val xw = ((x % max) + max) % max
-        return memory.get("$z/$xw/$y")
+        return memory.get(if (labelFree) "black-roads-v1/$z/$xw/$y" else "$z/$xw/$y")
     }
 
     /** Warm a single zoom level around a point right now (e.g. right after the rider zooms). */
@@ -198,7 +199,13 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
 
         val net = internetNetwork()
         return try {
-            val url = URL(URL_TEMPLATE.format(z, x, ((y % max) + max) % max))
+            val wrappedY = ((y % max) + max) % max
+            if (key.startsWith("black-roads-v1/")) {
+                val roads = blackRoads.fetch(z, x, wrappedY, net)
+                diskFile(key).outputStream().use { roads.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                return roads
+            }
+            val url = URL(URL_TEMPLATE.format(z, x, wrappedY))
             val conn = (net?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
             conn.setRequestProperty("User-Agent", USER_AGENT)
             conn.connectTimeout = 8_000

@@ -9,29 +9,30 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.*
+import com.example.navisarthi.ui.components.VehiclePicker
+import com.example.navisarthi.ui.theme.VehicleModel
 import com.example.navisarthi.data.SyncRepository
 import com.example.navisarthi.ui.navigation.AppNavigation
 import com.example.navisarthi.ui.theme.Bg1
 import com.example.navisarthi.ui.theme.NaviSarthiTheme
 import com.example.navisarthi.viewmodel.RouteViewModel
+import com.example.navisarthi.viewmodel.DashViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
+    private val dashViewModel: DashViewModel by viewModels()
     private val routeViewModel: RouteViewModel by viewModels()
-    private var authListener: FirebaseAuth.AuthStateListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Firestore sync follows sign-in: start mirroring/listening when signed in,
-        // stop on sign-out. Only wired when Firebase is configured (bring-your-own-project);
-        // otherwise the app runs fully local with no sync.
         val sync = SyncRepository.get(applicationContext)
+        // Drop any legacy account session while retaining the local database.
         if (com.example.navisarthi.data.FirebaseGate.isConfigured(applicationContext)) {
-            authListener = FirebaseAuth.AuthStateListener { fa ->
-                if (fa.currentUser != null) sync.startSync() else sync.stopSync()
-            }.also { FirebaseAuth.getInstance().addAuthStateListener(it) }
+            sync.stopSync()
+            FirebaseAuth.getInstance().signOut()
         }
 
         // Maintenance + document-expiry reminders on app open (fire even if Garage is never
@@ -47,10 +48,22 @@ class MainActivity : ComponentActivity() {
         }
 
         handleIntent(intent)
+        val vehiclePrefs = getSharedPreferences("vehicle", MODE_PRIVATE)
+        val savedVehicle = VehicleModel.entries.firstOrNull { it.name == vehiclePrefs.getString("model", null) }
         setContent {
-            NaviSarthiTheme {
+            var vehicle by remember { mutableStateOf(savedVehicle) }
+            fun chooseVehicle(model: VehicleModel) {
+                vehiclePrefs.edit().putString("model", model.name).apply()
+                vehicle = model
+            }
+            NaviSarthiTheme(vehicle = vehicle ?: VehicleModel.Himalayan450) {
                 Surface(modifier = Modifier.fillMaxSize(), color = Bg1) {
-                    AppNavigation(routeViewModel = routeViewModel)
+                    if (vehicle == null) {
+                        VehiclePicker(current = null, onSelect = ::chooseVehicle)
+                    } else {
+                        AppNavigation(routeViewModel = routeViewModel, dashViewModel = dashViewModel,
+                            onVehicleSelected = ::chooseVehicle)
+                    }
                 }
             }
         }
@@ -61,24 +74,17 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Don't leak / accumulate the auth listener across Activity recreations.
-        authListener?.let { FirebaseAuth.getInstance().removeAuthStateListener(it) }
-        authListener = null
-    }
-
     private fun handleIntent(intent: Intent?) {
         when (intent?.action) {
             Intent.ACTION_SEND -> {
                 if (intent.type == "text/plain") {
                     val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-                    routeViewModel.handleSharedText(text)
+                    routeViewModel.handleSharedText(text, dashViewModel.remainingJourney())
                 }
             }
             Intent.ACTION_VIEW -> {
                 val uri = intent.data?.toString() ?: return
-                routeViewModel.handleSharedText(uri)
+                routeViewModel.handleSharedText(uri, dashViewModel.remainingJourney())
             }
         }
     }

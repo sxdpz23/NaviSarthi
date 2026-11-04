@@ -470,22 +470,117 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             }
             NaviSarthiToggle(on = ui.headingUp, onChange = { vm.toggleHeadingUp() })
         }
-        Eyebrow("Map angle", Modifier.padding(top = 10.dp, bottom = 6.dp))
+        ControlHint("Heading-up follows your direction of travel. Switch it off for north-up in TDV.")
+        if (ui.stopCount > 1) {
+            Text("Stop ${ui.stopNumber} of ${ui.stopCount}: ${ui.destinationName.orEmpty()}",
+                color = TextHi, modifier = Modifier.padding(top = 10.dp))
+            if (ui.stopNumber < ui.stopCount) {
+                NaviSarthiBtn("Skip this stop", onClick = vm::skipStop,
+                    variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+                ControlHint("Continue to the next stop in your itinerary.")
+            }
+        }
+        ControlSection("Map angle")
         NaviSarthiSegmented(
             options = listOf("TDV", "POV"),
             selected = if (ui.perspective) "POV" else "TDV",
             onSelect = { vm.setPerspective(it == "POV") },
             modifier = Modifier.fillMaxWidth(),
         )
-        Eyebrow("Map colour theme", Modifier.padding(top = 10.dp, bottom = 6.dp))
+        ControlHint("TDV shows the map from above. POV tilts it to show more of the road ahead.")
+        var showTrafficSetup by remember { mutableStateOf(false) }
+        var trafficKey by remember { mutableStateOf("") }
+        ControlSection("Live traffic")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Show traffic along the active route", Modifier.weight(1f), color = TextMid)
+            NaviSarthiToggle(on = ui.trafficEnabled && ui.trafficAvailable, enabled = ui.trafficAvailable, onChange = { enabled ->
+                if (enabled && !ui.trafficConfigured) showTrafficSetup = true
+                else vm.setTrafficEnabled(enabled)
+            })
+        }
+        Text(
+            if (ui.trafficAvailable) "Refreshes every 3 minutes while online."
+            else "Live traffic is unavailable in Black with Golden Line.",
+            color = TextLo, fontSize = 12.sp,
+        )
+        Text("Green: near free flow · Yellow: slower · Orange: heavy · Red: severe",
+            color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        Text("Red and light grey: road closed.", color = TextLo, fontSize = 12.sp)
+        Text("Create a TomTom account, copy a key with Traffic API access, then paste it here and tap Enable.",
+            color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+        androidx.compose.material3.TextButton(onClick = {
+            val guide = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse("https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key"))
+            try {
+                context.startActivity(guide)
+            } catch (_: android.content.ActivityNotFoundException) {
+                android.widget.Toast.makeText(context, "No browser available", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }) { Text("Get a TomTom Traffic API key") }
+        if (ui.trafficConfigured && ui.trafficAvailable) {
+            androidx.compose.material3.TextButton(onClick = { showTrafficSetup = true }) {
+                Text("Traffic provider settings")
+            }
+        }
+        if (showTrafficSetup && ui.trafficAvailable) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showTrafficSetup = false; trafficKey = "" },
+                title = { Text("Connect TomTom traffic") },
+                text = {
+                    Column {
+                        Text("Enter a TomTom API key with Traffic API access. Live traffic needs internet.")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = trafficKey,
+                            onValueChange = { trafficKey = it.take(200) },
+                            label = { Text("TomTom API key") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        )
+                        if (ui.trafficConfigured) {
+                            androidx.compose.material3.TextButton(onClick = {
+                                vm.configureTraffic("")
+                                trafficKey = ""
+                                showTrafficSetup = false
+                            }) { Text("Remove key") }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(enabled = trafficKey.isNotBlank(), onClick = {
+                        vm.configureTraffic(trafficKey)
+                        vm.setTrafficEnabled(true)
+                        trafficKey = ""
+                        showTrafficSetup = false
+                    }) { Text("Enable") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        trafficKey = ""
+                        showTrafficSetup = false
+                    }) { Text("Cancel") }
+                },
+            )
+        }
+        ControlSection("Map colour theme")
         NaviSarthiSegmented(
             options = listOf("Light", "Dark", "Black"),
             selected = ui.mapStyle.name,
             onSelect = { vm.setMapStyle(com.example.navisarthi.dash.map.MapRenderer.Style.valueOf(it)) },
             modifier = Modifier.fillMaxWidth(),
         )
+        ControlHint("Light is for daylight, Dark reduces glare, and Black shows a label-free road map.")
+        if (ui.mapStyle == com.example.navisarthi.dash.map.MapRenderer.Style.Black) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Adapt to Dash Golden Line colour", Modifier.weight(1f), color = TextMid)
+                NaviSarthiToggle(on = ui.goldenRoute, onChange = vm::setGoldenRoute)
+            }
+            ControlHint("Use gold for the route, rider marker, and arrival message. Live traffic is paused while gold is on.")
+        }
 
         Spacer(Modifier.height(16.dp))
+
+        ControlSection("Map controls")
+        ControlHint("Pan with the on-screen joystick. Use − or + to change the dash zoom.", Modifier.padding(bottom = 8.dp))
 
         // Controls: joystick + zoom (drive the actual dash map)
         Row(

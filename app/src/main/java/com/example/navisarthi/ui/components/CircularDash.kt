@@ -57,6 +57,7 @@ fun CircularDash(
         label = "ring-alpha",
     )
 
+    val accent = Gold
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -89,12 +90,12 @@ fun CircularDash(
                     transformOrigin = TransformOrigin(0.5f, 0.5f)
                 }
         ) {
-            drawMapContents()
+            drawMapContents(accent)
         }
 
         // Tick ring overlay
         Canvas(Modifier.fillMaxSize()) {
-            drawTickRing()
+            drawTickRing(accent)
         }
 
         // Live ring pulse (behind the rider marker)
@@ -102,7 +103,7 @@ fun CircularDash(
             Canvas(Modifier.fillMaxSize()) {
                 // this.size is DrawScope.size (px)
                 drawCircle(
-                    color = Gold.copy(alpha = ringAlpha * 0.5f),
+                    color = accent.copy(alpha = ringAlpha * 0.5f),
                     radius = this.size.minDimension * 0.12f * ringScale,
                     center = center,
                     style = Stroke(width = 2.dp.toPx()),
@@ -116,7 +117,7 @@ fun CircularDash(
             val cy = this.size.height / 2f
             val r9 = 9.dp.toPx()
             drawCircle(color = Color(0xFF0C1413), radius = r9, center = Offset(cx, cy))
-            drawCircle(color = Gold, radius = r9, center = Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
+            drawCircle(color = accent, radius = r9, center = Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
             val path = Path().apply {
                 moveTo(cx, 2.dp.toPx())
                 lineTo(this@Canvas.size.width - 2.dp.toPx(), this@Canvas.size.height - 2.dp.toPx())
@@ -124,13 +125,13 @@ fun CircularDash(
                 lineTo(2.dp.toPx(), this@Canvas.size.height - 2.dp.toPx())
                 close()
             }
-            drawPath(path, Gold)
+            drawPath(path, accent)
         }
 
         // N compass
         Text(
             "N",
-            color = Gold,
+            color = accent,
             fontFamily = GeistMonoFamily,
             fontWeight = FontWeight.Bold,
             fontSize = (size.value * 0.05f).sp,
@@ -193,7 +194,7 @@ fun CircularDash(
     }
 }
 
-private fun DrawScope.drawMapContents() {
+private fun DrawScope.drawMapContents(accent: Color) {
     val w = size.width
     val h = size.height
 
@@ -230,7 +231,7 @@ private fun DrawScope.drawMapContents() {
 
     // Active route (gold)
     val routePaint = Paint().apply {
-        color = Gold
+        color = accent
         strokeWidth = 7f
         strokeCap = StrokeCap.Round
         strokeJoin = StrokeJoin.Round
@@ -254,7 +255,7 @@ private fun DrawScope.drawMapContents() {
     })
 }
 
-private fun DrawScope.drawTickRing() {
+private fun DrawScope.drawTickRing(accent: Color) {
     val cx = size.width / 2f
     val cy = size.height / 2f
     for (i in 0 until 60) {
@@ -263,7 +264,7 @@ private fun DrawScope.drawTickRing() {
         val r1 = (if (major) 0.9f else 0.93f) * (size.width / 2f)
         val r2 = 0.96f * (size.width / 2f)
         drawLine(
-            color = if (major) Gold.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.13f),
+            color = if (major) accent.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.13f),
             start = Offset(cx + cos(angle) * r1, cy + sin(angle) * r1),
             end   = Offset(cx + cos(angle) * r2, cy + sin(angle) * r2),
             strokeWidth = if (major) 1.4f else 0.8f,

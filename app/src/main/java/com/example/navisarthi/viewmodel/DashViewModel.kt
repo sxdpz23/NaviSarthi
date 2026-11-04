@@ -47,6 +47,8 @@ data class DashUiState(
     val ssid: String = "",            // empty until a dash is discovered/paired (see DashConfig)
     val wifiPassword: String = "12345678",  // RE Tripper factory passphrase; rider-overridable
     val destinationName: String? = null,
+    val stopNumber: Int = 0,
+    val stopCount: Int = 0,
     val errorMessage: String? = null,
     val retryAttempt: Int = 0,        // >0 while auto-retrying the flaky auth handshake
     val mapZoom: Int = 19,
@@ -60,6 +62,9 @@ data class DashUiState(
     val recalculating: Boolean = false, // off-route long enough / actively rerouting → ETA frozen, pill shows "Recalculating"
     val headingUp: Boolean = true,
     val perspective: Boolean = false,
+    val goldenRoute: Boolean = false,
+    val trafficEnabled: Boolean = false,
+    val trafficConfigured: Boolean = false,
     val mapStyle: MapRenderer.Style = MapRenderer.Style.Light,
     val followMode: Boolean = true,
     val thermal: String = "OK",
@@ -71,7 +76,9 @@ data class DashUiState(
     val riderBearing: Float = 0f,
     val destLatLng: Pair<Double, Double>? = null,
     val routePoints: List<GeoPoint> = emptyList(),
-)
+) {
+    val trafficAvailable: Boolean get() = mapStyle != MapRenderer.Style.Black || !goldenRoute
+}
 
 class DashViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(DashUiState())
@@ -93,7 +100,25 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     private var recordJob: Job? = null
     private val tiles       = TileProvider(app, viewModelScope)
     private val location    = LocationTracker(app)
-    private val mapRenderer = MapRenderer(tiles)
+    private val trafficTiles = com.example.navisarthi.dash.map.TrafficTiles(app, viewModelScope)
+    private val mapRenderer = MapRenderer(tiles, trafficTiles)
+
+    init {
+        _ui.update { it.copy(trafficConfigured = trafficTiles.configured, trafficEnabled = trafficTiles.enabled) }
+    }
+
+    fun configureTraffic(key: String) {
+        trafficTiles.configure(key)
+        if (!trafficTiles.configured) trafficTiles.setEnabled(false)
+        _ui.update { it.copy(trafficConfigured = trafficTiles.configured, trafficEnabled = trafficTiles.enabled) }
+        lastSignature = ""
+    }
+
+    fun setTrafficEnabled(enabled: Boolean) {
+        trafficTiles.setEnabled(enabled && trafficTiles.configured && _ui.value.trafficAvailable)
+        _ui.update { it.copy(trafficEnabled = trafficTiles.enabled) }
+        lastSignature = ""
+    }
     private val mediaInfo   = com.example.navisarthi.media.MediaInfoProvider(app)
     private val callController = com.example.navisarthi.media.CallController(app)
     private var mediaObserveJob: Job? = null
@@ -127,6 +152,14 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile private var headingUp = true
     @Volatile private var displayRoute: List<GeoPoint> = emptyList()
     @Volatile private var arrived = false
+    private var arrivalMini = false
+    private var navigationStartedMs = 0L
+    private var arrivalDuration: String? = null
+
+    fun setGoldenRoute(enabled: Boolean) {
+        _ui.update { it.copy(goldenRoute = enabled) }
+        lastSignature = ""
+    }
 
     fun setPerspective(enabled: Boolean) {
         _ui.update { it.copy(perspective = enabled) }
@@ -631,42 +664,90 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
 
     @Volatile private var routeMode = RouteMode.Car
 
-    fun setDestination(name: String, lat: Double?, lng: Double?, mode: RouteMode = RouteMode.Car, previewRoute: Route? = null) {
+    private data class JourneyStop(val place: com.example.navisarthi.data.SharedLocation, val preview: Route?)
+    @Volatile private var journey = emptyList<JourneyStop>()
+    @Volatile private var journeyIndex = 0
+    @Volatile private var offlineJourney = false
+
+    @Synchronized
+    fun startJourney(stops: List<com.example.navisarthi.data.SharedLocation>, mode: RouteMode, previews: List<Route>, offline: Boolean = false) {
+        require(stops.isNotEmpty() && stops.all { it.lat != null && it.lng != null })
+        offlineJourney = offline
+        journey = stops.mapIndexed { index, place -> JourneyStop(place, previews.getOrNull(index)) }
+        journeyIndex = 0
+        navigationStartedMs = SystemClock.elapsedRealtime()
+        activateStop(journey.first(), mode)
+    }
+
+    @Synchronized
+    fun remainingJourney(): List<com.example.navisarthi.data.SharedLocation>? =
+        if (journey.isEmpty() || arrived) null else journey.drop(journeyIndex).map { it.place }
+
+    @Synchronized
+    fun skipStop() {
+        advanceStop(journey, journeyIndex, usePreview = false)
+    }
+
+    @Synchronized
+    private fun advanceStop(expected: List<JourneyStop>, index: Int, usePreview: Boolean): Boolean {
+        if (journey !== expected || index != journeyIndex || index + 1 !in expected.indices) return false
+        journeyIndex++
+        val next = expected[journeyIndex]
+        activateStop(if (usePreview || offlineJourney) next else next.copy(preview = null), routeMode)
+        return true
+    }
+
+    private fun activateStop(stop: JourneyStop, mode: RouteMode) {
+        val name = stop.place.name.ifBlank { "Dropped pin" }
+        val lat = requireNotNull(stop.place.lat)
+        val lng = requireNotNull(stop.place.lng)
+        val previewRoute = stop.preview
         routeMode = mode
         routeFetchJob?.cancel()
         lastRouteAttemptMs = 0L
         _ui.update { it.copy(
             destinationName = name, hasRoute = false,
-            destLatLng = if (lat != null && lng != null) lat to lng else null,
+            stopNumber = journeyIndex + 1, stopCount = journey.size,
+            destLatLng = lat to lng,
             routePoints = emptyList(),
         ) }
         destLat = lat
         destLng = lng
         route = previewRoute
         arrived = false
+        arrivalMini = false
+        arrivalDuration = null
         displayRoute = emptyList()
         progressM = 0.0
+        offRouteSince = 0L
+        offRouteStreakStart = 0L
+        recalcHoldUntil = 0L
         smoothEtaSec = 0.0; etaArrivalMs = 0L; displayedEtaMin = null   // fresh ETA for the new route
         voice.resetTrip()   // fresh announcements for the new route
         session.updateRouteCard(name)
-        if (lat != null && lng != null) {
-            val loc = location.lastKnown()
-            tiles.prefetch(lat, lng, loc?.latitude, loc?.longitude)
-            if (previewRoute == null) fetchRoute(lat, lng)
-            else {
-                tiles.prefetchRoute(previewRoute.geometry)
-                _ui.update { it.copy(hasRoute = true, routePoints = previewRoute.geometry) }
-            }
+        lastSignature = ""
+        val loc = location.lastKnown()
+        tiles.prefetch(lat, lng, loc?.latitude, loc?.longitude)
+        if (previewRoute == null) {
+            if (!offlineJourney) fetchRoute(lat, lng)
+        } else {
+            if (!offlineJourney) tiles.prefetchRoute(previewRoute.geometry)
+            _ui.update { it.copy(hasRoute = true, routePoints = previewRoute.geometry) }
         }
     }
 
     /** Drop the destination/route → free roam. The map keeps streaming and follows the rider. */
+    @Synchronized
     fun exitNavigation() {
+        journey = emptyList()
+        journeyIndex = 0
         routeFetchJob?.cancel()
         destLat = null
         destLng = null
         route = null
         arrived = false
+        arrivalMini = false
+        arrivalDuration = null
         displayRoute = emptyList()
         progressM = 0.0
         offRouteSince = 0L
@@ -676,6 +757,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         lastSignature = ""   // force a redraw with no route line
         _ui.update { it.copy(
             destinationName = null,
+            stopNumber = 0, stopCount = 0,
             hasRoute = false,
             destLatLng = null,
             routePoints = emptyList(),
@@ -700,7 +782,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         routeFetchJob = viewModelScope.launch {
             val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(destLatV, destLngV), routeMode)
             ensureActive()
-            if (r != null && destLat == destLatV && destLng == destLngV) {
+            if (r != null && !arrived && destLat == destLatV && destLng == destLngV) {
                 route = r
                 tiles.prefetchRoute(r.geometry)
                 _ui.update { it.copy(hasRoute = true, routePoints = r.geometry) }
@@ -885,11 +967,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         val fixAgeMs = loc?.let { FixFreshness.ageMs(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) } ?: Long.MAX_VALUE
         val navigationFixValid = loc != null && loc.hasAccuracy() &&
             FixFreshness.usable(loc.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos(), loc.accuracy)
+        val activeJourney = journey
+        val activeIndex = journeyIndex
         val r = route
         val dLat = destLat; val dLng = destLng
         // A cached origin may correctly have been rejected while GPS warmed up.
         // Retry from a fresh fix rather than leaving the destination permanently unrouted.
-        if (!arrived && r == null && navigationFixValid && dLat != null && dLng != null &&
+        if (!offlineJourney && !arrived && r == null && navigationFixValid && dLat != null && dLng != null &&
             routeFetchJob?.isActive != true && SystemClock.elapsedRealtime() - lastRouteAttemptMs >= 6_000L) {
             fetchRoute(dLat, dLng)
         }
@@ -900,11 +984,21 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
 
         displayRoute = if (arrived) emptyList() else r?.geometry.orEmpty()
         var routeMatch: GeoPoint? = null
-        if (!arrived && navigationFixValid && loc != null && dLat != null && dLng != null &&
-            GeoPoint.distMeters(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)) <= 5.0) {
-            arrived = true
-            displayRoute = emptyList()
-            session.updateNavInfo(0x3C, 0, DashCommands.NAV_UNIT_METERS, 0, DashCommands.NAV_UNIT_METERS)
+        if (navigationFixValid && loc != null && dLat != null && dLng != null) {
+            val nearby = GeoPoint.distMeters(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)) <= 15.0
+            if (!arrived && nearby) {
+                if (advanceStop(activeJourney, activeIndex, usePreview = true)) return true
+                if (journey !== activeJourney || journeyIndex != activeIndex) return false
+                arrived = true
+                arrivalMini = true
+                val seconds = (SystemClock.elapsedRealtime() - navigationStartedMs) / 1000
+                arrivalDuration = if (seconds >= 3600) "%dh %02dm".format(seconds / 3600, seconds / 60 % 60)
+                    else "%dm %02ds".format(seconds / 60, seconds % 60)
+                displayRoute = emptyList()
+                routeFetchJob?.cancel()
+                session.updateNavInfo(0xFF, 0, DashCommands.NAV_UNIT_METERS, 0, DashCommands.NAV_UNIT_METERS)
+            }
+            if (!nearby) arrivalMini = false
         }
         var maneuverCue: String? = null
         var remainingM: Double? = null
@@ -1008,7 +1102,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         // Recompute the route if the rider has clearly left it for a few seconds.
-        maybeReroute(offRoute, if (navigationFixValid) loc else null)
+        if (offlineJourney && offRoute) maneuverCue = "Return to downloaded route"
+        else if (!offlineJourney) maybeReroute(offRoute, if (navigationFixValid) loc else null)
 
         // GPS health: LOST if no fresh fix for a few seconds (or none at all), WEAK if the fix is
         // imprecise or coming in slowly, else GOOD. Drives the on-dash indicator and marker colour.
@@ -1022,6 +1117,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(
             hasGps = navigationFixValid,
             gpsStatus = gpsStatus,
+            routePoints = if (arrived) emptyList() else it.routePoints,
             riderLat = matchedLat,
             riderLng = matchedLng,
             riderBearing = heading,
@@ -1156,7 +1252,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             // for buttery motion. Safe from standstill jitter because the camera is fed the
             // SMOOTHED position (which settles and stops), not raw GPS.
             append("%.6f".format(centerLat)); append("%.6f".format(centerLng))
-            append(maneuverCue); append(arrived); append(routeMatch); append(displayRoute.size)
+            append(maneuverCue); append(arrived); append(arrivalMini); append(_ui.value.goldenRoute); append(routeMatch); append(displayRoute.size)
             append(_ui.value.mapStyle); append(_ui.value.perspective)
             append(zoom); append(panX.toInt()); append(panY.toInt())
             append(if (headingUp) (camHeading * 10).toInt() else 0)
@@ -1198,9 +1294,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         com.example.navisarthi.data.RideDiagnostics.log("reroute", "off-route ${offSec}s → requesting new route")
         val startMs = System.currentTimeMillis()
         viewModelScope.launch {
-            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng), routeMode)
+            val requestedMode = routeMode
+            val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng), requestedMode)
             val took = System.currentTimeMillis() - startMs
-            if (r != null) {
+            if (r != null && !arrived && destLat == dLat && destLng == dLng && routeMode == requestedMode) {
                 route = r
                 progressM = 0.0
                 offRouteSince = 0L
@@ -1231,7 +1328,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         val etaPrimary = when {
             recalculating && route != null -> "Recalculating"
             mins != null && etaArrivalMs > 0L -> when {
-                arriving   -> "Arriving"
+                arriving   -> "< 1 min"
                 mins >= 60 -> "${mins / 60}h ${mins % 60}m"
                 else       -> "$mins min"
             }
@@ -1254,12 +1351,15 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             destLat = destLat,
             destLng = destLng,
             destName = _ui.value.destinationName,
-            route = displayRoute,
+            route = if (arrived) emptyList() else displayRoute,
             maneuverText = _ui.value.maneuver,
             remainingText = remainingM?.let { fmtDist(it) },
             tilt3d = _ui.value.perspective && destLat != null && !arrived,
             style = _ui.value.mapStyle,
-            arrived = arrived,
+            arrived = arrivalMini,
+            arrivalDuration = arrivalDuration,
+            goldenRoute = _ui.value.goldenRoute,
+            traffic = trafficTiles.enabled && _ui.value.trafficAvailable && !offlineJourney && !arrived && displayRoute.size >= 2,
             etaPrimary = etaPrimary,
             etaSecondary = etaSecondary,
             gpsWeak = gpsStatus == GpsStatus.WEAK,

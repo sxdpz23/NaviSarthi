@@ -47,6 +47,7 @@ class SyncRepository private constructor(context: Context) {
     /** Bumped on every local OR remote data change so ViewModels reload. */
     private val _revision = MutableStateFlow(0L)
     val revision = _revision.asStateFlow()
+    internal fun notifyLocalRestore() = bump()
     private fun bump() { _revision.value++ }
 
     private val regs = mutableListOf<ListenerRegistration>()

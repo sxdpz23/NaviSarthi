@@ -53,8 +53,10 @@ fun RidesScreen(ridesViewModel: RidesViewModel = viewModel()) {
         if (rides.isEmpty()) {
             EmptyRides()
         } else {
+            ControlSection("Ride summary")
             RideTotals(rides)
-            Spacer(Modifier.height(14.dp))
+            ControlSection("Recorded rides")
+            ControlHint("Each ride shows its distance, duration, and recorded route when available.", Modifier.padding(bottom = 8.dp))
             rides.forEach { ride ->
                 RideCard(ride, onDelete = { ridesViewModel.deleteRide(ride) })
                 Spacer(Modifier.height(12.dp))
@@ -138,6 +140,7 @@ private fun MiniStat(value: String, label: String) {
 
 @Composable
 private fun TrackSketch(points: List<com.example.navisarthi.dash.nav.GeoPoint>, modifier: Modifier) {
+    val accent = Gold
     Canvas(modifier) {
         val minLat = points.minOf { it.lat }; val maxLat = points.maxOf { it.lat }
         val minLng = points.minOf { it.lng }; val maxLng = points.maxOf { it.lng }
@@ -150,12 +153,12 @@ private fun TrackSketch(points: List<com.example.navisarthi.dash.nav.GeoPoint>, 
             val y = (size.height - (p.lat - minLat) / span * size.height).toFloat()
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(path, Gold, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(path, accent, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         // start (green-ish) + end (gold) dots
         val first = points.first(); val last = points.last()
         drawCircle(TextHi, 2.5f, Offset(((first.lng - minLng) / span * size.width).toFloat(),
             (size.height - (first.lat - minLat) / span * size.height).toFloat()))
-        drawCircle(Gold, 2.5f, Offset(((last.lng - minLng) / span * size.width).toFloat(),
+        drawCircle(accent, 2.5f, Offset(((last.lng - minLng) / span * size.width).toFloat(),
             (size.height - (last.lat - minLat) / span * size.height).toFloat()))
     }
 }

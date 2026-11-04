@@ -131,7 +131,7 @@ object DashCommands {
     // projection flag (0x55 on / 0xAA off).
     private val NAV_TEMPLATE =
         ("007e001100000000020100054b31472025050100145461696c6c65206465204d617320647520477200" +
-         "050200013c050300013405050002000a05060001300507000130050800043033303305540001300509" +
+         "050200013c05030001ff05050002000a05060001300507000130050800043033303305540001300509" +
          "0002004f0546000110050a000155050c000104050b0006303031303030055500012006050001aa060d0001aa")
             .hexToBytes()
 
@@ -197,7 +197,7 @@ object DashCommands {
             }
         }
         patch1(0x06, 0x05, if (projectionOn) 0x55 else 0xAA)
-        maneuver?.let { patch1(0x05, 0x02, it) }
+        patch1(0x05, 0x02, maneuver ?: 0xFF)
         primaryUnit?.let { patch1(0x05, 0x06, it) }
         // The template carries the captured French ride's figures (total 0x004F =
         // "7.9 km", secondary 0x000A). Zero them by DEFAULT so a card sent with no live
@@ -242,6 +242,7 @@ object DashCommands {
         fun u8(v: Int) = "%02X".format(v and 0xFF)
         val tlvs = StringBuilder()
         tlvs.append("05020001").append(u8(maneuver))      // primary maneuver
+        tlvs.append("05030001FF")                       // hide secondary glyph
         tlvs.append("05040002").append(u16(primaryDist))  // primary distance
         tlvs.append("05060001").append(u8(primaryUnit))   // primary unit
         tlvs.append("05090002").append(u16(totalDist))    // total distance
@@ -250,7 +251,7 @@ object DashCommands {
         tlvs.append("06050001").append(if (projectionOn) "55" else "AA") // projection flag
         tlvs.append("060D0001AA")                          // decimal format off
 
-        val segCount = 8 + 1
+        val segCount = 9 + 1
         val innerHex = "%04X".format(segCount) + NAV_HDR + tlvs.toString()
         val innerBytes = innerHex.length / 2
         val outerLen = innerBytes + 2

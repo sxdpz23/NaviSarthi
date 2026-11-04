@@ -28,14 +28,12 @@ import com.example.navisarthi.ui.NaviSarthiIcons
 import com.example.navisarthi.ui.screens.*
 import com.example.navisarthi.ui.theme.*
 import com.example.navisarthi.viewmodel.AppViewModel
-import com.example.navisarthi.viewmodel.AuthViewModel
 import com.example.navisarthi.viewmodel.ConnStage
 import com.example.navisarthi.viewmodel.ConnectionState
 import com.example.navisarthi.viewmodel.DashViewModel
 import com.example.navisarthi.viewmodel.RouteViewModel
 
 sealed class Screen(val route: String) {
-    object Login    : Screen("login")
     object Home     : Screen("home")
     object Route    : Screen("route")
     object Dash     : Screen("dash")
@@ -56,15 +54,14 @@ private val bottomTabs = listOf(
 
 @Composable
 fun AppNavigation(
-    authViewModel: AuthViewModel = viewModel(),
     appViewModel: AppViewModel = viewModel(),
     dashViewModel: DashViewModel = viewModel(),
     routeViewModel: RouteViewModel = viewModel(),
+    onVehicleSelected: (VehicleModel) -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val ctx = androidx.compose.ui.platform.LocalContext.current
 
     // Analytics screen_view per destination. A single-Activity Compose app doesn't auto-log these,
     // so feed each nav route to Analytics — that's what makes per-feature usage (and time spent on
@@ -79,17 +76,11 @@ fun AppNavigation(
     // after opening Dash from the Home button, tapping Home did nothing (target == start
     // destination + a restoreState mismatch). Routing both through this fixes it.
     fun navigateTab(route: String) {
+        if (route == Screen.Home.route && navController.popBackStack(route, inclusive = false)) return
         navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            popUpTo(Screen.Home.route)
             launchSingleTop = true
-            restoreState = true
         }
-    }
-
-    // Skip the login screen on every cold start once the rider has passed it (signed in OR chose
-    // "continue locally"); cleared on sign-out so it returns. Remembered once, read here.
-    val startDest = remember {
-        if (com.example.navisarthi.data.AuthPrefs.isOnboarded(ctx)) Screen.Home.route else Screen.Login.route
     }
 
     val showBottomNav = currentRoute in listOf(
@@ -127,7 +118,7 @@ fun AppNavigation(
 
     // Auto-navigate to Route when a Maps share arrives
     LaunchedEffect(routeState.pendingNavigate, currentRoute) {
-        if (routeState.pendingNavigate && currentRoute != null && currentRoute != Screen.Login.route) {
+        if (routeState.pendingNavigate && currentRoute != null) {
             if (currentRoute != Screen.Route.route) {
                 navController.navigate(Screen.Route.route) { launchSingleTop = true }
             }
@@ -139,26 +130,8 @@ fun AppNavigation(
         Box(Modifier.weight(1f)) {
             NavHost(
                 navController = navController,
-                startDestination = startDest,
+                startDestination = Screen.Home.route,
             ) {
-                composable(Screen.Login.route) {
-                    LoginScreen(
-                        authViewModel = authViewModel,
-                        onSignedIn = {
-                            com.example.navisarthi.data.AuthPrefs.setOnboarded(ctx, true)
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(Screen.Login.route) { inclusive = true }
-                            }
-                        },
-                        onSkip = {
-                            com.example.navisarthi.data.AuthPrefs.setOnboarded(ctx, true)
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(Screen.Login.route) { inclusive = true }
-                            }
-                        },
-                    )
-                }
-
                 composable(Screen.Home.route) {
                     HomeScreen(
                         conn = conn,
@@ -181,14 +154,9 @@ fun AppNavigation(
                     RouteScreen(
                         routeViewModel = routeViewModel,
                         onBack = { navController.popBackStack() },
-                        onSentToDash = { destName ->
-                            dashViewModel.setDestination(
-                                name = destName,
-                                lat  = routeState.destination?.lat,
-                                lng  = routeState.destination?.lng,
-                                mode = routeState.mode,
-                                previewRoute = routeState.route,
-                            )
+                        onSentToDash = { _ ->
+                            val plan = routeViewModel.state.value
+                            dashViewModel.startJourney(plan.stops, plan.mode, plan.legs, offline = plan.offline)
                             // Start navigation: open the dash view and begin the
                             // WiFi → auth → stream flow (no-op if already streaming).
                             dashViewModel.connect()
@@ -218,14 +186,8 @@ fun AppNavigation(
                     SettingsScreen(
                         conn = conn,
                         onConnChange = { appViewModel.setConn(it) },
-                        authViewModel = authViewModel,
                         dashViewModel = dashViewModel,
-                        onSignedOut = {
-                            com.example.navisarthi.data.AuthPrefs.setOnboarded(ctx, false)
-                            navController.navigate(Screen.Login.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
+                        onVehicleSelected = onVehicleSelected,
                         onBack = { navController.popBackStack() },
                     )
                 }

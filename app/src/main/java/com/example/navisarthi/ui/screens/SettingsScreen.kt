@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import com.example.navisarthi.ui.NaviSarthiIcons
 import com.example.navisarthi.ui.components.*
 import com.example.navisarthi.ui.theme.*
-import com.example.navisarthi.viewmodel.AuthViewModel
 import com.example.navisarthi.viewmodel.ConnectionState
 import com.example.navisarthi.viewmodel.DashViewModel
 import kotlinx.coroutines.launch
@@ -35,20 +34,12 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     conn: ConnectionState,
     onConnChange: (ConnectionState) -> Unit,
-    authViewModel: AuthViewModel,
     dashViewModel: DashViewModel,
-    onSignedOut: () -> Unit,
+    onVehicleSelected: (VehicleModel) -> Unit,
     onBack: () -> Unit,
 ) {
-    val auth by authViewModel.state.collectAsState()
     val dashUi by dashViewModel.ui.collectAsState()
     var showSwitchDialog by remember { mutableStateOf(false) }
-    val email = auth.email ?: "Not signed in"
-    val initials = remember(auth.email, auth.displayName) {
-        val src = auth.displayName?.takeIf { it.isNotBlank() } ?: auth.email ?: "?"
-        src.split(" ", ".", "@").filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }.ifBlank { "?" }
-    }
-
     var autoConnect by remember { mutableStateOf(true) }
     var screenOff   by remember { mutableStateOf(true) }
     var keepAwake   by remember { mutableStateOf(true) }
@@ -74,29 +65,20 @@ fun SettingsScreen(
         ScreenHeader(title = "Settings", onBack = onBack,
             hint = "Connection, screen-off streaming, voice guidance, units, and media/call permissions.")
 
-        // Account card
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp, onClick = {}) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(GoldTint),
-                ) {
-                    Text(initials, color = Gold, fontFamily = GeistMonoFamily, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    auth.displayName?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, color = TextHi, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-                    }
-                    Text(email, color = if (auth.displayName.isNullOrBlank()) TextHi else TextMid, fontSize = if (auth.displayName.isNullOrBlank()) 15.5.sp else 12.5.sp, fontWeight = if (auth.displayName.isNullOrBlank()) FontWeight.SemiBold else FontWeight.Normal, fontFamily = GeistFamily, modifier = Modifier.padding(top = 2.dp))
-                }
-            }
+        val vehicle = LocalVehicle.current
+        var showVehiclePicker by remember { mutableStateOf(false) }
+        ControlSection("Vehicle")
+        NaviSarthiBtn(vehicle.label, onClick = { showVehiclePicker = true },
+            icon = NaviSarthiIcons.Motor, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        ControlHint("Tap to select another vehicle and change the app accent.")
+        if (showVehiclePicker) {
+            VehiclePicker(current = vehicle, onSelect = {
+                onVehicleSelected(it)
+                showVehiclePicker = false
+            }, onDismiss = { showVehiclePicker = false })
         }
 
-        SectionLabel("Connection")
+        ControlSection("Connection")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(NaviSarthiIcons.Bt, "Tripper Dash",
                 sub = when (conn) { ConnectionState.Connected -> "Connected"; ConnectionState.Searching -> "Connecting…"; ConnectionState.Offline -> "Not connected" },
@@ -142,7 +124,7 @@ fun SettingsScreen(
             )
         }
 
-        SectionLabel("During a ride")
+        ControlSection("During a ride")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(NaviSarthiIcons.Power, "Turn phone screen off", "Map keeps streaming to the dash",
                 control = { NaviSarthiToggle(screenOff) { screenOff = it } })
@@ -151,7 +133,7 @@ fun SettingsScreen(
                 control = { NaviSarthiToggle(keepAwake) { keepAwake = it } }, last = true)
         }
 
-        SectionLabel("Media & calls on dash")
+        ControlSection("Media & calls on dash")
         // Re-check the grant on ON_RESUME so the chip flips to "On" the moment the user comes back
         // from the system notification-access screen (the Settings value isn't observable on its own).
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -208,7 +190,7 @@ fun SettingsScreen(
             )
         }
 
-        SectionLabel("Voice & guidance")
+        ControlSection("Voice & guidance")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
             NaviSarthiSegmented(listOf("Off", "Chime", "Full TTS"), voice, {
                 voiceManager.setMode(when (it) {
@@ -219,46 +201,20 @@ fun SettingsScreen(
             }, Modifier.fillMaxWidth())
         }
 
-        SectionLabel("Units")
+        ControlHint("Pick a chime or spoken directions. Pair your helmet headset in Android settings.")
+
+        ControlSection("Units")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
             NaviSarthiSegmented(listOf("Kilometres", "Miles"), units, { units = it }, Modifier.fillMaxWidth())
         }
 
-        SectionLabel("Sync")
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
-            val (syncTitle, syncSub) = when {
-                !auth.syncAvailable -> "Local only" to "Add your own Firebase project to sync across devices"
-                auth.isSignedIn     -> "Synced" to (auth.email ?: "Signed in")
-                else                -> "Not signed in" to "Sign in to sync across devices · data stays local until then"
-            }
-            SettingRow(NaviSarthiIcons.Sync, syncTitle, syncSub,
-                control = {
-                    NaviSarthiChip(
-                        if (auth.isSignedIn) "On" else "Off",
-                        if (auth.isSignedIn) ChipTone.Gold else ChipTone.Off, dot = true,
-                    )
-                }, last = true)
-        }
-
-        Spacer(Modifier.height(22.dp))
-
-        if (auth.isSignedIn) {
-            NaviSarthiBtn(
-                "Sign out",
-                onClick = { authViewModel.signOut(); onSignedOut() },
-                icon = NaviSarthiIcons.Power,
-                variant = BtnVariant.Danger,
-                size = BtnSize.Md,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(6.dp))
-        }
+        DriveBackupSettings()
 
         TestBuildCard()
 
         val appVersion = remember { com.example.navisarthi.data.UpdateChecker.currentVersionName(ctx) }
         Text(
-            "NAVISARTHI v$appVersion · ${if (!auth.syncAvailable) "local only" else if (auth.isSignedIn) "sync on" else "sync off"}",
+            "NAVISARTHI v$appVersion",
             color = TextDis, fontSize = 11.sp, fontFamily = GeistMonoFamily,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp),
         )
@@ -347,10 +303,6 @@ private fun TestBuildCard() {
     }
 }
 
-@Composable
-private fun SectionLabel(label: String) {
-    Eyebrow(label, Modifier.padding(top = 22.dp, bottom = 9.dp, start = 4.dp))
-}
 
 @Composable
 private fun SettingRow(

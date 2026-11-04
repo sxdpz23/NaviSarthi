@@ -140,7 +140,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(12.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        NaviSarthiChip("Himalayan 450", ChipTone.Gold, icon = NaviSarthiIcons.Motor)
+                        NaviSarthiChip(LocalVehicle.current.label, ChipTone.Gold, icon = NaviSarthiIcons.Motor)
                     }
                 }
             }
@@ -148,6 +148,7 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
+        ControlSection("Quick actions")
         NaviSarthiBtn(
             "Start navigation", onClick = { onNavigate("route") },
             icon = NaviSarthiIcons.Navi, variant = BtnVariant.Primary, size = BtnSize.Lg,
@@ -156,6 +157,8 @@ fun HomeScreen(
 
         Spacer(Modifier.height(10.dp))
 
+        ControlHint("Choose destinations, order your stops, and preview the route.")
+        Spacer(Modifier.height(8.dp))
         NaviSarthiBtn(
             "Open dash view", onClick = { onNavigate("dash") },
             icon = NaviSarthiIcons.Dash, variant = BtnVariant.Secondary, size = BtnSize.Md,
@@ -164,28 +167,19 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
+        ControlHint("Connect to the TFT and adjust how the map appears.")
+        Spacer(Modifier.height(8.dp))
         val mapsContext = LocalContext.current
         NaviSarthiBtn(
             "Open Google Maps",
-            onClick = {
-                val uri = android.net.Uri.parse("https://maps.google.com/")
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
-                try {
-                    mapsContext.startActivity(android.content.Intent(intent).setPackage("com.google.android.apps.maps"))
-                } catch (_: android.content.ActivityNotFoundException) {
-                    try {
-                        mapsContext.startActivity(intent)
-                    } catch (_: android.content.ActivityNotFoundException) {
-                        android.widget.Toast.makeText(mapsContext, "Google Maps is unavailable", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
+            onClick = { com.example.navisarthi.util.openGoogleMaps(mapsContext) },
             icon = NaviSarthiIcons.Pin, variant = BtnVariant.Secondary, size = BtnSize.Md,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(18.dp))
 
-        Eyebrow("Saved destinations", Modifier.padding(bottom = 6.dp, start = 4.dp))
+        ControlHint("Find a place in Google Maps and share it back to NaviSarthi.")
+        ControlSection("Saved destinations")
 
         if (saved.isEmpty()) {
             NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp) {

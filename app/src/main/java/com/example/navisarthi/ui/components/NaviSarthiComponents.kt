@@ -187,7 +187,7 @@ fun NaviSarthiChip(
 
 // ---- Toggle ----
 @Composable
-fun NaviSarthiToggle(on: Boolean, onChange: (Boolean) -> Unit) {
+fun NaviSarthiToggle(on: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     val track = if (on) Gold else Surf3
     val bd    = if (on) Gold else Line3
     val knob  = if (on) OnGold else TextMid
@@ -202,6 +202,7 @@ fun NaviSarthiToggle(on: Boolean, onChange: (Boolean) -> Unit) {
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                enabled = enabled,
             ) { onChange(!on) },
     ) {
         Box(
@@ -258,6 +259,23 @@ fun NaviSarthiDivider(modifier: Modifier = Modifier) {
 }
 
 // ---- Eyebrow label ----
+/** Consistent hierarchy for groups of controls on a scrolling screen. */
+@Composable
+fun ControlSection(title: String, modifier: Modifier = Modifier) {
+    Eyebrow(title, modifier.padding(top = 22.dp, bottom = 8.dp))
+}
+
+@Composable
+fun ControlHint(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier.padding(top = 6.dp),
+        color = TextLo,
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+    )
+}
+
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier) {
     Text(

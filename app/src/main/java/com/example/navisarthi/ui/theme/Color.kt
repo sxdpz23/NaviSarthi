@@ -1,6 +1,8 @@
 package com.example.navisarthi.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 
 // ---- Surfaces (warm-neutral near-black) ----
 val Bg0    = Color(0xFF0A0B0C)
@@ -20,14 +22,14 @@ val TextMid = Color(0xFF9EA0A3)
 val TextLo  = Color(0xFF65686B)
 val TextDis = Color(0xFF44474A)
 
-// ---- Accent: yellowish gold ----
-val Gold       = Color(0xFFE9B949)
-val GoldBright = Color(0xFFFFCD5E)
-val GoldDeep   = Color(0xFFC99A30)
-val GoldTint   = Color(0x24E9B949)
-val GoldTint2  = Color(0x3DE9B949)
-val GoldGlow   = Color(0x59E9B949)
-val OnGold     = Color(0xFF1A1402)
+// Accent tokens follow the vehicle selected by the rider.
+val Gold: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.accent
+val GoldBright: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.bright
+val GoldDeep: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.deep
+val GoldTint: Color @Composable @ReadOnlyComposable get() = Gold.copy(alpha = 36 / 255f)
+val GoldTint2: Color @Composable @ReadOnlyComposable get() = Gold.copy(alpha = 61 / 255f)
+val GoldGlow: Color @Composable @ReadOnlyComposable get() = Gold.copy(alpha = 89 / 255f)
+val OnGold: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.onAccent
 
 // ---- Status ----
 val Warn    = Color(0xFFD8853E)

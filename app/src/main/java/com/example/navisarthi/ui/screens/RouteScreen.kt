@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -51,6 +53,14 @@ fun RouteScreen(
         else              -> ""
     }
 
+    var deleting by remember { mutableStateOf<com.example.navisarthi.data.SavedLocation?>(null) }
+    val downloaded by routeViewModel.downloaded.collectAsState()
+    val downloadStatus by routeViewModel.downloadStatus.collectAsState()
+    val downloading by routeViewModel.downloadInProgress.collectAsState()
+    val itineraries by routeViewModel.itineraries.collectAsState()
+    var showSaveItinerary by remember { mutableStateOf(false) }
+    var itineraryName by remember { mutableStateOf("") }
+    var deleteItinerary by remember { mutableStateOf<RouteViewModel.SavedItinerary?>(null) }
     val savedList by routeViewModel.saved.collectAsState()
     val ctx = LocalContext.current
     val voiceManager = remember { com.example.navisarthi.dash.nav.VoiceManager.get(ctx) }
@@ -104,7 +114,7 @@ fun RouteScreen(
                 riderLat = null,
                 riderLng = null,
                 dest = dest?.let { d -> if (d.lat != null && d.lng != null) d.lat to d.lng else null },
-                routePoints = routeState.route?.geometry.orEmpty(),
+                routePoints = routeState.legs.flatMap { it.geometry },
                 hasLocationPermission = true,
                 fitRoute = true,
                 modifier = Modifier.fillMaxSize(),
@@ -263,7 +273,8 @@ fun RouteScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp),
             )
 
-            Eyebrow("Route type", Modifier.padding(bottom = 6.dp))
+            ControlHint("Use a chime for a short cue or Full TTS for spoken directions.")
+            ControlSection("Route type")
             NaviSarthiSegmented(
                 options = listOf("Car", "Bike"),
                 selected = routeState.mode.name,
@@ -271,10 +282,60 @@ fun RouteScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
             )
             if (routeState.routingError) {
-                Text("Could not find a ${routeState.mode.name.lowercase()} route. Check your connection and retry.", color = TextLo)
+                Text("Could not preview every leg. Check your connection and retry.", color = TextLo)
+                TextButton(onClick = routeViewModel::computeRoute) { Text("Retry preview") }
             }
 
-            val canStart = dest?.lat != null && dest.lng != null && !routeState.isResolving
+            ControlHint("Car and Bike use different routing profiles. Bike is for motorcycles.")
+            ControlSection("Destinations")
+            NaviSarthiBtn(
+                label = if (routeState.stops.isEmpty()) "Add destination" else "Add next stop / destination",
+                onClick = { com.example.navisarthi.util.openGoogleMaps(ctx) },
+                icon = NaviSarthiIcons.Pin,
+                variant = BtnVariant.Secondary,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            )
+
+            ControlHint("Pick a place in Google Maps, then tap Share and choose NaviSarthi.")
+
+            if (routeState.stops.isNotEmpty()) {
+                ControlSection("Journey stops")
+                routeState.stops.forEachIndexed { index, stop ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${index + 1}. ${stop.name}", Modifier.weight(1f), color = TextHi)
+                        TextButton(enabled = index > 0 && !routeState.needsStopChoice,
+                            onClick = { routeViewModel.moveStop(index, -1) }) { Text("Up") }
+                        TextButton(enabled = !routeState.needsStopChoice,
+                            onClick = { routeViewModel.removeStop(index) }) { Text("Remove") }
+                    }
+                }
+                ControlHint("Use Up to reorder a stop or Remove to take it out of this trip.")
+            }
+
+            if (routeState.needsStopChoice && dest?.lat != null && dest.lng != null) {
+                Text("Add ${dest.name} to this journey?", color = TextHi)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(enabled = routeState.stops.size < 8, onClick = {
+                        routeViewModel.chooseStop(RouteViewModel.StopChoice.Next)
+                    }) { Text("Add next") }
+                    TextButton(enabled = routeState.stops.size < 8, onClick = {
+                        routeViewModel.chooseStop(RouteViewModel.StopChoice.Append)
+                    }) { Text("Append") }
+                    TextButton(onClick = {
+                        routeViewModel.chooseStop(RouteViewModel.StopChoice.Replace)
+                    }) { Text("Replace") }
+                }
+            }
+            if (routeState.needsStopChoice) {
+                TextButton(onClick = routeViewModel::dismissStopChoice) { Text("Cancel new stop") }
+            }
+
+            if (routeState.offline) {
+                Text("Offline route · Start near the downloaded route. Rerouting needs an online route.",
+                    color = TextLo, fontSize = 12.sp)
+            }
+            val canStart = routeState.stops.isNotEmpty() && !routeState.needsStopChoice &&
+                !routeState.isResolving && !routeState.routing
             NaviSarthiBtn(
                 label = when {
                     sent                   -> "Starting navigation…"
@@ -291,6 +352,7 @@ fun RouteScreen(
             )
 
             if (canStart) {
+                ControlHint("Send the stops to the TFT and guide each leg in order.")
                 Spacer(Modifier.height(10.dp))
                 NaviSarthiBtn(
                     label = "Save this destination",
@@ -302,10 +364,41 @@ fun RouteScreen(
                 )
             }
 
+            if (routeState.stops.isNotEmpty() && !routeState.needsStopChoice) {
+                NaviSarthiBtn("Save itinerary", onClick = {
+                    itineraryName = ""
+                    showSaveItinerary = true
+                }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+            }
+
+            if (itineraries.isNotEmpty()) {
+                ControlSection("Saved itineraries")
+                ControlHint("Open a saved stop list, or download its route while online to follow it without data.", Modifier.padding(bottom = 6.dp))
+                if (downloadStatus.isNotBlank()) Text(downloadStatus, color = TextLo)
+                itineraries.forEach { item ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(item.name, color = TextHi)
+                            Text("${item.stops.size} stops · ${item.mode.name}", color = TextLo, fontSize = 12.sp)
+                        }
+                        TextButton(onClick = { routeViewModel.loadItinerary(item) }) { Text("Open") }
+                        TextButton(enabled = !downloading, onClick = { deleteItinerary = item }) { Text("Delete") }
+                    }
+                    Row(Modifier.fillMaxWidth()) {
+                        if (item.id in downloaded) {
+                            TextButton(onClick = { routeViewModel.openOffline(item) }) { Text("Open offline") }
+                        }
+                        TextButton(enabled = !downloading, onClick = { routeViewModel.downloadItinerary(item) }) {
+                            Text(if (item.id in downloaded) "Download again" else "Download offline")
+                        }
+                    }
+                }
+            }
+
             // ── Saved destinations ──
             if (savedList.isNotEmpty()) {
-                Spacer(Modifier.height(22.dp))
-                Eyebrow("Saved destinations", Modifier.padding(bottom = 6.dp, start = 4.dp))
+                ControlSection("Saved destinations")
+                ControlHint("Tap a saved place to use it in your itinerary.", Modifier.padding(bottom = 6.dp))
                 NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
                     savedList.forEachIndexed { i, loc ->
                         if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -334,6 +427,7 @@ fun RouteScreen(
                                 NaviSarthiIcons.Edit, "edit", tint = TextLo,
                                 modifier = Modifier.size(18.dp).clickable { editing = loc },
                             )
+                            TextButton(onClick = { deleting = loc }) { Text("Delete") }
                         }
                     }
                 }
@@ -341,11 +435,52 @@ fun RouteScreen(
         }
     }
 
+    if (showSaveItinerary) {
+        AlertDialog(
+            onDismissRequest = { showSaveItinerary = false },
+            title = { Text("Save itinerary") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = itineraryName,
+                    onValueChange = { itineraryName = it.take(80) },
+                    label = { Text("Itinerary name") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = { TextButton(enabled = itineraryName.isNotBlank(), onClick = {
+                routeViewModel.saveItinerary(itineraryName)
+                showSaveItinerary = false
+            }) { Text("Save") } },
+            dismissButton = { TextButton(onClick = { showSaveItinerary = false }) { Text("Cancel") } },
+        )
+    }
+    deleteItinerary?.let { item ->
+        AlertDialog(
+            onDismissRequest = { deleteItinerary = null },
+            title = { Text("Delete saved itinerary?") },
+            text = { Text(item.name) },
+            confirmButton = { TextButton(onClick = {
+                routeViewModel.deleteItinerary(item.id)
+                deleteItinerary = null
+            }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { deleteItinerary = null }) { Text("Cancel") } },
+        )
+    }
+
     if (showSave) SaveLocationDialog(
         defaultName = destName,
         onSave = { name, note -> routeViewModel.saveCurrentDestination(name, note); showSave = false },
         onDismiss = { showSave = false },
     )
+    deleting?.let { loc ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("Delete saved destination?") },
+            text = { Text(loc.name) },
+            confirmButton = { TextButton(onClick = { routeViewModel.deleteSaved(loc); deleting = null }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+        )
+    }
     editing?.let { loc ->
         EditLocationDialog(
             loc = loc,
