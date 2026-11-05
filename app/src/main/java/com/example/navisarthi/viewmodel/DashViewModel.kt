@@ -26,6 +26,7 @@ import com.example.navisarthi.dash.video.DashEncoder
 import com.example.navisarthi.dash.video.NalProcessor
 import com.example.navisarthi.dash.video.RtpPacketizer
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -119,15 +120,114 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(trafficEnabled = trafficTiles.enabled) }
         lastSignature = ""
     }
+    private val accessoryBattery = com.example.navisarthi.media.BluetoothAccessoryBattery(app)
+    val accessoryBatteryEnabled = accessoryBattery.enabled
+    val accessoryBatteryStatus = accessoryBattery.status
+    val accessoryIconsOnly = accessoryBattery.iconsOnly
+    fun setAccessoryIconsOnly(enabled: Boolean) = accessoryBattery.setIconsOnly(enabled)
+    fun hasAccessoryBluetoothAccess() = accessoryBattery.hasAccess()
+    fun setAccessoryBatteryEnabled(enabled: Boolean) = accessoryBattery.setEnabled(enabled)
+    fun refreshAccessoryBattery() = accessoryBattery.refresh()
+    private fun currentBatteryPillReadings() = if (accessoryBattery.enabled.value)
+        com.example.navisarthi.media.combinedBatteryReadings(accessoryBattery.mobilePercent.value, accessoryBattery.readings.value)
+        else emptyList()
+    private fun currentAccessoryBatteryLabel(): String? = com.example.navisarthi.media.accessoryBatteryLabel(
+        currentBatteryPillReadings(), android.os.SystemClock.elapsedRealtime(), accessoryBattery.iconsOnly.value)
+    private fun currentAccessoryBatteryIcon(): com.example.navisarthi.media.AccessoryIcon? =
+        if (accessoryBattery.iconsOnly.value) com.example.navisarthi.media.selectedAccessoryBattery(
+            currentBatteryPillReadings(), android.os.SystemClock.elapsedRealtime())?.icon else null
+
     private val mediaInfo   = com.example.navisarthi.media.MediaInfoProvider(app)
     val musicEnabled = mediaInfo.enabled
     val nowPlaying = mediaInfo.nowPlaying
     val musicStatus = mediaInfo.status
     fun setMusicEnabled(enabled: Boolean) = mediaInfo.setEnabled(enabled)
     fun refreshMusic() = mediaInfo.refresh()
+    fun musicDiagnostics(): String =
+        "NaviSarthi ${com.example.navisarthi.BuildConfig.VERSION_NAME} (${com.example.navisarthi.BuildConfig.VERSION_CODE})\n" +
+            mediaInfo.diagnostics() + "\n" + session.musicDiagnostics()
+    fun startMusicScreen() {
+        mediaInfo.start(com.example.navisarthi.media.MusicObservationOwner.SCREEN)
+        accessoryBattery.setScreenVisible(true)
+    }
+    fun stopMusicScreen() {
+        mediaInfo.stop(com.example.navisarthi.media.MusicObservationOwner.SCREEN)
+        accessoryBattery.setScreenVisible(false)
+    }
     fun musicNext() = mediaInfo.skipNext()
     fun musicPrevious() = mediaInfo.skipPrevious()
     fun musicPlayPause() = mediaInfo.togglePlayback()
+
+    private val consoleHistory = com.example.navisarthi.media.ConsoleCallHistory(app)
+    val callHistoryEnabled = consoleHistory.enabled
+    val callHistoryStatus = consoleHistory.status
+    val favoritesEnabled = consoleHistory.favoritesEnabled
+    val consoleDialingEnabled = consoleHistory.dialingEnabled
+    val missedBadgeEnabled = consoleHistory.badgeEnabled
+    val consoleDialStatus = consoleHistory.dialStatus
+    private val dialSnapshot = com.example.navisarthi.media.ConsoleDialSnapshot()
+    private var historyCategory: com.example.navisarthi.dash.protocol.CallHistoryCategory? = null
+    private var historyRequestJob: Job? = null
+    private var historyAuditJob: Job? = null
+    private var missedBadgeJob: Job? = null
+    private var lastHistoryRows: List<com.example.navisarthi.media.ConsoleCallEntry>? = null
+    fun hasCallHistoryAccess() = consoleHistory.hasAccess()
+    fun hasFavoriteContactsAccess() = consoleHistory.hasContactsAccess()
+    fun hasConsoleDialAccess() = consoleHistory.hasDialAccess()
+    fun refreshCallHistoryAccess() {
+        consoleHistory.refreshAccess()
+        historyCategory?.let {
+            if (!consoleHistory.categoryAllowed(it)) { dialSnapshot.clear(); requestCallHistory(it) }
+        }
+        refreshMissedBadge()
+    }
+    fun setCallHistoryEnabled(enabled: Boolean) {
+        consoleHistory.setEnabled(enabled)
+        dialSnapshot.clear()
+        historyCategory?.let { requestCallHistory(it) }
+    }
+    fun setFavoritesEnabled(enabled: Boolean) {
+        consoleHistory.setFavorites(enabled)
+        dialSnapshot.clear()
+        historyCategory?.let { requestCallHistory(it) }
+    }
+    fun setConsoleDialingEnabled(enabled: Boolean) { consoleHistory.setDialing(enabled) }
+    fun setMissedBadgeEnabled(enabled: Boolean) {
+        consoleHistory.setBadge(enabled)
+        refreshMissedBadge()
+    }
+    private fun refreshMissedBadge() {
+        val previous = missedBadgeJob
+        missedBadgeJob = viewModelScope.launch {
+            previous?.cancelAndJoin()
+            val count = consoleHistory.missedCount()
+            session.updateMissedCallCount(if (consoleHistory.badgeEnabled.value && consoleHistory.hasAccess()) count else 0)
+        }
+    }
+    private fun requestCallHistory(category: com.example.navisarthi.dash.protocol.CallHistoryCategory, force: Boolean = true) {
+        val previous = historyRequestJob
+        if (force) dialSnapshot.clear()
+        historyRequestJob = viewModelScope.launch {
+            previous?.cancelAndJoin()
+            if (historyCategory != category) lastHistoryRows = null
+            historyCategory = category
+            val rows = consoleHistory.entries(category)
+            if (force || rows != lastHistoryRows) {
+                dialSnapshot.clear()
+                val transferred = session.sendCallHistory(category, rows.map { it.label }) { consoleHistory.categoryAllowed(category) }
+                if (transferred && consoleHistory.categoryAllowed(category)) dialSnapshot.displayed(category, rows)
+                lastHistoryRows = rows
+            }
+        }
+    }
+    private fun dialFromConsole(selection: com.example.navisarthi.dash.protocol.ConsoleDialSelection) {
+        if (_ui.value.stage != ConnStage.STREAMING || !consoleHistory.dialingEnabled.value ||
+            !consoleHistory.hasDialAccess() || !consoleHistory.categoryAllowed(selection.category) ||
+            com.example.navisarthi.media.CallInfoProvider.incomingCall.value != null) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val number = dialSnapshot.number(selection.category, selection.index, now) ?: return
+        if (consoleHistory.dial(number)) dialSnapshot.dialRequested(now)
+    }
 
     private val callController = com.example.navisarthi.media.CallController(app)
     private var mediaObserveJob: Job? = null
@@ -310,8 +410,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         private const val BTN_MAP_ZOOM_OUT = 0x13
         // MEDIA-mode codes (after pressing IN to enter the dash's audio controls): L/R skip tracks on
         // the phone's player, NOT map zoom. Map zoom stays on the direct map-mode codes above.
-        private const val BTN_MEDIA_NEXT = 0x09   // media-mode RIGHT → next track
-        private const val BTN_MEDIA_PREV = 0x0A   // media-mode LEFT  → previous track
+        // Media codes live in ConsoleMusicInput, including capture-verified 0x05 play/pause.
+        // 0x18 opens the native media overlay; it must not also toggle the phone player.
     }
 
     /** Project a lat/lng forward [distM] metres along [bearingDeg] (great-circle). */
@@ -445,11 +545,15 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // separate HOME button is intentionally untouched — it does the dash's native exit; its code
         // just falls through to the logged-else branch. Codes verified fw 11.63: IN=0x18, RIGHT=0x09,
         // LEFT=0x0A, DOWN=0x07. Every unmatched code is shown in ui.lastButton so we can retune.
+        session.onConsoleDial = { selection -> dialFromConsole(selection) }
+        session.onCallHistoryRequest = { category -> requestCallHistory(category) }
         session.onButton = { btn ->
             val code = btn.toInt() and 0xFF
             val call = com.example.navisarthi.media.CallInfoProvider.incomingCall.value
             val ringing = call?.incoming == true
             val active  = call != null && !call.incoming
+            val musicAction = com.example.navisarthi.media.ConsoleMusicInput.actionFor(
+                code, mediaInfo.enabled.value, ringing, active)
             val label = when {
                 // Ringing: IN answers, DOWN rejects. Active call: DOWN hangs up (fixes "can't end").
                 ringing && code == BTN_ANSWER -> { answerCall(call!!); "Call answered" }
@@ -459,8 +563,16 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 // call — only DOWN is reserved for hang-up, and that's not a map/media code anyway).
                 !ringing && code == BTN_MAP_ZOOM_IN  -> { zoomOut(); "Zoom out (map)" }
                 !ringing && code == BTN_MAP_ZOOM_OUT -> { zoomIn(); "Zoom in (map)" }
-                !ringing && code == BTN_MEDIA_NEXT -> { if (mediaInfo.skipNext()) "Next track requested" else "Music: ${mediaInfo.status.value}" }
-                !ringing && code == BTN_MEDIA_PREV -> { if (mediaInfo.skipPrevious()) "Previous track requested" else "Music: ${mediaInfo.status.value}" }
+                musicAction != null -> {
+                    val dispatched = when (musicAction) {
+                        com.example.navisarthi.media.ConsoleMusicAction.NEXT -> mediaInfo.skipNext()
+                        com.example.navisarthi.media.ConsoleMusicAction.PREVIOUS -> mediaInfo.skipPrevious()
+                        com.example.navisarthi.media.ConsoleMusicAction.TOGGLE -> mediaInfo.togglePlayback()
+                        com.example.navisarthi.media.ConsoleMusicAction.VOLUME_UP -> mediaInfo.adjustMusicVolume(true)
+                        com.example.navisarthi.media.ConsoleMusicAction.VOLUME_DOWN -> mediaInfo.adjustMusicVolume(false)
+                    }
+                    if (dispatched) "Music $musicAction requested" else "Music: ${mediaInfo.status.value}"
+                }
                 else -> "code 0x${code.toString(16).uppercase()}"
             }
             // Persist every button code so untethered tests are diagnosable from the remote pull
@@ -819,6 +931,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         val clamped = z.coerceIn(11, 20)
         if (clamped == zoom) return
         zoom = clamped
+        session.updateZoom(zoom)
         _ui.update { it.copy(mapZoom = zoom) }
         // Make zoom feel instant: force a redraw on the very next tick (the renderer bridges the
         // gap with scaled neighbouring-zoom tiles), and warm the real tiles for the new level so
@@ -1276,6 +1389,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             // for buttery motion. Safe from standstill jitter because the camera is fed the
             // SMOOTHED position (which settles and stops), not raw GPS.
             append("%.6f".format(centerLat)); append("%.6f".format(centerLng))
+            append(currentAccessoryBatteryLabel()); append(currentAccessoryBatteryIcon())
             append(maneuverCue); append(arrived); append(arrivalMini); append(_ui.value.goldenRoute); append(routeMatch); append(displayRoute.size)
             append(_ui.value.mapStyle); append(_ui.value.perspective)
             append(zoom); append(panX.toInt()); append(panY.toInt())
@@ -1389,6 +1503,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             etaPrimary = etaPrimary,
             etaSecondary = etaSecondary,
             gpsWeak = gpsStatus == GpsStatus.WEAK,
+            accessoryBatteryLabel = currentAccessoryBatteryLabel(),
+            accessoryBatteryIcon = currentAccessoryBatteryIcon(),
             gpsLost = gpsStatus == GpsStatus.LOST,
         )
         val canvas = Canvas(bmp)
@@ -1532,19 +1648,46 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Bridge the phone's now-playing session + incoming-call notification onto the dash (TLV 05 0d /
      * 05 22), matching the dash. Needs notification access; without it MediaInfoProvider
-     * stays silent and the dash simply shows no media card. Album art (05 40) is captured in the
-     * protocol but not auto-sent yet (fragmentation unverified — see DashCommands.albumArtFrames).
+     * stays silent and the dash simply shows no media card. Artwork uses the verified OGRE 05 40
+     * fragmentation with owned thumbnail bitmaps; native call-history requests are handled separately.
      */
     private fun startMediaForwarding() {
         val granted = com.example.navisarthi.media.MediaInfoProvider.isAccessGranted(getApplication())
         com.example.navisarthi.data.RideDiagnostics.log("media", "forwarding start — notification access=$granted")
         mediaInfo.start()
+        accessoryBattery.setStreaming(true)
+        historyAuditJob?.cancel()
+        historyAuditJob = viewModelScope.launch {
+            while (isActive) {
+                consoleHistory.refreshAccess()
+                refreshMissedBadge()
+                historyCategory?.let {
+                    if (!consoleHistory.categoryAllowed(it)) dialSnapshot.clear()
+                    requestCallHistory(it, force = false)
+                }
+                delay(5000)
+            }
+        }
         mediaObserveJob?.cancel()
         mediaObserveJob = viewModelScope.launch {
             launch {
+                mediaInfo.nowPlaying.collectLatest { np ->
+                    val jpeg = withContext(Dispatchers.Default) {
+                        runCatching { com.example.navisarthi.media.ConsoleAlbumArt.encode(np?.art) }
+                            .getOrElse { com.example.navisarthi.media.ConsoleAlbumArt.encode(null) }
+                    }
+                    session.updateAlbumArt(jpeg)
+                }
+            }
+            launch {
                 mediaInfo.nowPlaying.collect { np ->
                     com.example.navisarthi.data.RideDiagnostics.log("media", "now-playing observed: ${np?.title ?: "(none)"}")
-                    session.updateNowPlaying(np?.title, np?.album.orEmpty(), np?.artist.orEmpty())
+                    session.updateNowPlaying(np?.title, np?.album.orEmpty(), np?.artist.orEmpty(),
+                        when (np?.playbackState) {
+                            android.media.session.PlaybackState.STATE_PLAYING -> true
+                            android.media.session.PlaybackState.STATE_PAUSED -> false
+                            else -> null // OGRE sends no play/pause flag for buffering/unknown states.
+                        })
                 }
             }
             launch {
@@ -1557,6 +1700,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun stopMediaForwarding() {
+        accessoryBattery.setStreaming(false)
+        historyAuditJob?.cancel(); historyAuditJob = null
+        missedBadgeJob?.cancel(); missedBadgeJob = null
+        historyRequestJob?.cancel(); historyRequestJob = null
+        historyCategory = null; lastHistoryRows = null
+        dialSnapshot.clear()
+        session.updateAlbumArt(null)
         mediaObserveJob?.cancel(); mediaObserveJob = null
         mediaInfo.stop()
         session.updateNowPlaying(null, "", "")
@@ -1572,6 +1722,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // service + wake/wifi locks + GPS don't outlive it (otherwise they'd hold the CPU/WiFi
         // awake with nothing producing frames).
         releaseBackgroundResources()
+        mediaInfo.close()
+        accessoryBattery.close()
         voice.shutdown()
         com.example.navisarthi.data.RideDiagnostics.stop("app closed")
     }

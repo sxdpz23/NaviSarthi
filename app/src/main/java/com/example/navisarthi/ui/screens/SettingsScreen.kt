@@ -65,7 +65,7 @@ fun SettingsScreen(
             .padding(bottom = 24.dp),
     ) {
         ScreenHeader(title = "Settings", onBack = onBack,
-            hint = "Connection, screen-off streaming, voice guidance, units, and media/call permissions.")
+            hint = "Connection, music, phone and calls, battery usage, and voice guidance.")
 
         val vehicle = LocalVehicle.current
         var showVehiclePicker by remember { mutableStateOf(false) }
@@ -146,7 +146,7 @@ fun SettingsScreen(
         val musicEnabled by dashViewModel.musicEnabled.collectAsState()
         val playing by dashViewModel.nowPlaying.collectAsState()
         val musicStatus by dashViewModel.musicStatus.collectAsState()
-        LaunchedEffect(Unit) { dashViewModel.refreshMusic() }
+
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(NaviSarthiIcons.Zap, "Enable music controls", musicStatus,
                 control = { NaviSarthiToggle(musicEnabled) { dashViewModel.setMusicEnabled(it) } }, last = true)
@@ -168,9 +168,42 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f))
             }
         }
-        ControlHint("Start Spotify or YouTube Music on your phone. Console media-mode left/right requests previous/next. Console play/pause mapping awaits bike verification. Audio stays on your selected phone/headset output.")
+        ControlHint("Start Spotify or YouTube Music on your phone. In console music controls: left/right changes tracks, middle plays/pauses, and up/down adjusts media volume. Audio stays on your selected phone/headset output.")
 
-        ControlSection("Media & calls on dash")
+        if (com.example.navisarthi.BuildConfig.DEBUG) {
+            NaviSarthiBtn("Copy music diagnostics", onClick = {
+                val clipboard = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                    "NaviSarthi music diagnostics", dashViewModel.musicDiagnostics()))
+                android.widget.Toast.makeText(ctx, "Music diagnostics copied", android.widget.Toast.LENGTH_SHORT).show()
+            }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        }
+
+        ControlSection("Bluetooth accessories")
+        val accessoryEnabled by dashViewModel.accessoryBatteryEnabled.collectAsState()
+        val accessoryStatus by dashViewModel.accessoryBatteryStatus.collectAsState()
+        val accessoryIconsOnly by dashViewModel.accessoryIconsOnly.collectAsState()
+        var accessoryPermissionGranted by remember { mutableStateOf(dashViewModel.hasAccessoryBluetoothAccess()) }
+        val accessoryPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            accessoryPermissionGranted = it
+            dashViewModel.refreshAccessoryBattery()
+        }
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Bt, "Battery pill on console", accessoryStatus,
+                control = { NaviSarthiToggle(accessoryEnabled) { enabled ->
+                    dashViewModel.setAccessoryBatteryEnabled(enabled)
+                    if (enabled && !accessoryPermissionGranted) accessoryPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
+                } })
+            SettingRow(NaviSarthiIcons.Bt, "Icons instead of names", "Keep battery percentages beside device icons",
+                control = { NaviSarthiToggle(accessoryIconsOnly) { dashViewModel.setAccessoryIconsOnly(it) } }, last = true)
+        }
+        if (accessoryEnabled && !accessoryPermissionGranted) NaviSarthiBtn("Allow Nearby devices access", onClick = {
+            accessoryPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
+        }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        ControlHint("Mobile battery and connected accessory batteries alternate every five seconds in one map pill. Phone battery works without Bluetooth access. Accessory levels appear when reported by the device.")
+
+        ControlSection("Phone & calls")
+        ControlHint("Caller information, recent calls, favorite contacts, console dialing and missed-call reminders.")
         // Re-check the grant on ON_RESUME so the chip flips to "On" the moment the user comes back
         // from the system notification-access screen (the Settings value isn't observable on its own).
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -179,16 +212,51 @@ fun SettingsScreen(
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         var mediaGranted by remember { mutableStateOf(com.example.navisarthi.media.MediaInfoProvider.isAccessGranted(ctx)) }
         var callAnswerGranted by remember { mutableStateOf(answerGranted()) }
-        DisposableEffect(lifecycleOwner) {
+        var historyGranted by remember { mutableStateOf(dashViewModel.hasCallHistoryAccess()) }
+        var favoritesGranted by remember { mutableStateOf(dashViewModel.hasFavoriteContactsAccess()) }
+        var dialGranted by remember { mutableStateOf(dashViewModel.hasConsoleDialAccess()) }
+        var batteryRestricted by remember {
+            mutableStateOf(com.example.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(ctx))
+        }
+        var batterySettingsUnavailable by remember { mutableStateOf(false) }
+        val backgroundSettingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            batteryRestricted = com.example.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(ctx)
+        }
+        fun openBackgroundSettings() {
+            batterySettingsUnavailable = false
+            val readiness = com.example.navisarthi.util.DeviceReadiness
+            val intent = if (!readiness.isIgnoringBatteryOptimizations(ctx)) readiness.batteryExemptionIntent(ctx)
+                else readiness.appSettingsIntent(ctx)
+            if (runCatching { backgroundSettingsLauncher.launch(intent) }.isFailure &&
+                runCatching { backgroundSettingsLauncher.launch(readiness.appSettingsIntent(ctx)) }.isFailure) {
+                batterySettingsUnavailable = true
+            }
+        }
+        DisposableEffect(lifecycleOwner, dashViewModel) {
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                dashViewModel.startMusicScreen()
+            }
             val obs = LifecycleEventObserver { _, e ->
+                if (e == Lifecycle.Event.ON_START) dashViewModel.startMusicScreen()
+                if (e == Lifecycle.Event.ON_STOP) dashViewModel.stopMusicScreen()
                 if (e == Lifecycle.Event.ON_RESUME) {
                     mediaGranted = com.example.navisarthi.media.MediaInfoProvider.isAccessGranted(ctx)
                     callAnswerGranted = answerGranted()
+                    historyGranted = dashViewModel.hasCallHistoryAccess()
+                    favoritesGranted = dashViewModel.hasFavoriteContactsAccess()
+                    dialGranted = dashViewModel.hasConsoleDialAccess()
+                    accessoryPermissionGranted = dashViewModel.hasAccessoryBluetoothAccess()
+                    dashViewModel.refreshAccessoryBattery()
+                    batteryRestricted = com.example.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(ctx)
+                    dashViewModel.refreshCallHistoryAccess()
                     dashViewModel.refreshMusic()
                 }
             }
             lifecycleOwner.lifecycle.addObserver(obs)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(obs)
+                dashViewModel.stopMusicScreen()
+            }
         }
         val callPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             callAnswerGranted = it
@@ -196,8 +264,8 @@ fun SettingsScreen(
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(
                 NaviSarthiIcons.Zap,
-                "Now playing & calls on dash",
-                if (mediaGranted) "Access granted · music uses the toggle above"
+                "Caller & music information",
+                if (mediaGranted) "Notification access granted for caller names and music"
                 else "Tap to allow notification access",
                 control = {
                     NaviSarthiChip(
@@ -227,6 +295,81 @@ fun SettingsScreen(
                 },
             )
         }
+
+        val historyEnabled by dashViewModel.callHistoryEnabled.collectAsState()
+        val historyStatus by dashViewModel.callHistoryStatus.collectAsState()
+        val historyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            historyGranted = it
+            dashViewModel.refreshCallHistoryAccess()
+        }
+        LaunchedEffect(Unit) { dashViewModel.refreshCallHistoryAccess() }
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Bt, "Share recent calls", historyStatus,
+                control = { NaviSarthiToggle(historyEnabled) { enabled ->
+                    dashViewModel.setCallHistoryEnabled(enabled)
+                    if (enabled && !historyGranted) historyPermission.launch(android.Manifest.permission.READ_CALL_LOG)
+                } }, last = true)
+        }
+        if (historyEnabled && !historyGranted) {
+            NaviSarthiBtn("Allow call history access", onClick = {
+                historyPermission.launch(android.Manifest.permission.READ_CALL_LOG)
+            }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        }
+        ControlHint("Shows the latest five incoming, missed or outgoing calls when you open that category on the console. Caller names use your phone's saved call-log labels. Turn sharing off to clear the displayed list. Console dialing uses the number associated with the displayed row.")
+
+        val favoriteSharing by dashViewModel.favoritesEnabled.collectAsState()
+        val consoleDialing by dashViewModel.consoleDialingEnabled.collectAsState()
+        val missedBadge by dashViewModel.missedBadgeEnabled.collectAsState()
+        val dialStatus by dashViewModel.consoleDialStatus.collectAsState()
+        val favoritesPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            favoritesGranted = it
+            dashViewModel.refreshCallHistoryAccess()
+        }
+        val dialPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            dialGranted = it
+            dashViewModel.refreshCallHistoryAccess()
+        }
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Bt, "Share favorite contacts",
+                if (!favoriteSharing) "Off" else if (!favoritesGranted) "Contacts permission needed" else "Five starred contacts from your phone",
+                control = { NaviSarthiToggle(favoriteSharing) { enabled ->
+                    dashViewModel.setFavoritesEnabled(enabled)
+                    if (enabled && !favoritesGranted) favoritesPermission.launch(android.Manifest.permission.READ_CONTACTS)
+                } })
+            SettingRow(NaviSarthiIcons.Bt, "Dial from console",
+                if (consoleDialing && !dialGranted) "Phone permission needed" else dialStatus,
+                control = { NaviSarthiToggle(consoleDialing) { enabled ->
+                    dashViewModel.setConsoleDialingEnabled(enabled)
+                    if (enabled && !dialGranted) dialPermission.launch(android.Manifest.permission.CALL_PHONE)
+                } })
+            SettingRow(NaviSarthiIcons.Bt, "Missed-call badge",
+                if (!missedBadge) "Off" else if (!historyGranted) "Call log permission needed" else "New missed calls from your phone",
+                control = { NaviSarthiToggle(missedBadge) { enabled ->
+                    dashViewModel.setMissedBadgeEnabled(enabled)
+                    if (enabled && !historyGranted) historyPermission.launch(android.Manifest.permission.READ_CALL_LOG)
+                } }, last = true)
+        }
+        if (favoriteSharing && !favoritesGranted) NaviSarthiBtn("Allow contacts access", onClick = {
+            favoritesPermission.launch(android.Manifest.permission.READ_CONTACTS)
+        }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        if (consoleDialing && !dialGranted) NaviSarthiBtn("Allow phone calls", onClick = {
+            dialPermission.launch(android.Manifest.permission.CALL_PHONE)
+        }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        if (missedBadge && !historyGranted && !historyEnabled) NaviSarthiBtn("Allow missed-call access", onClick = {
+            historyPermission.launch(android.Manifest.permission.READ_CALL_LOG)
+        }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        ControlHint("Star contacts in your phone's Contacts app. Select a displayed favorite or recent call on the console to call it. The missed-call badge follows your phone's new-call flag; viewing it here does not mark calls read.")
+
+        ControlSection("Battery & background usage")
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Power, "Background battery usage",
+                if (batteryRestricted) "Battery or background restrictions detected" else "No Android battery restrictions detected",
+                control = { NaviSarthiChip(if (batteryRestricted) "Review" else "Allowed",
+                    if (batteryRestricted) ChipTone.Off else ChipTone.Gold) },
+                onClick = { openBackgroundSettings() }, last = true)
+        }
+        if (batteryRestricted) ControlHint("Set NaviSarthi to Unrestricted or No restrictions and allow background activity so navigation can continue with the screen off.")
+        if (batterySettingsUnavailable) ControlHint("Open Android Settings → Apps → NaviSarthi → Battery to review background usage.")
 
         ControlSection("Voice & guidance")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {

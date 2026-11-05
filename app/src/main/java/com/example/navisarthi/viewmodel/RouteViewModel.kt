@@ -201,10 +201,13 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
             mode = previous.mode,
             destination = place,
             stops = stops,
-            needsStopChoice = true,
+            needsStopChoice = stops.isNotEmpty(),
             isResolving = place.needsExpansion,
             pendingNavigate = openRoute,
         )
+        // An empty itinerary has nothing to append to or replace. Commit valid coordinates
+        // immediately; unresolved shares wait for the resolver below.
+        if (stops.isEmpty() && place.lat != null && place.lng != null) updateStops(listOf(place))
     }
 
     fun selectSaved(loc: com.example.navisarthi.data.SavedLocation) {
@@ -231,6 +234,9 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 if (_state.value.destination !== loc) return@launch
                 _state.value = _state.value.copy(destination = resolved, isResolving = false)
+                if (coords != null && _state.value.stops.isEmpty() && !_state.value.needsStopChoice) {
+                    updateStops(listOf(resolved))
+                }
                 if (coords == null) Log.w(TAG, "No coords for '$name' (url+geocode both empty)")
             }
         }

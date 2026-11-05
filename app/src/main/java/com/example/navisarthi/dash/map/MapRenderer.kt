@@ -12,6 +12,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import com.example.navisarthi.dash.nav.GeoPoint
+import com.example.navisarthi.media.AccessoryIcon
 
 /**
  * Draws the navigation frame for the Tripper Dash (526 × 300).
@@ -52,8 +53,59 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         val etaPrimary: String? = null,    // big glance value, e.g. "24 min" (nav only)
         val etaSecondary: String? = null,  // smaller line, e.g. "18 km · 13:32"
         val gpsWeak: Boolean = false,      // imprecise/slow fix → amber marker + "GPS weak" pill
+        val accessoryBatteryLabel: String? = null,
+        val accessoryBatteryIcon: AccessoryIcon? = null,
         val gpsLost: Boolean = false,      // no fresh fix → grey marker + "GPS lost" pill
     )
+
+    private val accessoryIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = 1.6f; strokeCap = Paint.Cap.ROUND; color = Color.rgb(196, 201, 208)
+    }
+    private val accessoryIconPath = Path()
+    private val accessoryIconRect = RectF()
+
+    private fun drawAccessoryIcon(canvas: Canvas, icon: AccessoryIcon, cx: Float, cy: Float) {
+        val save = canvas.save()
+        canvas.translate(cx - 8f, cy - 8f)
+        val paint = accessoryIconPaint
+        val path = accessoryIconPath
+        path.reset()
+        when (icon) {
+            AccessoryIcon.MOBILE -> {
+                canvas.drawRoundRect(3f, 1f, 13f, 15f, 2f, 2f, paint)
+                canvas.drawLine(6f, 12f, 10f, 12f, paint)
+            }
+            AccessoryIcon.HEADPHONES -> {
+                accessoryIconRect.set(2f, 1f, 14f, 15f)
+                canvas.drawArc(accessoryIconRect, 180f, 180f, false, paint)
+                canvas.drawRoundRect(1f, 7f, 4f, 14f, 1f, 1f, paint)
+                canvas.drawRoundRect(12f, 7f, 15f, 14f, 1f, 1f, paint)
+            }
+            AccessoryIcon.SPEAKER -> {
+                path.moveTo(2f, 6f); path.lineTo(5f, 6f); path.lineTo(9f, 2f)
+                path.lineTo(9f, 14f); path.lineTo(5f, 10f); path.lineTo(2f, 10f); path.close()
+                canvas.drawPath(path, paint)
+                accessoryIconRect.set(6f, 3f, 15f, 13f)
+                canvas.drawArc(accessoryIconRect, -60f, 120f, false, paint)
+            }
+            AccessoryIcon.WATCH -> {
+                canvas.drawRoundRect(3f, 3f, 13f, 13f, 2f, 2f, paint)
+                canvas.drawLine(5f, 1f, 11f, 1f, paint); canvas.drawLine(5f, 15f, 11f, 15f, paint)
+                canvas.drawLine(8f, 5f, 8f, 8f, paint); canvas.drawLine(8f, 8f, 10f, 9f, paint)
+            }
+            AccessoryIcon.KEYBOARD -> {
+                canvas.drawRoundRect(1f, 3f, 15f, 13f, 1f, 1f, paint)
+                for (x in 4..12 step 4) { canvas.drawPoint(x.toFloat(), 6f, paint); canvas.drawPoint(x.toFloat(), 9f, paint) }
+                canvas.drawLine(5f, 11f, 11f, 11f, paint)
+            }
+            AccessoryIcon.BLUETOOTH -> {
+                path.moveTo(8f, 1f); path.lineTo(8f, 15f); path.lineTo(12f, 11f)
+                path.lineTo(4f, 4f); path.moveTo(4f, 12f); path.lineTo(12f, 5f); path.lineTo(8f, 1f)
+                canvas.drawPath(path, paint)
+            }
+        }
+        canvas.restoreToCount(save)
+    }
 
     private val bgColor   = Color.rgb(229, 227, 223) // Google Maps land colour, behind missing tiles
     private val routeBlue = Color.rgb(66, 133, 244)  // Google Maps directions blue (#4285F4)
@@ -422,9 +474,15 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
             return
         }
 
-        pillRect.set(w * .70f, h - 29f, w * .90f, h - 7f)
-        canvas.drawRoundRect(pillRect, 10f, 10f, etaBgPaint)
-        canvas.drawText("−  ZOOM  +", pillRect.centerX(), h - 14f, etaSmallPaint)
+        f.accessoryBatteryLabel?.let { label ->
+            val iconWidth = if (f.accessoryBatteryIcon != null) 20f else 0f
+            val halfWidth = (etaSmallPaint.measureText(label) + iconWidth) / 2f + 10f
+            val right = w * .90f
+            pillRect.set(right - halfWidth * 2f, h - 29f, right, h - 7f)
+            canvas.drawRoundRect(pillRect, 10f, 10f, etaBgPaint)
+            f.accessoryBatteryIcon?.let { drawAccessoryIcon(canvas, it, pillRect.left + 16f, h - 18f) }
+            canvas.drawText(label, pillRect.centerX() + iconWidth / 2f, h - 14f, etaSmallPaint)
+        }
 
         // ── Standby when nothing to show (dark text on the light map bg) ──
         if (f.riderLat == null && f.destLat == null) {

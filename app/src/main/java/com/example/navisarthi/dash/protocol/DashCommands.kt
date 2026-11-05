@@ -86,6 +86,11 @@ object DashCommands {
     /** q3c.t8 placeholder sent between projection-frame and z2 in the phone's capture. */
     fun navPlaceholder() = K1GPacket.build(K1GPacket.tlv(0x06, 0x0A, 0x00, 0x00))
 
+    /** OGRE NavigationRootFragment X7/Y7 and w2c.M2/N2/O2. */
+    fun zoomAvailability(canZoomIn: Boolean, canZoomOut: Boolean): ByteArray =
+        K1GPacket.build(K1GPacket.tlv(0x06, 0x0C,
+            (if (canZoomIn) 0x10 else 0) or (if (canZoomOut) 0x20 else 0)))
+
     // ── Projection control ────────────────────────────────────────────────
     /** q3c.g — projection keep-alive; MUST repeat at the encoder frame rate (4 Hz). */
     fun projectionFrame() = "0016000200000000020100054B314720000556000155".hexToBytes()
@@ -260,24 +265,30 @@ object DashCommands {
 
     // ── Media now-playing (05 0d) + telephony (05 22) ─────────────────────
     // Derived from the observed behaviour of the dash (2026-06):
-    //   05 0d value = three NUL-separated text fields [title]\0[album]\0[artist],
+    //   05 0d value = three NUL-separated text fields [album]\0[title]\0[artist],
     //                 each truncated to ~19–20 chars (the dash's display width).
     //   05 22 value = caller display name, NUL-terminated, re-sent ~1 Hz while ringing.
     //   05 40       = album-art JPEG, fragmented across ~1 KB packets (see albumArtFrames).
     // K1GPacket.build emits the exact captured frame: [len][segcount][..]"K1G "[seq] TT SS LL value.
 
-    private const val MEDIA_FIELD_MAX = 20   // RE truncates each field to the dash display width
+    private const val MEDIA_FIELD_MAX = 19 // OGRE djf.A1; byte text codec in l3d.n
 
-    private fun mediaField(s: String): ByteArray {
-        val t = if (s.length > MEDIA_FIELD_MAX) s.substring(0, MEDIA_FIELD_MAX) else s
-        return t.toByteArray(Charsets.UTF_8)
-    }
+    private fun mediaField(s: String): ByteArray = s.replace("\u0000", " ")
+        .take(MEDIA_FIELD_MAX).map { if (it.code <= 255) it.code.toByte() else 0xFF.toByte() }.toByteArray()
 
-    /** 05 0d now-playing card: title / album / artist, NUL-separated (matches the dash'slayout). */
+    /** OGRE w2c.l1/m1: enables/hides the console-owned native music ribbon. */
+    fun musicAvailable(available: Boolean): ByteArray =
+        K1GPacket.build(K1GPacket.tlv(0x05, 0x17, if (available) 0x55 else 0xAA))
+
+    /** OGRE w2c.i1/j1: actual player state, never an optimistic button-press toggle. */
+    fun musicPlaybackState(playing: Boolean): ByteArray =
+        K1GPacket.build(K1GPacket.tlv(0x05, 0x19, if (playing) 0x55 else 0xAA))
+
+    /** 05 0d captured field order: album / title / artist (see capture.md). */
     fun nowPlaying(title: String, album: String, artist: String): ByteArray {
         val out = ByteArrayOutputStream()
-        out.write(mediaField(title)); out.write(0x00)
         out.write(mediaField(album)); out.write(0x00)
+        out.write(mediaField(title)); out.write(0x00)
         out.write(mediaField(artist))
         return K1GPacket.build(K1GPacket.tlv(0x05, 0x0D, out.toByteArray()))
     }
@@ -292,16 +303,28 @@ object DashCommands {
      *  times the notification out once callNotify stops repeating, so this is belt-and-suspenders. */
     fun callClear(): ByteArray = K1GPacket.build(K1GPacket.tlv(0x05, 0x22, byteArrayOf(0x00)))
 
-    /**
-     * 05 40 album-art frames (EXPERIMENTAL — fragment sub-framing unconfirmed). The capture showed
-     * the art split across ~1 KB 05 40 TLVs with an incrementing seq byte; the 2-byte intra-value
-     * prefix we saw isn't decoded yet, so this is NOT auto-sent until validated against the dash.
-     * Returns one packet per ~1000-byte JPEG chunk.
-     */
-    fun albumArtFrames(jpeg: ByteArray, chunk: Int = 1000): List<ByteArray> =
-        jpeg.toList().chunked(chunk).map { c ->
-            K1GPacket.build(K1GPacket.tlv(0x05, 0x40, c.toByteArray()))
+    /** OGRE c3c: first=00 + total BE16; middle=index; final=FF. */
+    fun albumArtFrames(jpeg: ByteArray, chunk: Int = 1000): List<ByteArray> {
+        require(jpeg.isNotEmpty() && jpeg.size <= 65535)
+        require(chunk in 1..1000 && (jpeg.size + chunk - 1) / chunk < 255)
+        val frames = mutableListOf<ByteArray>()
+        val firstSize = minOf(chunk, jpeg.size)
+        frames += K1GPacket.build(K1GPacket.tlv(0x05, 0x40,
+            byteArrayOf(0, (jpeg.size shr 8).toByte(), jpeg.size.toByte()) + jpeg.copyOfRange(0, firstSize)))
+        var offset = firstSize
+        var index = 1
+        while (offset < jpeg.size) {
+            val end = minOf(offset + chunk, jpeg.size)
+            val flag = if (end == jpeg.size) 0xFF else index
+            frames += K1GPacket.build(K1GPacket.tlv(0x05, 0x40,
+                byteArrayOf(flag.toByte()) + jpeg.copyOfRange(offset, end)))
+            offset = end
+            index++
         }
+        // OGRE emits a final empty FF marker for a single-fragment image.
+        if (frames.size == 1) frames += K1GPacket.build(K1GPacket.tlv(0x05, 0x40, 0xFF))
+        return frames
+    }
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray, fromEnd: Boolean = false): Int {
         val range = if (fromEnd) (haystack.size - needle.size downTo 0) else (0..haystack.size - needle.size)

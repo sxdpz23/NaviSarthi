@@ -27,6 +27,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.navisarthi.util.DeviceReadiness
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +81,10 @@ fun RouteScreen(
         com.example.navisarthi.dash.nav.VoiceMode.FULL  -> "Full TTS"
     }
     var sent by remember { mutableStateOf(false) }
+    var showBatteryGuidance by rememberSaveable { mutableStateOf(false) }
+    var batteryExempt by remember { mutableStateOf(DeviceReadiness.isIgnoringBatteryOptimizations(ctx)) }
+    var backgroundRestricted by remember { mutableStateOf(DeviceReadiness.isBackgroundRestricted(ctx)) }
+    var batterySettingsError by remember { mutableStateOf<String?>(null) }
     var showSave by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<com.example.navisarthi.data.SavedLocation?>(null) }
 
@@ -101,6 +107,31 @@ fun RouteScreen(
     val navPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { sent = true }
+
+    fun startAfterBatteryGuidance() {
+        showBatteryGuidance = false
+        if (hasLocationPermission()) sent = true else navPermLauncher.launch(navPermissions)
+    }
+    val navigationBatterySettings = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        batteryExempt = DeviceReadiness.isIgnoringBatteryOptimizations(ctx)
+        backgroundRestricted = DeviceReadiness.isBackgroundRestricted(ctx)
+        // A cancelled pending start must never be resumed by a late settings result.
+        if (showBatteryGuidance && batteryExempt && !backgroundRestricted) startAfterBatteryGuidance()
+    }
+    fun openNavigationBatterySettings(requestExemption: Boolean) {
+        batterySettingsError = null
+        val intent = if (requestExemption) DeviceReadiness.batteryExemptionIntent(ctx)
+            else DeviceReadiness.appSettingsIntent(ctx)
+        val launched = runCatching { navigationBatterySettings.launch(intent) }.isSuccess
+        if (!launched) {
+            val fallback = runCatching {
+                navigationBatterySettings.launch(DeviceReadiness.appSettingsIntent(ctx))
+            }.isSuccess
+            if (!fallback) batterySettingsError = "Open Android Settings → Apps → NaviSarthi → Battery and allow background use, then return here."
+        }
+    }
 
     LaunchedEffect(sent) {
         if (sent) {
@@ -389,7 +420,14 @@ fun RouteScreen(
                     routeState.routing     -> "Finding route…"
                     else                   -> "Start navigation"
                 },
-                onClick = { if (hasLocationPermission()) sent = true else navPermLauncher.launch(navPermissions) },
+                onClick = {
+                    batteryExempt = DeviceReadiness.isIgnoringBatteryOptimizations(ctx)
+                    backgroundRestricted = DeviceReadiness.isBackgroundRestricted(ctx)
+                    if (DeviceReadiness.shouldShowNavigationBatteryGuidance(ctx)) {
+                        batterySettingsError = null
+                        showBatteryGuidance = true
+                    } else if (hasLocationPermission()) sent = true else navPermLauncher.launch(navPermissions)
+                },
                 icon = if (sent) NaviSarthiIcons.Check else NaviSarthiIcons.Navi,
                 variant = if (sent) BtnVariant.Secondary else BtnVariant.Primary,
                 size = BtnSize.Lg,
@@ -479,6 +517,31 @@ fun RouteScreen(
                 }
             }
         }
+    }
+
+    if (showBatteryGuidance) {
+        AlertDialog(
+            onDismissRequest = { showBatteryGuidance = false },
+            title = { Text("Keep navigation running") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Battery saving can stop NaviSarthi while your phone is locked or another app is open. Maps, console guidance and voice directions may stop abruptly.")
+                    Text("Before riding, set NaviSarthi's battery usage to Unrestricted or No restrictions. Allow background activity or Auto-start if available, and remove NaviSarthi from Sleeping apps.")
+                    if (batteryExempt) Text("Battery optimization is disabled, but Android still reports restricted background usage. Allow background activity in app settings.")
+                    if (backgroundRestricted) Text("Android still reports background usage as restricted. Open app settings and allow background use.")
+                    batterySettingsError?.let { Text(it) }
+                    if (!batteryExempt) TextButton(onClick = { openNavigationBatterySettings(false) }) { Text("Open app settings") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { openNavigationBatterySettings(!batteryExempt) }) {
+                    Text(if (batteryExempt) "Review background settings" else "Allow background use")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { startAfterBatteryGuidance() }) { Text("Start anyway") }
+            },
+        )
     }
 
     if (showSaveItinerary) {

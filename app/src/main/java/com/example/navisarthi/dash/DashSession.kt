@@ -53,6 +53,8 @@ class DashSession(private val scope: CoroutineScope) {
     // appears in the ride log, the dash never accepted the stream — the likely "Timeout!" cause.
     @Volatile private var loggedFirstAck = false
 
+    var onConsoleDial: ((com.example.navisarthi.dash.protocol.ConsoleDialSelection) -> Unit)? = null
+    var onCallHistoryRequest: ((com.example.navisarthi.dash.protocol.CallHistoryCategory) -> Unit)? = null
     var onButton: ((Byte) -> Unit)? = null
     var onError:  ((String) -> Unit)? = null
 
@@ -65,19 +67,66 @@ class DashSession(private val scope: CoroutineScope) {
     private var heartbeatJob: Job? = null
     private var navInfoJob: Job? = null
     private var mediaInfoJob: Job? = null
+    @Volatile private var consoleZoom = 19
+    fun updateZoom(zoom: Int) { consoleZoom = zoom.coerceIn(11, 20) }
+
+    @Volatile private var pendingArt: ByteArray? = null
+    private var artJob: Job? = null
+
+    fun updateAlbumArt(jpeg: ByteArray?) {
+        val previous = pendingArt
+        if (jpeg == null) pendingArt = null
+        else if (previous == null || !previous.contentEquals(jpeg)) pendingArt = jpeg.copyOf()
+    }
+
+    suspend fun sendCallHistory(category: com.example.navisarthi.dash.protocol.CallHistoryCategory,
+        labels: List<String>, allowed: () -> Boolean): Boolean {
+        val currentSocket = socket ?: return false
+        val key = auth?.sessionKey ?: return false
+        for (index in 0..4) {
+            currentCoroutineContext().ensureActive()
+            if (socket !== currentSocket) return false
+            val label = if (allowed()) labels.getOrNull(index).orEmpty() else ""
+            currentSocket.send(com.example.navisarthi.dash.protocol.CallHistoryProtocol.slot(index, label, key))
+            delay(10)
+        }
+        if (socket !== currentSocket) return false
+        currentSocket.send(com.example.navisarthi.dash.protocol.CallHistoryProtocol.categoryReady(category))
+        return true
+    }
+
+    fun updateMissedCallCount(count: Int) {
+        if (_state.value == DashState.STREAMING) {
+            scope.launch(Dispatchers.IO) { socket?.send(com.example.navisarthi.dash.protocol.CallHistoryProtocol.missedCallCount(count)) }
+        }
+    }
+
 
     // Now-playing + incoming-call pushed to the dash at ~1 Hz (mirrors the dash's05 0d / 05 22 cadence).
     // Strings, not the media model, so the protocol layer stays decoupled from the media provider.
-    @Volatile private var npTitle: String? = null
-    @Volatile private var npAlbum = ""
-    @Volatile private var npArtist = ""
+    private data class NativeMusic(val title: String, val album: String, val artist: String, val playing: Boolean?)
+    @Volatile private var nativeMusic: NativeMusic? = null
     @Volatile private var caller: String? = null
+    @Volatile private var musicSendAttempts = 0L
+    @Volatile private var musicResponses = 0L
+    @Volatile private var lastMusicResponse = "none"
+    @Volatile private var musicFailure: String? = null
+
+    fun musicDiagnostics(): String = """
+        Console state: ${_state.value}
+        Queued metadata lengths (title/album/artist): ${nativeMusic?.title?.length ?: 0}/${nativeMusic?.album?.length ?: 0}/${nativeMusic?.artist?.length ?: 0}
+        Now-playing send attempts: $musicSendAttempts
+        Media responses (05 58): $musicResponses
+        Last media response: $lastMusicResponse
+        Last send exception: ${musicFailure ?: "none"}
+        Attempts and responses do not confirm native ribbon rendering.
+    """.trimIndent()
+
 
     /** Push the latest now-playing metadata; sent to the dash at 1 Hz while streaming (null title = hide). */
-    fun updateNowPlaying(title: String?, album: String, artist: String) {
-        npTitle = title?.takeIf { it.isNotBlank() }
-        npAlbum = album
-        npArtist = artist
+    fun updateNowPlaying(title: String?, album: String, artist: String, playing: Boolean? = null) {
+        nativeMusic = if (title.isNullOrBlank() && artist.isBlank()) null else
+            NativeMusic(title?.takeIf { it.isNotBlank() } ?: "Now Playing", album, artist, playing)
     }
 
     /** Push the current incoming-call caller name (null clears it). */
@@ -133,12 +182,35 @@ class DashSession(private val scope: CoroutineScope) {
 
     fun startStreaming() {
         if (_state.value != DashState.READY) return
+        musicSendAttempts = 0
+        musicResponses = 0
+        lastMusicResponse = "none"
+        musicFailure = null
         _state.value = DashState.STREAMING
         // Projection-on route card + faster keep-alive begin now
         launchProjectionHeartbeat()
         launchRouteCardKeepAlive()
         launchNavInfo()
         launchMediaInfo()
+        artJob?.cancel()
+        artJob = scope.launch(Dispatchers.IO) {
+            var sent: ByteArray? = null
+            while (isActive && _state.value == DashState.STREAMING) {
+                val art = pendingArt
+                val currentSocket = socket
+                if (art != null && currentSocket != null && (sent == null || !sent.contentEquals(art))) {
+                    var completed = true
+                    for (packet in DashCommands.albumArtFrames(art)) {
+                        ensureActive()
+                        if (pendingArt !== art || socket !== currentSocket) { completed = false; break }
+                        currentSocket.send(packet)
+                        delay(10)
+                    }
+                    if (completed) sent = art
+                }
+                delay(100)
+            }
+        }
     }
 
     fun sendRtp(packet: ByteArray) { socket?.sendRtp(packet) }
@@ -159,6 +231,8 @@ class DashSession(private val scope: CoroutineScope) {
         sessionJob?.cancel(); sessionJob = null
         rxJob?.cancel(); projHbJob?.cancel(); routeCardJob?.cancel(); heartbeatJob?.cancel(); navInfoJob?.cancel(); mediaInfoJob?.cancel()
         navActive = false
+        artJob?.cancel(); artJob = null
+        pendingArt = null
         socket?.let {
             runCatching { it.send(DashCommands.projectionStop()) }
             runCatching { it.send(DashCommands.projectionOff()) }
@@ -275,6 +349,18 @@ class DashSession(private val scope: CoroutineScope) {
         }
         if (!onlyAcks) Dbg.i(TAG) { "RX RAW (${pkt.size}B): ${pkt.toHexFull()}" }
         for (tlv in tlvs) {
+            if (tlv.type == 0x05 && tlv.sub == 0x58) {
+                musicResponses++
+                lastMusicResponse = tlv.value.take(16).joinToString(" ") { "%02X".format(it.toInt() and 255) }
+                com.example.navisarthi.data.RideDiagnostics.log("media", "RX 05 58: $lastMusicResponse")
+            }
+            if (_state.value == DashState.STREAMING && tlv.type == 0x09 && tlv.sub == 0x01) {
+                val category = com.example.navisarthi.dash.protocol.CallHistoryCategory.fromRequest(tlv.value)
+                if (category != null) scope.launch(Dispatchers.Main) { onCallHistoryRequest?.invoke(category) }
+                else com.example.navisarthi.dash.protocol.CallHistoryProtocol.dialSelection(tlv.value)?.let { selection ->
+                    scope.launch(Dispatchers.Main) { onConsoleDial?.invoke(selection) }
+                }
+            }
             // ── Auth (07 xx) ──
             if (tlv.type == 0x07) {
                 when (val ev = auth?.ingest(tlv)) {
@@ -389,6 +475,8 @@ class DashSession(private val scope: CoroutineScope) {
         routeCardJob = scope.launch(Dispatchers.IO) {
             while (isActive && _state.value == DashState.STREAMING) {
                 socket?.send(liveRouteCard(projectionOn = true))
+                val currentZoom = consoleZoom
+                socket?.send(DashCommands.zoomAvailability(currentZoom < 20, currentZoom > 11))
                 delay(ROUTE_CARD_MS)
             }
         }
@@ -437,16 +525,27 @@ class DashSession(private val scope: CoroutineScope) {
                     prevCaller != null -> { runCatching { socket?.send(DashCommands.callClear()) }; loggedCall = false }
                 }
                 prevCaller = c
-                val title = npTitle
-                if (title == null && hadNowPlaying) {
-                    runCatching { socket?.send(DashCommands.nowPlaying("", "", "")) }
+                val music = nativeMusic
+                val currentSocket = socket
+                if (music == null) {
+                    runCatching {
+                        currentSocket?.send(DashCommands.musicAvailable(false))
+                        if (hadNowPlaying) currentSocket?.send(DashCommands.nowPlaying("", "", ""))
+                    }.onFailure { musicFailure = it.javaClass.simpleName }
                     loggedNp = false
                 }
-                hadNowPlaying = title != null
-                title?.let {
-                    runCatching { socket?.send(DashCommands.nowPlaying(it, npAlbum, npArtist)) }
-                    if (!loggedNp) { loggedNp = true
-                        com.example.navisarthi.data.RideDiagnostics.log("media", "TX now-playing 05 0d: $it") }
+                hadNowPlaying = music != null
+                if (music != null && currentSocket != null) {
+                    musicSendAttempts++
+                    runCatching {
+                        currentSocket.send(DashCommands.musicAvailable(true))
+                        music.playing?.let { currentSocket.send(DashCommands.musicPlaybackState(it)) }
+                        currentSocket.send(DashCommands.nowPlaying(music.title, music.album, music.artist))
+                    }.onFailure { musicFailure = it.javaClass.simpleName }
+                    if (!loggedNp) {
+                        loggedNp = true
+                        com.example.navisarthi.data.RideDiagnostics.log("media", "TX music available + playback state + metadata")
+                    }
                 }
                 delay(ROUTE_CARD_MS)
             }

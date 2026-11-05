@@ -3,8 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Console joystick adjusts the phone media stream, without changing its output route. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Passive accessory connection/battery reporting; no Bluetooth scanning. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- startScan() to warm scan results so we resolve the exact dash SSID on the first try -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -33,6 +37,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Answer / reject the live call from the dash joystick (TelecomManager). Runtime-granted. -->
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <!-- Optional, user-enabled native console incoming/missed/outgoing history. -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
     <!-- In-app updater: download the new APK from GitHub Releases and hand it to the
          system package installer (the install itself still needs the user's tap + the
          per-app "install unknown apps" grant). -->

@@ -1,6 +1,7 @@
 package com.example.navisarthi.util
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.location.LocationManager
@@ -9,28 +10,27 @@ import android.os.PowerManager
 import android.provider.Settings
 
 /**
- * Cross-OEM background-execution readiness.
- *
- * Stock Android keeps a foreground service alive with the screen off, but OxygenOS, Samsung
- * One UI, MIUI, ColorOS/Realme etc. aggressively kill apps that aren't exempt from battery
- * optimization — which silently stops the dash stream (the whole point of the app) the moment
- * the screen goes off. The behaviour was device-dependent because nothing here asked for the
- * exemption; this makes it uniform.
- *
- * The `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog is a standard framework intent and
- * behaves the same on every OEM. The OEM-specific "Autostart" / "Sleeping apps" toggles can't be
- * granted programmatically — only the app's settings page can be opened for the rider to flip them.
+ * Android battery-exemption and background-settings guidance.
+ * Exemption helps background operation but does not prove that manufacturer-specific
+ * sleeping-app, autostart or background-activity restrictions are disabled.
  */
 object DeviceReadiness {
 
     private const val PREFS = "navisarthi_readiness"
     private const val KEY_BATTERY_ASKED = "battery_exemption_asked"
 
-    /** True if the OS won't throttle/kill us in the background (needed for screen-off streaming). */
+    /** Standard Doze exemption only; manufacturer restrictions are not exposed by this check. */
     fun isIgnoringBatteryOptimizations(ctx: Context): Boolean {
         val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
         return pm.isIgnoringBatteryOptimizations(ctx.packageName)
     }
+
+    fun isBackgroundRestricted(ctx: Context): Boolean =
+        ctx.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true
+
+    /** Warn only while Android reports optimization or restricted background usage. */
+    fun shouldShowNavigationBatteryGuidance(ctx: Context): Boolean =
+        !isIgnoringBatteryOptimizations(ctx) || isBackgroundRestricted(ctx)
 
     /**
      * Whether we've already shown the rider the battery-exemption dialog once. We fold the request
