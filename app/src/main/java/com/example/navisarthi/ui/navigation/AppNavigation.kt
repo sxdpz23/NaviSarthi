@@ -62,6 +62,17 @@ fun AppNavigation(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val garageEnabled by appViewModel.garageEnabled.collectAsState()
+
+    // Covers restored back stacks as well as disabling Garage from Settings.
+    LaunchedEffect(garageEnabled, currentRoute) {
+        if (!garageEnabled && currentRoute == Screen.Garage.route) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Home.route) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     // Analytics screen_view per destination. A single-Activity Compose app doesn't auto-log these,
     // so feed each nav route to Analytics — that's what makes per-feature usage (and time spent on
@@ -141,7 +152,7 @@ fun AppNavigation(
                                 // back stack stays consistent with the bottom bar (see navigateTab).
                                 "route" -> navigateTab(Screen.Route.route)
                                 "dash" -> navigateTab(Screen.Dash.route)
-                                "garage" -> navigateTab(Screen.Garage.route)
+                                "garage" -> if (garageEnabled) navigateTab(Screen.Garage.route)
                                 // Settings is a detail screen (its own back), not a tab.
                                 "settings" -> navController.navigate(Screen.Settings.route)
                             }
@@ -172,7 +183,7 @@ fun AppNavigation(
                 }
 
                 composable(Screen.Garage.route) {
-                    GarageScreen(
+                    if (garageEnabled) GarageScreen(
                         tab = garageTab,
                         onTabChange = { appViewModel.setGarageTab(it) },
                     )
@@ -188,6 +199,8 @@ fun AppNavigation(
                         onConnChange = { appViewModel.setConn(it) },
                         dashViewModel = dashViewModel,
                         onVehicleSelected = onVehicleSelected,
+                        garageEnabled = garageEnabled,
+                        onGarageEnabledChange = appViewModel::setGarageEnabled,
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -201,6 +214,7 @@ fun AppNavigation(
         if (showBottomNav) {
             NaviSarthiBottomNav(
                 currentRoute = currentRoute,
+                garageEnabled = garageEnabled,
                 onNavSelect = { screen -> navigateTab(screen.route) },
             )
         }
@@ -210,6 +224,7 @@ fun AppNavigation(
 @Composable
 private fun NaviSarthiBottomNav(
     currentRoute: String?,
+    garageEnabled: Boolean,
     onNavSelect: (Screen) -> Unit,
 ) {
     Row(
@@ -220,7 +235,7 @@ private fun NaviSarthiBottomNav(
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .navigationBarsPadding(),
     ) {
-        bottomTabs.forEach { tab ->
+        bottomTabs.filter { garageEnabled || it.screen != Screen.Garage }.forEach { tab ->
             val active = currentRoute == tab.screen.route
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

@@ -56,7 +56,7 @@ data class Maneuver(
         ManeuverType.SHARP_RIGHT -> 0x17
         ManeuverType.SLIGHT_LEFT -> 0x18
         ManeuverType.SLIGHT_RIGHT -> 0x19
-        ManeuverType.UTURN -> if (rightUTurn) 0x1A else 0x3D
+        ManeuverType.UTURN -> 0x1A // India: right-side U-turn cue, including saved routes
         ManeuverType.ARRIVE -> 0x3C
         ManeuverType.ROUNDABOUT -> when (val exit = roundaboutExit ?: 0) {
             in 1..9 -> 0x31 + exit

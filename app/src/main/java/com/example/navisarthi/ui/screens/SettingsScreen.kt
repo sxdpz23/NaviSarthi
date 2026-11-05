@@ -36,6 +36,8 @@ fun SettingsScreen(
     onConnChange: (ConnectionState) -> Unit,
     dashViewModel: DashViewModel,
     onVehicleSelected: (VehicleModel) -> Unit,
+    garageEnabled: Boolean,
+    onGarageEnabledChange: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val dashUi by dashViewModel.ui.collectAsState()
@@ -77,6 +79,13 @@ fun SettingsScreen(
                 showVehiclePicker = false
             }, onDismiss = { showVehiclePicker = false })
         }
+
+        ControlSection("App features")
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Wrench, "Enable Garage", "Maintenance, fuel diary and vehicle records",
+                control = { NaviSarthiToggle(garageEnabled) { onGarageEnabledChange(it) } }, last = true)
+        }
+        ControlHint("Enable to show Garage in the bottom bar. Turn it off to hide Garage; your saved garage records are kept.")
 
         ControlSection("Connection")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
@@ -133,6 +142,34 @@ fun SettingsScreen(
                 control = { NaviSarthiToggle(keepAwake) { keepAwake = it } }, last = true)
         }
 
+        ControlSection("Music on console")
+        val musicEnabled by dashViewModel.musicEnabled.collectAsState()
+        val playing by dashViewModel.nowPlaying.collectAsState()
+        val musicStatus by dashViewModel.musicStatus.collectAsState()
+        LaunchedEffect(Unit) { dashViewModel.refreshMusic() }
+        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(NaviSarthiIcons.Zap, "Enable music controls", musicStatus,
+                control = { NaviSarthiToggle(musicEnabled) { dashViewModel.setMusicEnabled(it) } }, last = true)
+        }
+        playing?.let { track ->
+            ControlHint(listOf(track.title, track.artist).filter { it.isNotBlank() }.joinToString(" · "))
+            val actions = track.actions
+            val playAction = if (track.isPlaying) android.media.session.PlaybackState.ACTION_PAUSE
+                else android.media.session.PlaybackState.ACTION_PLAY
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NaviSarthiBtn("Previous", onClick = { dashViewModel.musicPrevious() },
+                    enabled = actions and android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L,
+                    modifier = Modifier.weight(1f))
+                NaviSarthiBtn(if (track.isPlaying) "Pause" else "Play", onClick = { dashViewModel.musicPlayPause() },
+                    enabled = actions and (playAction or android.media.session.PlaybackState.ACTION_PLAY_PAUSE) != 0L,
+                    modifier = Modifier.weight(1f))
+                NaviSarthiBtn("Next", onClick = { dashViewModel.musicNext() },
+                    enabled = actions and android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT != 0L,
+                    modifier = Modifier.weight(1f))
+            }
+        }
+        ControlHint("Start Spotify or YouTube Music on your phone. Console media-mode left/right requests previous/next. Console play/pause mapping awaits bike verification. Audio stays on your selected phone/headset output.")
+
         ControlSection("Media & calls on dash")
         // Re-check the grant on ON_RESUME so the chip flips to "On" the moment the user comes back
         // from the system notification-access screen (the Settings value isn't observable on its own).
@@ -147,6 +184,7 @@ fun SettingsScreen(
                 if (e == Lifecycle.Event.ON_RESUME) {
                     mediaGranted = com.example.navisarthi.media.MediaInfoProvider.isAccessGranted(ctx)
                     callAnswerGranted = answerGranted()
+                    dashViewModel.refreshMusic()
                 }
             }
             lifecycleOwner.lifecycle.addObserver(obs)
@@ -159,7 +197,7 @@ fun SettingsScreen(
             SettingRow(
                 NaviSarthiIcons.Zap,
                 "Now playing & calls on dash",
-                if (mediaGranted) "Enabled · song info + caller shown while riding"
+                if (mediaGranted) "Access granted · music uses the toggle above"
                 else "Tap to allow notification access",
                 control = {
                     NaviSarthiChip(

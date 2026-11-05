@@ -93,7 +93,7 @@ object Router {
                 else -> ManeuverType.CONTINUE
             }
             Maneuver(type, step.optString("instruction"), point, cumulative[index],
-                step.optInt("roundabout_exit_count").takeIf { it > 0 }, rightUTurn = code == 12)
+                step.optInt("roundabout_exit_count").takeIf { it > 0 }, rightUTurn = type == ManeuverType.UTURN)
         }
         return Route(geometry, maneuvers, cumulative.last(), trip.getJSONObject("summary").getDouble("time"), cumulative)
     }
@@ -136,6 +136,7 @@ object Router {
                             type = type,
                             instruction = exit?.let { "At the roundabout, take exit $it onto $name" } ?: buildInstruction(type, name),
                             roundaboutExit = exit,
+                            rightUTurn = type == ManeuverType.UTURN,
                             location = p,
                             cumulativeMeters = nearestCumulative(p, geometry, cum),
                         )

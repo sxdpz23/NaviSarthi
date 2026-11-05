@@ -7,6 +7,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.DashPathEffect
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
@@ -43,6 +44,8 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         val style: Style = Style.Light,
         val arrived: Boolean = false,
         val arrivalDuration: String? = null,
+        val journeyAverageKmh: Double? = null,
+        val journeyMaxKmh: Double? = null,
         val goldenRoute: Boolean = false,
         val traffic: Boolean = false,
         val tilt3d: Boolean = false,       // perspective 3D view (nav heading-up only)
@@ -64,11 +67,11 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
     }
     private val routeCasing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; style = Paint.Style.STROKE
-        strokeWidth = 11f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        strokeWidth = 13f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
     }
     private val routePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = routeBlue; style = Paint.Style.STROKE
-        strokeWidth = 6f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        strokeWidth = 9f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
     }
     private val dotPaint     = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 22f; isFakeBoldText = true }
@@ -142,6 +145,21 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
     ))
     private val darkFilter = nightFilter(247f, 265f, 295f)
     private val miniClip = Path()
+    private val miniBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        pathEffect = DashPathEffect(floatArrayOf(5f, 5f), 0f)
+    }
+    private val journeyStatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 22f
+    }
+    private val journeyStatLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        color = Color.LTGRAY
+        textSize = 11f
+    }
     private val perspectiveCamera = android.graphics.Camera()
 
     fun draw(canvas: Canvas, f: Frame) {
@@ -384,6 +402,19 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         }
 
         if (f.arrived) {
+            val radius = h * .57f
+            miniBorderPaint.color = Color.rgb(75, 79, 84)
+            pillRect.set(w / 2f - radius, h - radius, w / 2f + radius, h + radius)
+            canvas.drawArc(pillRect, 180f, 180f, false, miniBorderPaint)
+            journeyStatPaint.color = accent
+            fun drawJourneyStat(x: Float, label: String, value: Double?) {
+                canvas.drawText(label, x, h * .68f, journeyStatLabelPaint)
+                canvas.drawText(value?.takeIf { it.isFinite() }?.let { "%.0f".format(it) } ?: "—",
+                    x, h * .78f, journeyStatPaint)
+                canvas.drawText("km/h", x, h * .85f, journeyStatLabelPaint)
+            }
+            drawJourneyStat((w / 2f - radius) / 2f, "AVG", f.journeyAverageKmh)
+            drawJourneyStat(w - (w / 2f - radius) / 2f, "MAX", f.journeyMaxKmh)
             arrivalMessagePaint.color = accent
             canvas.drawText("You have", w / 2f, h * .22f, arrivalMessagePaint)
             canvas.drawText("Reached Your Destination ❤️", w / 2f, h * .32f, arrivalMessagePaint)

@@ -1,0 +1,56 @@
+{
+  "targets": {
+    "home": {
+      "fingerprints": {
+        "app/src/main/java/com/example/navisarthi/ui/navigation/AppNavigation.kt": "8456b2856301e27c86683a32e7b053f3dce203c98d9fcb0914b0fa36fef1a1e3",
+        "app/src/main/java/com/example/navisarthi/ui/screens/HomeScreen.kt": "f88fff6bb4894dafa943dc3f9dd44f0156a0815e9a40c17acfd73d285a208d01",
+        ".superdesign/design-system.md": "320a94a1430768d92d4a5fdd8e8aa163fe32b7827edeb770bf0eea62f7acbed9",
+        "app/src/main/java/com/example/navisarthi/ui/components/CircularDash.kt": "f966f948b5113c93c8b4b026d807ad36f3f586d9f5ed67bbe7874ee291dc6edf",
+        ".superdesign/ux-redesign-brief.md": "8186a8e9ac3808889defc133247e4a0b2db56fac02bb35ca9e5d9bccca47a7f7",
+        "app/src/main/java/com/example/navisarthi/ui/components/NaviSarthiComponents.kt": "3dc1f5124eb5736bbbb43f4975a41b074f341c19e27842a4e3c82204df384716",
+        "app/src/main/java/com/example/navisarthi/ui/NaviSarthiIcons.kt": "92531049da9218b553cbe9fbc14150df9b3aeddca678f5f881cac481cfa8a791"
+      },
+      "designSystemPath": ".superdesign/design-system.md",
+      "components": [
+        {
+          "sourcePath": "app/src/main/java/com/example/navisarthi/ui/components/NaviSarthiComponents.kt",
+          "name": "NaviSarthiHeader",
+          "id": "fd354203-084c-42ee-b3ae-eaa5ddf41134",
+          "logoAssetKey": "navisarthi-logo"
+        }
+      ],
+      "drafts": {
+        "b397b6ba-79cf-4e0f-9e69-bd18bd7d9ab6": {
+          "visualDirection": "Destination-first warm charcoal and gold; readable typography; sharing and connection sheets",
+          "currentVersion": 2,
+          "title": "NaviSarthi Home"
+        }
+      },
+      "targetKind": "existing-ui",
+      "activeDraftId": "b397b6ba-79cf-4e0f-9e69-bd18bd7d9ab6",
+      "referenceIds": [
+        "navisarthi-logo"
+      ],
+      "contextFiles": [
+        "app/src/main/java/com/example/navisarthi/ui/screens/HomeScreen.kt",
+        "app/src/main/java/com/example/navisarthi/ui/components/NaviSarthiComponents.kt",
+        "app/src/main/java/com/example/navisarthi/ui/components/CircularDash.kt",
+        "app/src/main/java/com/example/navisarthi/ui/navigation/AppNavigation.kt",
+        "app/src/main/java/com/example/navisarthi/ui/NaviSarthiIcons.kt",
+        ".superdesign/design-system.md",
+        ".superdesign/ux-redesign-brief.md"
+      ],
+      "baselineDraftId": "b397b6ba-79cf-4e0f-9e69-bd18bd7d9ab6",
+      "updatedAt": "2026-11-05T15:57:01.3036045Z",
+      "brandAssets": {
+        "logo": {
+          "sourcePath": "app/src/main/res/drawable-nodpi/navisarthi_logo.png",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/224da3cb-a450-40b9-89f2-2000b18f9716/brand-assets/navisarthi-logo/navisarthi_logo.png",
+          "assetKey": "navisarthi-logo"
+        }
+      },
+      "projectId": "224da3cb-a450-40b9-89f2-2000b18f9716"
+    }
+  },
+  "schemaVersion": 1
+}

@@ -120,6 +120,15 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         lastSignature = ""
     }
     private val mediaInfo   = com.example.navisarthi.media.MediaInfoProvider(app)
+    val musicEnabled = mediaInfo.enabled
+    val nowPlaying = mediaInfo.nowPlaying
+    val musicStatus = mediaInfo.status
+    fun setMusicEnabled(enabled: Boolean) = mediaInfo.setEnabled(enabled)
+    fun refreshMusic() = mediaInfo.refresh()
+    fun musicNext() = mediaInfo.skipNext()
+    fun musicPrevious() = mediaInfo.skipPrevious()
+    fun musicPlayPause() = mediaInfo.togglePlayback()
+
     private val callController = com.example.navisarthi.media.CallController(app)
     private var mediaObserveJob: Job? = null
     private val powerManager = app.getSystemService(Application.POWER_SERVICE) as PowerManager
@@ -155,6 +164,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     private var arrivalMini = false
     private var navigationStartedMs = 0L
     private var arrivalDuration: String? = null
+    private var arrivalAverageKmh: Double? = null
+    private var arrivalMaxKmh: Double? = null
 
     fun setGoldenRoute(enabled: Boolean) {
         _ui.update { it.copy(goldenRoute = enabled) }
@@ -224,7 +235,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile private var lastSnapDist = -1.0
     // Rolling average of actual moving speed (m/s), held through stops — drives a STEADY ETA
     // instead of one that swings with instantaneous speed at every brake/light.
-    private var smoothSpeedMps = 0.0
+    @Volatile private var navigationMotion: com.example.navisarthi.data.RideMotionStats? = null
 
     // Map-matched rider position: snapped onto the route while on it (kills the GPS
     // lane/road jitter), raw GPS when genuinely off-route. Drives the marker + camera.
@@ -448,8 +459,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 // call — only DOWN is reserved for hang-up, and that's not a map/media code anyway).
                 !ringing && code == BTN_MAP_ZOOM_IN  -> { zoomOut(); "Zoom out (map)" }
                 !ringing && code == BTN_MAP_ZOOM_OUT -> { zoomIn(); "Zoom in (map)" }
-                !ringing && code == BTN_MEDIA_NEXT -> { mediaInfo.skipNext(); "Next track" }
-                !ringing && code == BTN_MEDIA_PREV -> { mediaInfo.skipPrevious(); "Previous track" }
+                !ringing && code == BTN_MEDIA_NEXT -> { if (mediaInfo.skipNext()) "Next track requested" else "Music: ${mediaInfo.status.value}" }
+                !ringing && code == BTN_MEDIA_PREV -> { if (mediaInfo.skipPrevious()) "Previous track requested" else "Music: ${mediaInfo.status.value}" }
                 else -> "code 0x${code.toString(16).uppercase()}"
             }
             // Persist every button code so untethered tests are diagnosable from the remote pull
@@ -633,7 +644,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         recorder.start()
         recordJob = viewModelScope.launch {
             location.location.collect { loc ->
-                if (loc != null) recorder.add(loc.latitude, loc.longitude, loc.speed, loc.accuracy, loc.time)
+                if (loc != null) recorder.add(loc.latitude, loc.longitude,
+                    if (loc.hasSpeed()) loc.speed else Float.NaN, loc.accuracy, loc.elapsedRealtimeNanos / 1_000_000L)
             }
         }
     }
@@ -676,6 +688,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         journey = stops.mapIndexed { index, place -> JourneyStop(place, previews.getOrNull(index)) }
         journeyIndex = 0
         navigationStartedMs = SystemClock.elapsedRealtime()
+        navigationMotion = com.example.navisarthi.data.RideMotionStats(navigationStartedMs)
         activateStop(journey.first(), mode)
     }
 
@@ -717,6 +730,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         arrived = false
         arrivalMini = false
         arrivalDuration = null
+        arrivalAverageKmh = null
+        arrivalMaxKmh = null
         displayRoute = emptyList()
         progressM = 0.0
         offRouteSince = 0L
@@ -739,6 +754,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     /** Drop the destination/route → free roam. The map keeps streaming and follows the rider. */
     @Synchronized
     fun exitNavigation() {
+        navigationMotion = null
         journey = emptyList()
         journeyIndex = 0
         routeFetchJob?.cancel()
@@ -748,6 +764,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         arrived = false
         arrivalMini = false
         arrivalDuration = null
+        arrivalAverageKmh = null
+        arrivalMaxKmh = null
         displayRoute = emptyList()
         progressM = 0.0
         offRouteSince = 0L
@@ -967,6 +985,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         val fixAgeMs = loc?.let { FixFreshness.ageMs(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) } ?: Long.MAX_VALUE
         val navigationFixValid = loc != null && loc.hasAccuracy() &&
             FixFreshness.usable(loc.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos(), loc.accuracy)
+        if (!arrived && navigationFixValid && loc != null && loc.hasSpeed() && loc.accuracy <= 20f) {
+            navigationMotion?.add(loc.elapsedRealtimeNanos / 1_000_000L, loc.speed.toDouble())
+        }
         val activeJourney = journey
         val activeIndex = journeyIndex
         val r = route
@@ -991,6 +1012,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 if (journey !== activeJourney || journeyIndex != activeIndex) return false
                 arrived = true
                 arrivalMini = true
+                val arrivalElapsedMs = SystemClock.elapsedRealtime()
+                arrivalAverageKmh = navigationMotion?.averageSpeedMps(arrivalElapsedMs)?.times(3.6)
+                arrivalMaxKmh = navigationMotion?.maxSpeedMps?.times(3.6)
                 val seconds = (SystemClock.elapsedRealtime() - navigationStartedMs) / 1000
                 arrivalDuration = if (seconds >= 3600) "%dh %02dm".format(seconds / 3600, seconds / 60 % 60)
                     else "%dm %02ds".format(seconds / 60, seconds % 60)
@@ -1065,19 +1089,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             recalculating = rawRecalc || nowMs < recalcHoldUntil
 
             if (!recalculating) {
-                // Steady ETA: divide remaining distance by a ROLLING AVERAGE speed (held through
-                // stops), not the instantaneous value — so it tracks a typical pace instead of
-                // swinging every time you brake, accelerate or sit at a light.
-                if (loc.speed > 0.5f) {
-                    smoothSpeedMps = if (smoothSpeedMps <= 0.0) loc.speed.toDouble()
-                                     else smoothSpeedMps + (loc.speed - smoothSpeedMps) * 0.05
-                }
-                val speed = smoothSpeedMps.coerceAtLeast(3.0)  // floor: no absurd ETA at a crawl
-                val rawEta = ns.remainingM / speed
-                smoothEtaSec = if (smoothEtaSec <= 0.0) rawEta else smoothEtaSec + (rawEta - smoothEtaSec) * 0.08
+                // Whole-navigation average includes stopped time, and survives stop changes/reroutes.
+                // No speed floor or preset planning speed: wait until movement has been measured.
+                val average = navigationMotion?.averageSpeedMps(SystemClock.elapsedRealtime()) ?: 0.0
+                smoothEtaSec = if (average > 0.0) ns.remainingM / average else 0.0
                 // Refresh the displayed minutes + arrival clock only every 5 s so they read steady
                 // (like Google Maps) instead of flickering every second.
-                if (etaArrivalMs == 0L || nowMs - lastArrivalCalcMs > 5_000) {
+                if (smoothEtaSec > 0.0 && (etaArrivalMs == 0L || nowMs - lastArrivalCalcMs > 5_000)) {
                     etaArrivalMs = nowMs + (smoothEtaSec * 1000).toLong()
                     displayedEtaMin = Math.round(smoothEtaSec / 60.0).toInt()
                     lastArrivalCalcMs = nowMs
@@ -1169,7 +1187,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // doesn't trail the bike between 1 Hz fixes. Only predict while genuinely moving.
         val rider: Pair<Double, Double>? = when {
             loc == null -> null
-            routeMatch != null -> routeMatch.lat to routeMatch.lng
+            routeMatch != null -> {
+                val confidence = ((25f - loc.accuracy) / 15f).coerceIn(0f, 1f)
+                val distance = predictedDistance(loc.speed, (fixAgeMs / 1000.0).coerceAtMost(1.5)) * confidence
+                if (loc.hasBearing() && loc.speed >= BEARING_MIN_SPEED) {
+                    project(routeMatch.lat, routeMatch.lng, loc.bearing.toDouble(), distance)
+                } else routeMatch.lat to routeMatch.lng
+            }
             navigationFixValid && loc.hasBearing() && fixSpeed > 0.5f -> {
                 // Dead-reckon forward from the last fix so the camera keeps GLIDING through GPS
                 // gaps instead of freezing then snapping ("stuck then jump"). predictedDistance
@@ -1240,8 +1264,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         // Lock the dash marker to the smoothed centre (map slides under it).
-        frameRiderLat = routeMatch?.lat ?: if (rider != null) camLat else null
-        frameRiderLng = routeMatch?.lng ?: if (rider != null) camLng else null
+        frameRiderLat = if (rider != null) camLat else null
+        frameRiderLng = if (rider != null) camLng else null
 
         val centerLat = if (haveTarget) camLat else 0.0
         val centerLng = if (haveTarget) camLng else 0.0
@@ -1358,6 +1382,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             style = _ui.value.mapStyle,
             arrived = arrivalMini,
             arrivalDuration = arrivalDuration,
+            journeyAverageKmh = arrivalAverageKmh,
+            journeyMaxKmh = arrivalMaxKmh,
             goldenRoute = _ui.value.goldenRoute,
             traffic = trafficTiles.enabled && _ui.value.trafficAvailable && !offlineJourney && !arrived && displayRoute.size >= 2,
             etaPrimary = etaPrimary,

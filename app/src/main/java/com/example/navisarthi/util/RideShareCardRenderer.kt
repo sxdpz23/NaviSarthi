@@ -85,7 +85,8 @@ object RideShareCardRenderer {
             val speed = if (miles) ride.avgSpeedKmh / 1.609344 else ride.avgSpeedKmh
             add("Distance" to String.format(Locale.getDefault(), "%.1f %s", distance, if (miles) "mi" else "km"))
             add("Duration" to fmtDur(ride.durationSec))
-            add("Avg speed" to String.format(Locale.getDefault(), "%.1f %s", speed, if (miles) "mph" else "km/h"))
+            add("Avg speed" to if (ride.hasConsistentSpeedStats)
+                String.format(Locale.getDefault(), "%.1f %s", speed, if (miles) "mph" else "km/h") else "Unavailable")
         }
         val statLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TextLo.toArgb(); textSize = 26f }
         val statValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

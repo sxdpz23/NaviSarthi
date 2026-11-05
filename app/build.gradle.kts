@@ -42,8 +42,8 @@ android {
         minSdk = 34
         targetSdk = 36
         // Independent NaviSarthi version sequence.
-        versionCode = 14
-        versionName = "0.3.0-dev08"
+        versionCode = 18
+        versionName = "0.4.0-dev01"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for

@@ -116,8 +116,8 @@ private fun RideCard(ride: Ride, onDelete: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 MiniStat(fmtDuration(ride.durationSec), "duration")
-                MiniStat("%.0f km/h".format(ride.avgSpeedKmh), "avg")
-                MiniStat("%.0f km/h".format(ride.maxSpeedKmh), "max")
+                MiniStat(if (ride.hasConsistentSpeedStats) "%.0f km/h".format(ride.avgSpeedKmh) else "—", "avg")
+                MiniStat(if (ride.hasConsistentSpeedStats) "%.0f km/h".format(ride.maxSpeedKmh) else "—", "max")
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.size(34.dp).clip(CircleShape).background(Surf2)
@@ -126,6 +126,12 @@ private fun RideCard(ride: Ride, onDelete: () -> Unit) {
                     Icon(NaviSarthiIcons.X, contentDescription = "Delete ride", tint = TextLo, modifier = Modifier.size(16.dp))
                 }
             }
+            Text(
+                if (ride.hasConsistentSpeedStats) "Average includes time stopped. GPS gaps may reduce recorded distance."
+                else "Speed statistics unavailable: this older recording contains inconsistent GPS data.",
+                color = TextLo, fontSize = 11.sp, fontFamily = GeistFamily,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }

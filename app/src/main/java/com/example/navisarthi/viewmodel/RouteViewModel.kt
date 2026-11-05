@@ -15,6 +15,7 @@ import com.example.navisarthi.dash.nav.Router
 import com.example.navisarthi.util.Dbg
 import com.example.navisarthi.util.LocationParser
 import com.example.navisarthi.dash.nav.RouteMode
+import com.example.navisarthi.dash.nav.PlanningEstimate
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -152,7 +153,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             val distance = legs.sumOf { it.totalMeters }
-            val duration = legs.sumOf { it.totalSeconds }
+            val duration = PlanningEstimate.seconds(distance, item.mode)
             _state.value = RouteState(destination = item.stops.last(), mode = item.mode,
                 stops = item.stops, legs = legs, route = legs.first(), offline = true,
                 distanceText = fmtKm(distance), durationText = fmtDuration(duration), etaText = fmtEta(duration))
@@ -200,7 +201,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
             mode = previous.mode,
             destination = place,
             stops = stops,
-            needsStopChoice = stops.isNotEmpty(),
+            needsStopChoice = true,
             isResolving = place.needsExpansion,
             pendingNavigate = openRoute,
         )
@@ -208,15 +209,12 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectSaved(loc: com.example.navisarthi.data.SavedLocation) {
         selectPlace(SharedLocation(loc.name, loc.lat, loc.lng), openRoute = false)
-        acceptFirstPlace()
     }
 
     fun handleSharedText(text: String, activeStops: List<SharedLocation>? = null) {
         val loc = LocationParser.parse(text)
         selectPlace(loc, openRoute = true, activeStops = activeStops)
-        if (loc.lat != null && loc.lng != null) {
-            acceptFirstPlace()
-        } else if (loc.url != null) {
+        if ((loc.lat == null || loc.lng == null) && loc.url != null) {
             viewModelScope.launch {
                 val (urlCoords, resolvedName) = LocationParser.resolve(loc.url)
                 val name = when {
@@ -233,8 +231,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 if (_state.value.destination !== loc) return@launch
                 _state.value = _state.value.copy(destination = resolved, isResolving = false)
-                if (coords != null) acceptFirstPlace()
-                else Log.w(TAG, "No coords for '$name' (url+geocode both empty)")
+                if (coords == null) Log.w(TAG, "No coords for '$name' (url+geocode both empty)")
             }
         }
     }
@@ -262,11 +259,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
 
     private var routeRequest: kotlinx.coroutines.Job? = null
 
-    private fun acceptFirstPlace() {
-        if (!_state.value.needsStopChoice) chooseStop(StopChoice.Replace)
-    }
-
-    enum class StopChoice { Next, Append, Replace }
+    enum class StopChoice { Append, Replace }
 
     fun chooseStop(choice: StopChoice) {
         val state = _state.value
@@ -274,7 +267,6 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
         if (place.lat == null || place.lng == null) return
         if (choice != StopChoice.Replace && state.stops.size >= 8) return
         val proposed = when (choice) {
-            StopChoice.Next -> listOf(place) + state.stops
             StopChoice.Append -> state.stops + place
             StopChoice.Replace -> listOf(place)
         }
@@ -337,7 +329,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 from = to
             }
             val distance = legs.sumOf { it.totalMeters }
-            val duration = legs.sumOf { it.totalSeconds }
+            val duration = PlanningEstimate.seconds(distance, plan.mode)
             _state.value = _state.value.copy(
                 route = legs.first(), legs = legs.toList(), routing = false,
                 distanceText = fmtKm(distance), durationText = fmtDuration(duration), etaText = fmtEta(duration),
@@ -348,9 +340,10 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
     fun onNavigated() { _state.value = _state.value.copy(pendingNavigate = false) }
     fun clear() { routeRequest?.cancel(); _state.value = RouteState(mode = _state.value.mode) }
 
-    private fun fmtKm(m: Double) = "%.0f km".format(m / 1000.0)
+    private fun fmtKm(m: Double) = if (m < 1000) "%.0f m".format(m) else "%.1f km".format(m / 1000.0)
     private fun fmtDuration(sec: Double): String {
-        val total = (sec / 60.0).toInt()
+        if (sec > 0 && sec < 60) return "<1m"
+        val total = kotlin.math.ceil(sec / 60.0).toInt()
         return if (total >= 60) "${total / 60}h ${total % 60}m" else "${total}m"
     }
     private fun fmtEta(sec: Double): String =

@@ -7,6 +7,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.UnfoldMore
+import kotlin.math.roundToInt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -244,6 +252,10 @@ fun RouteScreen(
                 }
             }
 
+            ControlHint(
+                "Pre-journey estimate: ${com.example.navisarthi.dash.nav.PlanningEstimate.averageKmh(routeState.mode)} km/h average (${routeState.mode.name}). " +
+                    "Covers all stops; excludes stopover time and traffic delays. During navigation, live ETA uses your average speed since starting, including stopped time."
+            )
             Spacer(Modifier.height(20.dp))
 
             Row(
@@ -287,47 +299,70 @@ fun RouteScreen(
             }
 
             ControlHint("Car and Bike use different routing profiles. Bike is for motorcycles.")
-            ControlSection("Destinations")
-            NaviSarthiBtn(
-                label = if (routeState.stops.isEmpty()) "Add destination" else "Add next stop / destination",
-                onClick = { com.example.navisarthi.util.openGoogleMaps(ctx) },
-                icon = NaviSarthiIcons.Pin,
-                variant = BtnVariant.Secondary,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            )
-
-            ControlHint("Pick a place in Google Maps, then tap Share and choose NaviSarthi.")
-
             if (routeState.stops.isNotEmpty()) {
                 ControlSection("Journey stops")
+                val rowHeight = 64.dp
+                val rowPixels = with(LocalDensity.current) { rowHeight.toPx() }
+                var draggedIndex by remember { mutableStateOf<Int?>(null) }
+                var dragOffset by remember { mutableStateOf(0f) }
+                val stopCount = routeState.stops.size
                 routeState.stops.forEachIndexed { index, stop ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${index + 1}. ${stop.name}", Modifier.weight(1f), color = TextHi)
-                        TextButton(enabled = index > 0 && !routeState.needsStopChoice,
-                            onClick = { routeViewModel.moveStop(index, -1) }) { Text("Up") }
-                        TextButton(enabled = !routeState.needsStopChoice,
+                    Row(
+                        Modifier.fillMaxWidth().height(rowHeight)
+                            .zIndex(if (draggedIndex == index) 1f else 0f)
+                            .graphicsLayer { translationY = if (draggedIndex == index) dragOffset else 0f }
+                            .background(if (draggedIndex == index) Surf2 else Color.Transparent),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("${index + 1}. ${stop.name}", Modifier.weight(1f), color = TextHi, maxLines = 2)
+                        TextButton(enabled = !routeState.needsStopChoice && draggedIndex == null,
                             onClick = { routeViewModel.removeStop(index) }) { Text("Remove") }
+                        Box(
+                            Modifier.size(48.dp).pointerInput(index, stopCount, routeState.needsStopChoice) {
+                                if (!routeState.needsStopChoice) detectDragGesturesAfterLongPress(
+                                    onDragStart = { draggedIndex = index; dragOffset = 0f },
+                                    onDragCancel = { draggedIndex = null; dragOffset = 0f },
+                                    onDragEnd = {
+                                        val target = (index + (dragOffset / rowPixels).roundToInt()).coerceIn(0, stopCount - 1)
+                                        draggedIndex = null
+                                        dragOffset = 0f
+                                        if (target != index) routeViewModel.moveStop(index, target - index)
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset = (dragOffset + amount.y).coerceIn(
+                                            -index * rowPixels, (stopCount - index - 1) * rowPixels)
+                                    },
+                                )
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Outlined.UnfoldMore, contentDescription = "Hold and drag to reorder stop", tint = TextMid)
+                        }
                     }
                 }
-                ControlHint("Use Up to reorder a stop or Remove to take it out of this trip.")
+                ControlHint("Hold the chevron and drag a stop to its new position. Release to apply the order.")
+
             }
 
             if (routeState.needsStopChoice && dest?.lat != null && dest.lng != null) {
                 Text("Add ${dest.name} to this journey?", color = TextHi)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(enabled = routeState.stops.size < 8, onClick = {
-                        routeViewModel.chooseStop(RouteViewModel.StopChoice.Next)
-                    }) { Text("Add next") }
-                    TextButton(enabled = routeState.stops.size < 8, onClick = {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NaviSarthiBtn("Append", enabled = routeState.stops.size < 8, onClick = {
                         routeViewModel.chooseStop(RouteViewModel.StopChoice.Append)
-                    }) { Text("Append") }
-                    TextButton(onClick = {
+                    }, variant = BtnVariant.Secondary, modifier = Modifier.weight(1f))
+                    NaviSarthiBtn("Replace", onClick = {
                         routeViewModel.chooseStop(RouteViewModel.StopChoice.Replace)
-                    }) { Text("Replace") }
+                    }, variant = BtnVariant.Secondary, modifier = Modifier.weight(1f))
+                    NaviSarthiBtn("Cancel", onClick = routeViewModel::dismissStopChoice,
+                        variant = BtnVariant.Secondary, modifier = Modifier.weight(1f))
                 }
+                ControlHint("Append adds this place at the end. Replace starts a new route with this place. Cancel keeps your current stops.")
+                if (routeState.stops.size >= 8) ControlHint("Maximum 8 stops reached. Remove a stop to append another destination.")
             }
-            if (routeState.needsStopChoice) {
-                TextButton(onClick = routeViewModel::dismissStopChoice) { Text("Cancel new stop") }
+            if (routeState.needsStopChoice && (dest?.lat == null || dest.lng == null)) {
+                NaviSarthiBtn("Cancel", onClick = routeViewModel::dismissStopChoice,
+                    variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
             }
 
             if (routeState.offline) {
@@ -336,6 +371,17 @@ fun RouteScreen(
             }
             val canStart = routeState.stops.isNotEmpty() && !routeState.needsStopChoice &&
                 !routeState.isResolving && !routeState.routing
+            if (routeState.stops.size < 8) {
+                ControlHint("Pick a place in Google Maps, then Share to NaviSarthi. You can add up to 8 stops.",
+                    Modifier.padding(bottom = 8.dp))
+                NaviSarthiBtn(
+                    label = "Add next stop/destination",
+                    onClick = { com.example.navisarthi.util.openGoogleMaps(ctx) },
+                    icon = NaviSarthiIcons.Pin,
+                    variant = BtnVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                )
+            }
             NaviSarthiBtn(
                 label = when {
                     sent                   -> "Starting navigation…"

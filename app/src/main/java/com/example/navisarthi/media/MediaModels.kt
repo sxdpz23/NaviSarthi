@@ -9,6 +9,8 @@ data class NowPlaying(
     val album: String,
     val artist: String,
     val art: Bitmap? = null,
+    val isPlaying: Boolean = false,
+    val actions: Long = 0L,
 )
 
 /**

@@ -425,6 +425,8 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
         Spacer(Modifier.height(16.dp))
 
+        ControlHint("Live ETA uses your average speed since navigation started, including stopped time. It appears after movement is measured. GPS gaps can reduce accuracy.")
+
         // Map adjust mode toggle
         Row(
             verticalAlignment = Alignment.CenterVertically,

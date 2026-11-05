@@ -424,6 +424,7 @@ class DashSession(private val scope: CoroutineScope) {
         mediaInfoJob = scope.launch(Dispatchers.IO) {
             var prevCaller: String? = null
             var loggedNp = false
+            var hadNowPlaying = false
             var loggedCall = false
             while (isActive && _state.value == DashState.STREAMING) {
                 val c = caller
@@ -436,7 +437,13 @@ class DashSession(private val scope: CoroutineScope) {
                     prevCaller != null -> { runCatching { socket?.send(DashCommands.callClear()) }; loggedCall = false }
                 }
                 prevCaller = c
-                npTitle?.let {
+                val title = npTitle
+                if (title == null && hadNowPlaying) {
+                    runCatching { socket?.send(DashCommands.nowPlaying("", "", "")) }
+                    loggedNp = false
+                }
+                hadNowPlaying = title != null
+                title?.let {
                     runCatching { socket?.send(DashCommands.nowPlaying(it, npAlbum, npArtist)) }
                     if (!loggedNp) { loggedNp = true
                         com.example.navisarthi.data.RideDiagnostics.log("media", "TX now-playing 05 0d: $it") }

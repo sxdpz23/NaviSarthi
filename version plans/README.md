@@ -14,12 +14,12 @@ Maintain one plan per version. Before each feature addition, update its plan wit
 
 ## Versions
 
-1. 0.1.0 — branding and planning foundation.
-2. 0.2.0 — measured location, background and streaming reliability.
-3. 0.3.0 — multi-stop navigation, Google Maps sharing and rerouting.
-4. 0.4.0 — setup, joystick zoom and headset guidance qualification; first navigation pilot.
-5. 0.5.0 — offline maps, saved custom routes, ride history.
-6. 0.6.0 — live traffic and traffic-aware routing.
-7. 0.7.0 — music, wallpaper, garage and fuel diary integration.
+1. 0.1.0 ï¿½ branding and planning foundation.
+2. 0.2.0 ï¿½ measured location, background and streaming reliability.
+3. 0.3.0 ï¿½ multi-stop navigation, Google Maps sharing and rerouting.
+4. 0.4.0 ï¿½ setup, joystick zoom, console music controls via the app and headset guidance qualification; first navigation/music pilot.
+5. 0.5.0 ï¿½ offline maps, saved custom routes, ride history.
+6. 0.6.0 ï¿½ live traffic and traffic-aware routing.
+7. 0.7.0 ï¿½ wallpaper, garage and fuel diary integration; music moved to 0.4.0.
 
 Existing inherited features may remain but must not be presented as newly qualified. Hardware validation gates all supported-model claims. Do not assume high frame rates are supported by the console.

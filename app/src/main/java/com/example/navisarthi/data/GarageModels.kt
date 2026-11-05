@@ -31,6 +31,8 @@ data class Ride(
     val endLng: Double = 0.0,
     val sid: String = "",             // stable cross-device id (Firestore doc id)
 ) {
+    val hasConsistentSpeedStats: Boolean get() = avgSpeedMps.isFinite() && maxSpeedMps.isFinite() &&
+        avgSpeedMps >= 0.0 && maxSpeedMps >= avgSpeedMps
     val avgSpeedKmh: Double get() = avgSpeedMps * 3.6
     val maxSpeedKmh: Double get() = maxSpeedMps * 3.6
     val distanceKm: Double get() = distanceMeters / 1000.0

@@ -48,3 +48,5 @@ node_modules/
 # Keep NaviSarthi milestone plans in source control.
 !/version plans/
 !/version plans/**
+
+.superdesign/tmp/
