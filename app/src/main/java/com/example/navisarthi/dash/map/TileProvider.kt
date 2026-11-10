@@ -13,6 +13,9 @@ import com.example.navisarthi.dash.nav.GeoPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -70,6 +73,19 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
     }
     private val inflight = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var lastFetchAt = 0L
+    @Volatile private var speculativePrefetch = true
+    private var pointPrefetchJob: Job? = null
+    private var routePrefetchJob: Job? = null
+    private var zoomPrefetchJob: Job? = null
+
+    @Synchronized
+    fun setSpeculativePrefetchEnabled(enabled: Boolean) {
+        speculativePrefetch = enabled
+        if (!enabled) {
+            pointPrefetchJob?.cancel(); routePrefetchJob?.cancel(); zoomPrefetchJob?.cancel()
+        }
+    }
+
 
     /** Non-blocking: returns the cached tile, else kicks off async load. */
     fun get(z: Int, x: Int, y: Int, labelFree: Boolean = false): Bitmap? {
@@ -106,18 +122,25 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Warm a single zoom level around a point right now (e.g. right after the rider zooms). */
+    @Synchronized
     fun prefetchZoom(lat: Double, lng: Double, z: Int, radius: Int = 2) {
-        if (z < 0) return
-        scope.launch(Dispatchers.IO) { prefetchAround(lat, lng, z, radius) }
+        if (z < 0 || !speculativePrefetch) return
+        zoomPrefetchJob?.cancel()
+        zoomPrefetchJob = scope.launch(Dispatchers.IO) { prefetchAround(lat, lng, z, radius) }
     }
 
     /** Prefetch tiles around a point (and optionally a straight corridor) into disk. */
+    @Synchronized
     fun prefetch(lat: Double, lng: Double, fromLat: Double? = null, fromLng: Double? = null) {
-        scope.launch(Dispatchers.IO) {
+        if (!speculativePrefetch) return
+        pointPrefetchJob?.cancel()
+        pointPrefetchJob = scope.launch(Dispatchers.IO) {
             var count = 0
             // 11..20 so the rider's vicinity has tiles at every zoom level offline
             // (default nav zoom is now 19, max 20).
             for (z in 11..20) {
+                coroutineContext.ensureActive()
+                if (!speculativePrefetch) return@launch
                 val radius = if (z in 15..16) 2 else 1
                 count += prefetchAround(lat, lng, z, radius)
                 if (fromLat != null && fromLng != null) {
@@ -134,9 +157,11 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Prefetch tiles along the actual route polyline so offline riding has coverage. */
+    @Synchronized
     fun prefetchRoute(route: List<GeoPoint>) {
-        if (route.size < 2) return
-        scope.launch(Dispatchers.IO) {
+        if (route.size < 2 || !speculativePrefetch) return
+        routePrefetchJob?.cancel()
+        routePrefetchJob = scope.launch(Dispatchers.IO) {
             var count = 0
             // Sample the polyline so we don't fetch a tile for every vertex.
             for (z in 12..16) {
@@ -144,11 +169,15 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
                 val step = if (z >= 15) 1 else 3
                 var i = 0
                 while (i < route.size) {
+                    coroutineContext.ensureActive()
+                    if (!speculativePrefetch) return@launch
                     val p = route[i]
                     val cx = Mercator.lngToTileX(p.lng, z).toInt()
                     val cy = Mercator.latToTileY(p.lat, z).toInt()
                     val r = if (z >= 15) 1 else 0
                     for (dx in -r..r) for (dy in -r..r) {
+                        coroutineContext.ensureActive()
+                        if (!speculativePrefetch) return@launch
                         val key = "$z/${cx + dx}/${cy + dy}"
                         if (seen.add(key) && !diskFile(key).exists()) {
                             fetchKey(z, cx + dx, cy + dy, key); count++
@@ -163,11 +192,13 @@ class TileProvider(context: Context, private val scope: CoroutineScope) {
         }
     }
 
-    private fun prefetchAround(lat: Double, lng: Double, z: Int, radius: Int): Int {
+    private suspend fun prefetchAround(lat: Double, lng: Double, z: Int, radius: Int): Int {
         val cx = Mercator.lngToTileX(lng, z).toInt()
         val cy = Mercator.latToTileY(lat, z).toInt()
         var n = 0
         for (dx in -radius..radius) for (dy in -radius..radius) {
+            coroutineContext.ensureActive()
+            if (!speculativePrefetch) return n
             val x = cx + dx; val y = cy + dy
             if (y < 0 || y >= (1 shl z)) continue
             val key = "$z/$x/$y"

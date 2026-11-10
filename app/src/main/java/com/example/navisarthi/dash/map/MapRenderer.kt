@@ -66,7 +66,9 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
 
     private fun drawAccessoryIcon(canvas: Canvas, icon: AccessoryIcon, cx: Float, cy: Float) {
         val save = canvas.save()
-        canvas.translate(cx - 8f, cy - 8f)
+        canvas.translate(cx, cy)
+        canvas.scale(1.25f, 1.25f)
+        canvas.translate(-8f, -8f)
         val paint = accessoryIconPaint
         val path = accessoryIconPath
         path.reset()
@@ -136,6 +138,9 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
     private val etaBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(46, 255, 255, 255); style = Paint.Style.STROKE; strokeWidth = 1.5f }
     private val etaBigPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(126, 217, 87); textSize = 20f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }   // Google-nav green
     private val etaSmallPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(196, 201, 208); textSize = 12f; textAlign = Paint.Align.CENTER }
+    private val batteryTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; textSize = 15f; isFakeBoldText = true; textAlign = Paint.Align.CENTER
+    }
     // GPS-health pill (top-centre, shown only when the signal is weak/lost)
     private val gpsPillText    = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 13f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
 
@@ -475,13 +480,14 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         }
 
         f.accessoryBatteryLabel?.let { label ->
-            val iconWidth = if (f.accessoryBatteryIcon != null) 20f else 0f
-            val halfWidth = (etaSmallPaint.measureText(label) + iconWidth) / 2f + 10f
-            val right = w * .90f
-            pillRect.set(right - halfWidth * 2f, h - 29f, right, h - 7f)
-            canvas.drawRoundRect(pillRect, 10f, 10f, etaBgPaint)
-            f.accessoryBatteryIcon?.let { drawAccessoryIcon(canvas, it, pillRect.left + 16f, h - 18f) }
-            canvas.drawText(label, pillRect.centerX() + iconWidth / 2f, h - 14f, etaSmallPaint)
+            val iconWidth = if (f.accessoryBatteryIcon != null) 26f else 0f
+            val halfWidth = (batteryTextPaint.measureText(label) + iconWidth) / 2f + 13f
+            val right = w * .95f
+            pillRect.set(right - halfWidth * 2f, h - 37f, right, h - 7f)
+            canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
+            f.accessoryBatteryIcon?.let { drawAccessoryIcon(canvas, it, pillRect.left + 23f, pillRect.centerY()) }
+            val baseline = pillRect.centerY() - (batteryTextPaint.ascent() + batteryTextPaint.descent()) / 2f
+            canvas.drawText(label, pillRect.centerX() + iconWidth / 2f, baseline, batteryTextPaint)
         }
 
         // ── Standby when nothing to show (dark text on the light map bg) ──

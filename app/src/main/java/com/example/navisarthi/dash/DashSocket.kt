@@ -1,7 +1,6 @@
 package com.example.navisarthi.dash
 
 import android.util.Log
-import com.example.navisarthi.dash.protocol.K1GPacket
 import com.example.navisarthi.util.Dbg
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,7 +8,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicInteger
+import com.example.navisarthi.dash.protocol.ControlPacketSender
 
 /**
  * UDP sockets for the Tripper Dash, matching better-dash exactly:
@@ -41,7 +40,7 @@ class DashSocket(private val network: android.net.Network? = null) : AutoCloseab
     private val rxSocket:  DatagramSocket
     private val rtpSocket: DatagramSocket
 
-    private val seq = AtomicInteger(0)
+    private val controlSender: ControlPacketSender
 
     init {
         var tx:  DatagramSocket? = null
@@ -65,24 +64,24 @@ class DashSocket(private val network: android.net.Network? = null) : AutoCloseab
             txSocket  = tx
             rxSocket  = rx
             rtpSocket = rtp
+            controlSender = ControlPacketSender { pkt ->
+                Dbg.d(TAG) { "TX →$BROADCAST:$CTRL_PORT  ${pkt.size}B  ${pkt.hex()}" }
+                try {
+                    txSocket.send(DatagramPacket(pkt, pkt.size, broadcastAddr, CTRL_PORT))
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "TX send failed: ${e.javaClass.simpleName}: ${e.message}")
+                    false
+                }
+            }
         } catch (e: Exception) {
             tx?.close(); rx?.close(); rtp?.close()
             throw e
         }
     }
 
-    /** Send a K1G control packet (seq patched here, like K1GTx in the reference). */
-    fun send(data: ByteArray) {
-        val pkt = K1GPacket.patchSeq(data, seq.getAndIncrement())
-        Dbg.d(TAG) { "TX →$BROADCAST:$CTRL_PORT  ${pkt.size}B  ${pkt.hex()}" }
-        // UDP fire-and-forget: a dropped/unreachable link (ENETUNREACH, EBADF) must never
-        // crash the app — the session will fail and reconnect.
-        try {
-            txSocket.send(DatagramPacket(pkt, pkt.size, broadcastAddr, CTRL_PORT))
-        } catch (e: Exception) {
-            Log.w(TAG, "TX send failed (link down?): ${e.message}")
-        }
-    }
+    /** Match OGRE's single sender: sequence assignment and UDP write are serialized. */
+    fun send(data: ByteArray): Boolean = controlSender.send(data)
 
     fun sendRtp(data: ByteArray) {
         try {

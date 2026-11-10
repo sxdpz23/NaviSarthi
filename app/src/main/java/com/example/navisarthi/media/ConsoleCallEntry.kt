@@ -11,6 +11,27 @@ internal fun consoleDialNumber(raw: String): String? {
     return number.takeIf { it.matches(Regex("\\+?[0-9]{1,20}")) }
 }
 
+/** Normalize identity only; never change the number used to dial a displayed row. */
+internal fun consoleNumberKey(number: String?, canonical: String? = null): String? {
+    val key = canonical?.let(::consoleDialNumber) ?: number?.let(::consoleDialNumber) ?: return null
+    return if (key.startsWith("00") && key.length > 2) "+${key.drop(2)}" else key
+}
+
+/** Input order is authoritative: history arrives newest-first; favorites use contact order. */
+internal class UniqueConsoleCalls {
+    private val rows = mutableListOf<ConsoleCallEntry>()
+    private val numbers = mutableSetOf<String>()
+    val full get() = rows.size == 5
+    fun add(entry: ConsoleCallEntry, canonicalNumber: String? = null): Boolean {
+        if (full) return false
+        val key = entry.number?.let { consoleNumberKey(it, canonicalNumber) }
+        if (key != null && !numbers.add(key)) return false
+        rows += entry
+        return true
+    }
+    fun entries(): List<ConsoleCallEntry> = rows.toList()
+}
+
 /** A row is callable only after that exact snapshot has finished transferring. */
 internal class ConsoleDialSnapshot {
     private var category: CallHistoryCategory? = null

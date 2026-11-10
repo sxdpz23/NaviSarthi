@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.navisarthi.ui.NaviSarthiIcons
 import com.example.navisarthi.ui.components.*
+import com.example.navisarthi.ui.components.SpacedControlHint as ControlHint
 import com.example.navisarthi.ui.theme.*
 import com.example.navisarthi.viewmodel.ConnectionState
 import com.example.navisarthi.viewmodel.DashViewModel
@@ -61,8 +62,9 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(18.dp)
-            .padding(bottom = 24.dp),
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 18.dp)
+            .padding(bottom = ControlSpacing.PageBottom),
+        verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
     ) {
         ScreenHeader(title = "Settings", onBack = onBack,
             hint = "Connection, music, phone and calls, battery usage, and voice guidance.")
@@ -156,7 +158,7 @@ fun SettingsScreen(
             val actions = track.actions
             val playAction = if (track.isPlaying) android.media.session.PlaybackState.ACTION_PAUSE
                 else android.media.session.PlaybackState.ACTION_PLAY
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 NaviSarthiBtn("Previous", onClick = { dashViewModel.musicPrevious() },
                     enabled = actions and android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L,
                     modifier = Modifier.weight(1f))
@@ -200,7 +202,7 @@ fun SettingsScreen(
         if (accessoryEnabled && !accessoryPermissionGranted) NaviSarthiBtn("Allow Nearby devices access", onClick = {
             accessoryPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
         }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        ControlHint("Mobile battery and connected accessory batteries alternate every five seconds in one map pill. Phone battery works without Bluetooth access. Accessory levels appear when reported by the device.")
+        ControlHint("Mobile battery and connected accessory batteries alternate every two minutes in one map pill. Phone battery works without Bluetooth access. Accessory levels appear when reported by the device.")
 
         ControlSection("Phone & calls")
         ControlHint("Caller information, recent calls, favorite contacts, console dialing and missed-call reminders.")
@@ -315,7 +317,7 @@ fun SettingsScreen(
                 historyPermission.launch(android.Manifest.permission.READ_CALL_LOG)
             }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         }
-        ControlHint("Shows the latest five incoming, missed or outgoing calls when you open that category on the console. Caller names use your phone's saved call-log labels. Turn sharing off to clear the displayed list. Console dialing uses the number associated with the displayed row.")
+        ControlHint("Shows the latest five unique phone numbers in incoming, missed or outgoing calls when you open that category on the console. Caller names use your phone's saved call-log labels. Turn sharing off to clear the displayed list. Console dialing uses the number associated with the displayed row.")
 
         val favoriteSharing by dashViewModel.favoritesEnabled.collectAsState()
         val consoleDialing by dashViewModel.consoleDialingEnabled.collectAsState()
@@ -508,7 +510,7 @@ private fun SettingRow(
             Icon(icon, contentDescription = null, tint = TextMid, modifier = Modifier.size(19.dp))
         }
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
             if (sub != null) Text(sub, color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         }

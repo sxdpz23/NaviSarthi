@@ -31,7 +31,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.navisarthi.ui.NaviSarthiIcons
 import com.example.navisarthi.ui.components.*
+import com.example.navisarthi.ui.components.SpacedControlHint as ControlHint
 import com.example.navisarthi.ui.theme.*
+import com.example.navisarthi.dash.protocol.EtaDisplayMode
 import com.example.navisarthi.viewmodel.ConnStage
 import com.example.navisarthi.viewmodel.DashViewModel
 import kotlinx.coroutines.delay
@@ -155,7 +157,10 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
     val uiState = rememberUpdatedState(ui)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
+        vm.setPreviewVisible(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
         val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) vm.setPreviewVisible(true)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) vm.setPreviewVisible(false)
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 batteryOk = com.example.navisarthi.util.DeviceReadiness.isIgnoringBatteryOptimizations(context)
                 if (uiState.value.needsWifiOn &&
@@ -175,15 +180,16 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs); vm.setPreviewVisible(false) }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(18.dp)
-            .padding(bottom = 24.dp),
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 18.dp)
+            .padding(bottom = ControlSpacing.PageBottom),
+        verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
     ) {
         ScreenHeader(
             eyebrow = "What the rider sees",
@@ -423,9 +429,15 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        ControlHint("Live ETA uses your average speed since navigation started, including stopped time. It appears after movement is measured. GPS gaps can reduce accuracy.")
+        if (streaming) ControlHint("Automatic power profile: ${ui.powerProfile}. Precision and console connection remain active.")
+        ControlSection("ETA display")
+        NaviSarthiSegmented(
+            options = EtaDisplayMode.entries.map { it.label },
+            selected = ui.etaDisplayMode.label,
+            onSelect = { label -> vm.setEtaDisplayMode(EtaDisplayMode.entries.first { it.label == label }) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        ControlHint("Show arrival time and minutes or hours remaining in the ribbon or in a pill below the ride cursor. ETA uses your average speed since navigation started, including stopped time, and appears after movement is measured.")
 
         // Map adjust mode toggle
         Row(

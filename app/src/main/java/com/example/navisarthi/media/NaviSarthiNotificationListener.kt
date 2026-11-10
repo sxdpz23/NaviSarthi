@@ -21,14 +21,18 @@ class NaviSarthiNotificationListener : NotificationListenerService() {
     // NaviSarthiApplication should have re-bound it).
     override fun onListenerConnected() {
         com.example.navisarthi.data.RideDiagnostics.log("media", "notification listener CONNECTED")
+        MusicNotificationArtwork.clear()
+        runCatching { activeNotifications?.forEach(MusicNotificationArtwork::posted) }
     }
 
     override fun onListenerDisconnected() {
+        MusicNotificationArtwork.clear()
         com.example.navisarthi.data.RideDiagnostics.log("media", "notification listener DISCONNECTED")
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val n = sbn?.notification ?: return
+        MusicNotificationArtwork.posted(sbn)
         if (n.category != Notification.CATEGORY_CALL) return
         // CallStyle's EXTRA_CALL_TYPE (API 31+): 1=INCOMING, 2=ONGOING, 3=OUTGOING, 4=SCREENING.
         // INCOMING → ringing (overlay + answer/reject). ONGOING/OUTGOING → active (end only, no
@@ -70,6 +74,7 @@ class NaviSarthiNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        sbn?.let(MusicNotificationArtwork::removed)
         if (sbn?.notification?.category == Notification.CATEGORY_CALL) {
             CallInfoProvider.update(null)
         }

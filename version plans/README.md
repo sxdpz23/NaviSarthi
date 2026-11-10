@@ -5,7 +5,7 @@ Maintain one plan per version. Before each feature addition, update its plan wit
 ## Requirements
 
 - Personal use among friends; India-only; Android 14+; 2025+ Guerrilla 450, Himalayan 450 and Bear 650 intended, subject to per-console qualification.
-- Existing console Wi-Fi protocol only; never install or modify console firmware. Preserve console-owned instruments and upper map viewport/reference layout.
+- Existing console Wi-Fi protocol only. Versions before 0.8.0 must not install or modify console firmware. From 0.8.0, allow user-initiated official firmware updates only through the qualified workflow in [the console OTA plan](0.8.0.md). Preserve console-owned instruments and upper map viewport/reference layout.
 - Google Maps place sharing; editable ordered stops; ask Add next stop / Append stop / Replace destination during an active journey.
 - Fastest suitable motorcycle route respecting access restrictions; automatic rerouting; accurate location; joystick zoom; helmet voice guidance while Spotify/YouTube Music remain on the phone/headset.
 - Navigation continues with display timeout, power-button lock, or switching apps. Force-stop/removal from recents is outside the guarantee.
@@ -21,5 +21,7 @@ Maintain one plan per version. Before each feature addition, update its plan wit
 5. 0.5.0 � offline maps, saved custom routes, ride history.
 6. 0.6.0 � live traffic and traffic-aware routing.
 7. 0.7.0 � wallpaper, garage and fuel diary integration; music moved to 0.4.0.
+
+8. [0.8.0 — Console OTA updates](0.8.0.md): official TFT firmware discovery, download, validation, installation and post-reboot verification; planned and gated on package access and hardware qualification.
 
 Existing inherited features may remain but must not be presented as newly qualified. Hardware validation gates all supported-model claims. Do not assume high frame rates are supported by the console.

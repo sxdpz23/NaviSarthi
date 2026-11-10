@@ -162,6 +162,10 @@ class MediaInfoProvider(private val context: Context) {
                 isPlaying = state?.state == PlaybackState.STATE_PLAYING,
                 actions = state?.actions ?: 0L,
                 playbackState = state?.state,
+                artUri = md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
+                    ?: md.getString(MediaMetadata.METADATA_KEY_ART_URI)
+                    ?: md.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI),
+                playerPackage = next.packageName,
             )
             _status.value = when {
                 next == null -> "Open a music player on your phone"
@@ -190,6 +194,7 @@ class MediaInfoProvider(private val context: Context) {
             Selected player: ${controller?.packageName ?: "none"}
             Player status: ${_status.value}
             Source metadata lengths (title/album/artist): ${track?.title?.length ?: 0}/${track?.album?.length ?: 0}/${track?.artist?.length ?: 0}
+            Artwork sources: bitmap=${track?.art != null}; local URI=${track?.artUri?.startsWith("content:") == true || track?.artUri?.startsWith("android.resource:") == true}; media notification=${MusicNotificationArtwork.entries.value[track?.playerPackage]?.let { artworkTitleMatches(track?.title.orEmpty(), it.title) } == true}
             Playing: ${track?.isPlaying}; supported actions: ${track?.actions ?: 0L}
         """.trimIndent()
     }

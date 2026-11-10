@@ -4,6 +4,8 @@ import android.util.Log
 import com.example.navisarthi.dash.protocol.DashCommands
 import com.example.navisarthi.util.Dbg
 import com.example.navisarthi.dash.protocol.K1GPacket
+import com.example.navisarthi.dash.protocol.NativeMusic
+import com.example.navisarthi.dash.protocol.musicTransferNeeded
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +58,7 @@ class DashSession(private val scope: CoroutineScope) {
     var onConsoleDial: ((com.example.navisarthi.dash.protocol.ConsoleDialSelection) -> Unit)? = null
     var onCallHistoryRequest: ((com.example.navisarthi.dash.protocol.CallHistoryCategory) -> Unit)? = null
     var onButton: ((Byte) -> Unit)? = null
+    var onNavigationExit: (() -> Unit)? = null
     var onError:  ((String) -> Unit)? = null
 
     @Volatile var destinationName: String = "NaviSarthi"
@@ -70,29 +73,12 @@ class DashSession(private val scope: CoroutineScope) {
     @Volatile private var consoleZoom = 19
     fun updateZoom(zoom: Int) { consoleZoom = zoom.coerceIn(11, 20) }
 
-    @Volatile private var pendingArt: ByteArray? = null
-    private var artJob: Job? = null
-
-    fun updateAlbumArt(jpeg: ByteArray?) {
-        val previous = pendingArt
-        if (jpeg == null) pendingArt = null
-        else if (previous == null || !previous.contentEquals(jpeg)) pendingArt = jpeg.copyOf()
-    }
-
     suspend fun sendCallHistory(category: com.example.navisarthi.dash.protocol.CallHistoryCategory,
         labels: List<String>, allowed: () -> Boolean): Boolean {
         val currentSocket = socket ?: return false
         val key = auth?.sessionKey ?: return false
-        for (index in 0..4) {
-            currentCoroutineContext().ensureActive()
-            if (socket !== currentSocket) return false
-            val label = if (allowed()) labels.getOrNull(index).orEmpty() else ""
-            currentSocket.send(com.example.navisarthi.dash.protocol.CallHistoryProtocol.slot(index, label, key))
-            delay(10)
-        }
-        if (socket !== currentSocket) return false
-        currentSocket.send(com.example.navisarthi.dash.protocol.CallHistoryProtocol.categoryReady(category))
-        return true
+        return com.example.navisarthi.dash.protocol.CallHistoryTransfer.send(
+            category, labels, key, allowed, { socket === currentSocket }, currentSocket::send)
     }
 
     fun updateMissedCallCount(count: Int) {
@@ -102,12 +88,15 @@ class DashSession(private val scope: CoroutineScope) {
     }
 
 
-    // Now-playing + incoming-call pushed to the dash at ~1 Hz (mirrors the dash's05 0d / 05 22 cadence).
-    // Strings, not the media model, so the protocol layer stays decoupled from the media provider.
-    private data class NativeMusic(val title: String, val album: String, val artist: String, val playing: Boolean?)
+    // Availability/playback/caller keep-alive at ~1 Hz; changed metadata precedes artwork.
+    // A bounded periodic metadata/art refresh recovers UDP loss without per-frame image sends.
     @Volatile private var nativeMusic: NativeMusic? = null
     @Volatile private var caller: String? = null
     @Volatile private var musicSendAttempts = 0L
+    @Volatile private var artworkAttempts = 0L
+    @Volatile private var artworkCompleted = 0L
+    @Volatile private var artworkFailed = 0L
+    @Volatile private var lastArtworkPackets = "none"
     @Volatile private var musicResponses = 0L
     @Volatile private var lastMusicResponse = "none"
     @Volatile private var musicFailure: String? = null
@@ -116,17 +105,21 @@ class DashSession(private val scope: CoroutineScope) {
         Console state: ${_state.value}
         Queued metadata lengths (title/album/artist): ${nativeMusic?.title?.length ?: 0}/${nativeMusic?.album?.length ?: 0}/${nativeMusic?.artist?.length ?: 0}
         Now-playing send attempts: $musicSendAttempts
-        Media responses (05 58): $musicResponses
+        Media status replies (05 58; not artwork ACKs): $musicResponses
         Last media response: $lastMusicResponse
         Last send exception: ${musicFailure ?: "none"}
+        Queued artwork: ${nativeMusic?.art?.size ?: 0} JPEG bytes
+        Artwork content source: ${nativeMusic?.artSource ?: "none"}
+        Artwork transfers attempted/completed/failed: $artworkAttempts/$artworkCompleted/$artworkFailed
+        Last artwork packets: $lastArtworkPackets
         Attempts and responses do not confirm native ribbon rendering.
     """.trimIndent()
 
 
-    /** Push the latest now-playing metadata; sent to the dash at 1 Hz while streaming (null title = hide). */
-    fun updateNowPlaying(title: String?, album: String, artist: String, playing: Boolean? = null) {
+    /** Publish metadata and its JPEG together; null title/artist hides music. */
+    fun updateNowPlaying(title: String?, album: String, artist: String, playing: Boolean? = null, art: ByteArray? = null, artSource: String = "unknown") {
         nativeMusic = if (title.isNullOrBlank() && artist.isBlank()) null else
-            NativeMusic(title?.takeIf { it.isNotBlank() } ?: "Now Playing", album, artist, playing)
+            NativeMusic(title?.takeIf { it.isNotBlank() } ?: "Now Playing", album, artist, playing, art?.copyOf(), artSource)
     }
 
     /** Push the current incoming-call caller name (null clears it). */
@@ -140,6 +133,15 @@ class DashSession(private val scope: CoroutineScope) {
     @Volatile private var navTotalUnit = DashCommands.NAV_UNIT_METERS
     @Volatile private var navEta: String? = null
     @Volatile private var navActive = false
+    @Volatile private var etaRibbonTitle: String? = null
+
+    fun updateEtaRibbon(title: String?) {
+        if (etaRibbonTitle == title) return
+        etaRibbonTitle = title
+        if (_state.value == DashState.READY || _state.value == DashState.STREAMING) {
+            scope.launch(Dispatchers.IO) { socket?.send(liveRouteCard(projectionOn = true)) }
+        }
+    }
 
     /** Push the latest turn-by-turn figures; sent to the dash at 1 Hz. */
     fun updateNavInfo(
@@ -163,14 +165,14 @@ class DashSession(private val scope: CoroutineScope) {
      */
     private fun liveRouteCard(projectionOn: Boolean): ByteArray =
         if (navActive) DashCommands.routeCard(
-            destinationName, projectionOn,
+            etaRibbonTitle ?: destinationName, projectionOn,
             maneuver = navManeuver,
             primaryUnit = navPrimaryUnit,
             totalDist = navTotalDist,
             totalUnit = navTotalUnit,
             etaHHMM = navEta,
         )
-        else DashCommands.routeCard(destinationName, projectionOn)
+        else DashCommands.routeCard(etaRibbonTitle ?: destinationName, projectionOn)
 
     // ── Public API ────────────────────────────────────────────────────────
 
@@ -182,6 +184,7 @@ class DashSession(private val scope: CoroutineScope) {
 
     fun startStreaming() {
         if (_state.value != DashState.READY) return
+        artworkAttempts = 0; artworkCompleted = 0; artworkFailed = 0; lastArtworkPackets = "none"
         musicSendAttempts = 0
         musicResponses = 0
         lastMusicResponse = "none"
@@ -192,31 +195,13 @@ class DashSession(private val scope: CoroutineScope) {
         launchRouteCardKeepAlive()
         launchNavInfo()
         launchMediaInfo()
-        artJob?.cancel()
-        artJob = scope.launch(Dispatchers.IO) {
-            var sent: ByteArray? = null
-            while (isActive && _state.value == DashState.STREAMING) {
-                val art = pendingArt
-                val currentSocket = socket
-                if (art != null && currentSocket != null && (sent == null || !sent.contentEquals(art))) {
-                    var completed = true
-                    for (packet in DashCommands.albumArtFrames(art)) {
-                        ensureActive()
-                        if (pendingArt !== art || socket !== currentSocket) { completed = false; break }
-                        currentSocket.send(packet)
-                        delay(10)
-                    }
-                    if (completed) sent = art
-                }
-                delay(100)
-            }
-        }
     }
 
     fun sendRtp(packet: ByteArray) { socket?.sendRtp(packet) }
 
     fun updateRouteCard(name: String) {
         destinationName = name.ifBlank { "NaviSarthi" }
+        etaRibbonTitle = null
         navActive = false   // new destination — old figures are stale until the next updateNavInfo
         if (_state.value == DashState.READY || _state.value == DashState.STREAMING) {
             scope.launch(Dispatchers.IO) {
@@ -231,8 +216,6 @@ class DashSession(private val scope: CoroutineScope) {
         sessionJob?.cancel(); sessionJob = null
         rxJob?.cancel(); projHbJob?.cancel(); routeCardJob?.cancel(); heartbeatJob?.cancel(); navInfoJob?.cancel(); mediaInfoJob?.cancel()
         navActive = false
-        artJob?.cancel(); artJob = null
-        pendingArt = null
         socket?.let {
             runCatching { it.send(DashCommands.projectionStop()) }
             runCatching { it.send(DashCommands.projectionOff()) }
@@ -400,6 +383,14 @@ class DashSession(private val scope: CoroutineScope) {
                 continue
             }
             // ── 09 00: button / joystick event → echo ack + notify UI ──
+            if (com.example.navisarthi.dash.protocol.ConsoleNavigationControl.isExit(tlv)) {
+                sock.send(DashCommands.buttonAck(0x12.toByte()))
+                scope.launch(Dispatchers.Main) {
+                    if (socket === sock && (_state.value == DashState.READY || _state.value == DashState.STREAMING))
+                        onNavigationExit?.invoke()
+                }
+                continue
+            }
             if (tlv.type == 0x09 && tlv.sub == 0x00 && tlv.value.isNotEmpty()) {
                 val btn = tlv.value.last()  // 0900 0001 <code>
                 Log.i(TAG, "JOYSTICK 09 00 → code 0x${(btn.toInt() and 0xFF).toString(16).uppercase()}  full=${tlv.value.toHexFull()}")
@@ -513,7 +504,10 @@ class DashSession(private val scope: CoroutineScope) {
             var prevCaller: String? = null
             var loggedNp = false
             var hadNowPlaying = false
+            var deliveredMusic: NativeMusic? = null
+            var lastArtworkSendMs = 0L
             var loggedCall = false
+            var clearedUnavailable = false
             while (isActive && _state.value == DashState.STREAMING) {
                 val c = caller
                 when {
@@ -529,18 +523,51 @@ class DashSession(private val scope: CoroutineScope) {
                 val currentSocket = socket
                 if (music == null) {
                     runCatching {
-                        currentSocket?.send(DashCommands.musicAvailable(false))
-                        if (hadNowPlaying) currentSocket?.send(DashCommands.nowPlaying("", "", ""))
+                        if (!clearedUnavailable && currentSocket != null) {
+                            clearedUnavailable = currentSocket.send(DashCommands.musicAvailable(false))
+                            if (hadNowPlaying) clearedUnavailable = currentSocket.send(DashCommands.nowPlaying("", "", "")) && clearedUnavailable
+                        }
                     }.onFailure { musicFailure = it.javaClass.simpleName }
                     loggedNp = false
+                    deliveredMusic = null
+                    lastArtworkSendMs = 0L
                 }
                 hadNowPlaying = music != null
                 if (music != null && currentSocket != null) {
-                    musicSendAttempts++
+                    clearedUnavailable = false
                     runCatching {
-                        currentSocket.send(DashCommands.musicAvailable(true))
-                        music.playing?.let { currentSocket.send(DashCommands.musicPlaybackState(it)) }
-                        currentSocket.send(DashCommands.nowPlaying(music.title, music.album, music.artist))
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        // State re-announcements must carry the image too; unchanged ticks send no media reset flags.
+                        if (musicTransferNeeded(deliveredMusic, music, lastArtworkSendMs, now)) {
+                            musicSendAttempts++
+                            val packets = music.art?.let { DashCommands.albumArtFrames(it) }.orEmpty()
+                            if (packets.isNotEmpty()) artworkAttempts++
+                            var sentPackets = 0
+                            var completed = currentSocket.send(DashCommands.musicAvailable(true)) &&
+                                (music.playing?.let { currentSocket.send(DashCommands.musicPlaybackState(it)) } ?: true) &&
+                                currentSocket.send(DashCommands.nowPlaying(music.title, music.album, music.artist))
+                            if (completed) {
+                                for (packet in packets) {
+                                    ensureActive()
+                                    if (socket !== currentSocket || nativeMusic !== music || !currentSocket.send(packet)) {
+                                        completed = false
+                                        break
+                                    }
+                                    sentPackets++
+                                    delay(10)
+                                }
+                            }
+                            if (packets.isNotEmpty()) {
+                                if (completed) artworkCompleted++ else artworkFailed++
+                                lastArtworkPackets = "$sentPackets/${packets.size} locally sent, ${music.art?.size ?: 0} bytes"
+                            }
+                            if (!completed) musicFailure = "Media batch interrupted or UDP send failed"
+                            else musicFailure = null
+                            if (completed) { deliveredMusic = music; lastArtworkSendMs = now }
+                            else deliveredMusic = null
+                            com.example.navisarthi.data.RideDiagnostics.log("media",
+                                "Artwork ${music.art?.size ?: 0} bytes: ${if (completed) "sent" else "retry pending"}")
+                        }
                     }.onFailure { musicFailure = it.javaClass.simpleName }
                     if (!loggedNp) {
                         loggedNp = true

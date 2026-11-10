@@ -12,6 +12,8 @@ data class NowPlaying(
     val isPlaying: Boolean = false,
     val actions: Long = 0L,
     val playbackState: Int? = null,
+    val artUri: String? = null,
+    val playerPackage: String? = null,
 )
 
 /**

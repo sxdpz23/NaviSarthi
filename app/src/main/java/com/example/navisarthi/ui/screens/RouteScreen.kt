@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.navisarthi.ui.NaviSarthiIcons
 import com.example.navisarthi.ui.components.*
+import com.example.navisarthi.ui.components.SpacedControlHint as ControlHint
 import com.example.navisarthi.ui.theme.*
 import com.example.navisarthi.viewmodel.RouteViewModel
 
@@ -194,8 +195,9 @@ fun RouteScreen(
                 .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                 .background(Bg1)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 8.dp)
-                .padding(bottom = 20.dp),
+                .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 12.dp)
+                .padding(bottom = ControlSpacing.PageBottom),
+            verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
         ) {
             // Drag handle
             Box(
@@ -313,7 +315,7 @@ fun RouteScreen(
                         else   -> com.example.navisarthi.dash.nav.VoiceMode.CHIME
                     })
                 },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             ControlHint("Use a chime for a short cue or Full TTS for spoken directions.")
@@ -322,7 +324,7 @@ fun RouteScreen(
                 options = listOf("Car", "Bike"),
                 selected = routeState.mode.name,
                 onSelect = { routeViewModel.setRouteMode(com.example.navisarthi.dash.nav.RouteMode.valueOf(it)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
             if (routeState.routingError) {
                 Text("Could not preview every leg. Check your connection and retry.", color = TextLo)
@@ -333,7 +335,7 @@ fun RouteScreen(
             if (routeState.stops.isNotEmpty()) {
                 ControlSection("Journey stops")
                 val rowHeight = 64.dp
-                val rowPixels = with(LocalDensity.current) { rowHeight.toPx() }
+                val rowPixels = with(LocalDensity.current) { (rowHeight + ControlSpacing.Item).toPx() }
                 var draggedIndex by remember { mutableStateOf<Int?>(null) }
                 var dragOffset by remember { mutableStateOf(0f) }
                 val stopCount = routeState.stops.size

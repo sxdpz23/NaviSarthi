@@ -1,5 +1,7 @@
 package com.example.navisarthi.media
 
+internal const val BATTERY_PILL_INTERVAL_MS = 120_000L
+
 enum class AccessoryIcon { MOBILE, HEADPHONES, SPEAKER, WATCH, KEYBOARD, BLUETOOTH }
 
 internal data class AccessoryBattery(val id: String, val name: String, val percent: Int,
@@ -26,7 +28,7 @@ internal class AccessoryBatteryState {
 }
 
 internal fun selectedAccessoryBattery(readings: List<AccessoryBattery>, nowMs: Long): AccessoryBattery? =
-    if (readings.isEmpty()) null else readings[((nowMs.coerceAtLeast(0) / 5000) % readings.size).toInt()]
+    if (readings.isEmpty()) null else readings[((nowMs.coerceAtLeast(0) / BATTERY_PILL_INTERVAL_MS) % readings.size).toInt()]
 
 internal fun accessoryBatteryLabel(readings: List<AccessoryBattery>, nowMs: Long, iconsOnly: Boolean = false): String? {
     val item = selectedAccessoryBattery(readings, nowMs) ?: return null

@@ -8,9 +8,14 @@ import android.provider.ContactsContract
 import android.net.Uri
 import android.os.Bundle
 import android.telecom.TelecomManager
+import android.telephony.PhoneNumberUtils
+import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.example.navisarthi.dash.protocol.CallHistoryCategory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
@@ -31,6 +36,18 @@ class ConsoleCallHistory(private val context: Context) {
     private val _dialStatus = MutableStateFlow(if (_dialing.value) "Select a console contact to call" else "Console dialing off")
     val dialStatus = _dialStatus.asStateFlow()
     private fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    private fun numberRegion(): String = runCatching {
+        context.getSystemService(TelephonyManager::class.java)?.let {
+            it.networkCountryIso.takeIf(String::isNotBlank) ?: it.simCountryIso
+        }
+    }.getOrNull()?.takeIf(String::isNotBlank)
+        ?.uppercase(java.util.Locale.ROOT)
+        ?: context.resources.configuration.locales[0].country.uppercase(java.util.Locale.ROOT)
+
+    private fun canonicalNumber(number: String, providerNumber: String?, region: String): String? =
+        providerNumber?.let(::consoleDialNumber) ?: runCatching {
+            PhoneNumberUtils.formatNumberToE164(number, region)
+        }.getOrNull()
     fun hasContactsAccess() = granted(Manifest.permission.READ_CONTACTS)
     fun hasDialAccess() = granted(Manifest.permission.CALL_PHONE)
     fun setFavorites(value: Boolean) { prefs.edit().putBoolean("favorites", value).apply(); _favorites.value = value }
@@ -59,27 +76,29 @@ class ConsoleCallHistory(private val context: Context) {
                 ?.use { it.count.coerceAtMost(65535) } ?: 0
         } catch (_: Exception) { 0 }
     }
-    private fun favoriteRows(): List<ConsoleCallEntry> {
+    private suspend fun favoriteRows(): List<ConsoleCallEntry> {
         if (!_favorites.value || !hasContactsAccess()) return emptyList()
         val phone = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
-        val rows = mutableListOf<ConsoleCallEntry>()
+        val rows = UniqueConsoleCalls()
+        val region = numberRegion()
         val contacts = mutableSetOf<Long>()
-        val numbers = mutableSetOf<String>()
         context.contentResolver.query(phone, arrayOf(
             ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-            ContactsContract.CommonDataKinds.Phone.NUMBER),
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+            ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER),
             "${ContactsContract.CommonDataKinds.Phone.STARRED} = ?", arrayOf("1"),
             "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE LOCALIZED ASC, ${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} ASC, ${ContactsContract.CommonDataKinds.Phone.IS_SUPER_PRIMARY} DESC, ${ContactsContract.CommonDataKinds.Phone._ID} ASC")?.use { cursor ->
-            while (rows.size < 5 && cursor.moveToNext()) {
+            while (!rows.full && cursor.moveToNext()) {
+                currentCoroutineContext().ensureActive()
                 val number = consoleDialNumber(cursor.getString(2).orEmpty()) ?: continue
                 val id = cursor.getLong(0)
-                if (id in contacts || number in numbers) continue
-                contacts += id; numbers += number
-                rows += ConsoleCallEntry(cursor.getString(1)?.takeIf(String::isNotBlank) ?: number, number)
+                if (id in contacts) continue
+                if (rows.add(ConsoleCallEntry(cursor.getString(1)?.takeIf(String::isNotBlank) ?: number, number),
+                    canonicalNumber(number, cursor.getString(3), region))) contacts += id
             }
         }
-        return rows
+        return rows.entries()
     }
     fun hasAccess(): Boolean = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
     fun setEnabled(value: Boolean) {
@@ -95,7 +114,7 @@ class ConsoleCallHistory(private val context: Context) {
         _status.value = when {
             !_enabled.value -> "Call history off"
             !hasAccess() -> "Call log permission needed"
-            else -> "Ready · latest five per category"
+            else -> "Ready · latest five unique numbers per category"
         }
     }
     suspend fun entries(category: CallHistoryCategory): List<ConsoleCallEntry> = withContext(Dispatchers.IO) {
@@ -103,24 +122,30 @@ class ConsoleCallHistory(private val context: Context) {
         if (!categoryAllowed(category)) return@withContext emptyList()
         try {
             if (category == CallHistoryCategory.FAVORITES) return@withContext favoriteRows()
-            val uri = CallLog.Calls.CONTENT_URI.buildUpon().appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, "5").build()
-            val rows = mutableListOf<ConsoleCallEntry>()
-            val cursor = context.contentResolver.query(uri,
-                arrayOf(CallLog.Calls.CACHED_NAME, CallLog.Calls.NUMBER, CallLog.Calls.NUMBER_PRESENTATION),
-                "${CallLog.Calls.TYPE} = ?", arrayOf(category.callType.toString()), "${CallLog.Calls.DATE} DESC")
+            val rows = UniqueConsoleCalls()
+            val region = numberRegion()
+            // Limit unique output, not raw calls: repeated callers must not consume the five slots.
+            val cursor = context.contentResolver.query(CallLog.Calls.CONTENT_URI,
+                arrayOf(CallLog.Calls.CACHED_NAME, CallLog.Calls.NUMBER, CallLog.Calls.NUMBER_PRESENTATION, CallLog.Calls.CACHED_NORMALIZED_NUMBER),
+                "${CallLog.Calls.TYPE} = ?", arrayOf(category.callType.toString()), "${CallLog.Calls.DATE} DESC, ${CallLog.Calls._ID} DESC")
             if (cursor == null) {
                 _status.value = "Call history unavailable"
                 return@withContext emptyList()
             }
             cursor.use {
-                while (rows.size < 5 && it.moveToNext()) {
+                while (!rows.full && it.moveToNext()) {
+                    currentCoroutineContext().ensureActive()
                     val number = it.getString(1).orEmpty()
                     val label = if (it.getInt(2) != CallLog.Calls.PRESENTATION_ALLOWED) "Private number"
                         else it.getString(0)?.takeIf(String::isNotBlank) ?: number.ifBlank { "Unknown caller" }
-                    rows += ConsoleCallEntry(label, if (it.getInt(2) == CallLog.Calls.PRESENTATION_ALLOWED) consoleDialNumber(number) else null)
+                    val callable = if (it.getInt(2) == CallLog.Calls.PRESENTATION_ALLOWED) consoleDialNumber(number) else null
+                    rows.add(ConsoleCallEntry(label, callable),
+                        callable?.let { clean -> canonicalNumber(clean, it.getString(3), region) })
                 }
             }
-            rows
+            rows.entries()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: SecurityException) {
             _status.value = "Call log access denied on this device"
             emptyList()

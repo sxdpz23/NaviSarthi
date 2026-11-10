@@ -54,12 +54,12 @@ internal class BluetoothAccessoryBattery(private val context: Context) {
     private fun schedule() {
         handler.removeCallbacks(poll)
         refresh()
-        if (wanted) handler.postDelayed(poll, 5000)
+        if (wanted) handler.postDelayed(poll, BATTERY_PILL_INTERVAL_MS)
     }
     private val poll = object : Runnable {
         override fun run() {
             refresh()
-            if (wanted) handler.postDelayed(this, 5000)
+            if (wanted) handler.postDelayed(this, BATTERY_PILL_INTERVAL_MS)
         }
     }
     private val listener = object : BluetoothProfile.ServiceListener {

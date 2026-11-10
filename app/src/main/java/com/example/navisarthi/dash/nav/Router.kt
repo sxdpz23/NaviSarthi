@@ -19,10 +19,13 @@ object Router {
     private const val BASE = "https://router.project-osrm.org/route/v1/driving"
     private const val UA = "NaviSarthi/1.0 (personal motorcycle nav; single user)"
 
-    suspend fun route(from: GeoPoint, to: GeoPoint, mode: RouteMode = RouteMode.Car): Route? = withContext(Dispatchers.IO) {
-        if (mode == RouteMode.Bike) return@withContext motorcycleRoute(from, to)
+    suspend fun route(from: GeoPoint, to: GeoPoint, mode: RouteMode = RouteMode.Car,
+        departureHeading: Int? = null): Route? = withContext(Dispatchers.IO) {
+        require(departureHeading == null || departureHeading in 0..359)
+        if (mode == RouteMode.Bike) return@withContext motorcycleRoute(from, to, departureHeading)
         val url = "$BASE/${from.lng},${from.lat};${to.lng},${to.lat}" +
-                "?overview=full&geometries=polyline&steps=true&annotations=false"
+                "?overview=full&geometries=polyline&steps=true&annotations=false" +
+                (departureHeading?.let(DepartureDirection::osrmOption) ?: "")
         try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 setRequestProperty("User-Agent", UA)
@@ -31,19 +34,23 @@ object Router {
             }
             val body = conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
             conn.disconnect()
-            parse(body)
+            acceptDeparture(parse(body), departureHeading)
         } catch (e: Exception) {
             Log.w(TAG, "route() failed: ${e.message}")
             null
         }
     }
 
-    private fun motorcycleRoute(from: GeoPoint, to: GeoPoint): Route? {
+    private fun motorcycleRoute(from: GeoPoint, to: GeoPoint, departureHeading: Int?): Route? {
+        val origin = JSONObject().put("lat", from.lat).put("lon", from.lng)
+        departureHeading?.let {
+            origin.put("heading", it).put("heading_tolerance", DepartureDirection.TOLERANCE_DEGREES)
+        }
         val request = JSONObject()
             .put("costing", "motorcycle")
             .put("units", "kilometers")
             .put("locations", org.json.JSONArray(listOf(
-                JSONObject().put("lat", from.lat).put("lon", from.lng),
+                origin,
                 JSONObject().put("lat", to.lat).put("lon", to.lng),
             )))
         val query = java.net.URLEncoder.encode(request.toString(), "UTF-8")
@@ -54,7 +61,7 @@ object Router {
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 10_000
                 val response = conn.inputStream.bufferedReader().use { it.readText() }
-                parseMotorcycle(response)
+                acceptDeparture(parseMotorcycle(response), departureHeading)
             } finally {
                 conn.disconnect()
             }
@@ -62,6 +69,13 @@ object Router {
             Log.w(TAG, "Motorcycle routing failed", e)
             null
         }
+    }
+
+    private fun acceptDeparture(route: Route?, heading: Int?): Route? {
+        if (route == null || heading == null) return route
+        if (DepartureDirection.accepts(route, heading)) return route
+        Log.w(TAG, "Rejected route: backwards departure or immediate origin U-turn")
+        return null
     }
 
     private fun parseMotorcycle(response: String): Route? {

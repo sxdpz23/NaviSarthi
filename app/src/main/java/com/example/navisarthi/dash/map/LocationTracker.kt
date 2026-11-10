@@ -79,6 +79,15 @@ class LocationTracker(context: Context) {
     private fun reject(): Boolean { rejectStreak++; return false }
 
     private var running = false
+    private var intervalMs = 500L
+
+    /** Called on Main; retain zero-distance updates so parked fixes do not age out. */
+    fun setUpdateInterval(value: Long) {
+        val next = value.coerceIn(500L, 2_000L)
+        if (next == intervalMs) return
+        intervalMs = next
+        if (running) { stop(); start() }
+    }
 
     /** Requires ACCESS_FINE_LOCATION at runtime; no-ops without it. */
     @SuppressLint("MissingPermission")
@@ -87,14 +96,14 @@ class LocationTracker(context: Context) {
         try {
             _location.value = lastKnown()
             // GPS for accuracy + heading; NETWORK as a fallback while GPS warms up.
-            // minDistance=0: keep GPS fixes flowing every second even when parked.
+            // minDistance=0: keep periodic GPS fixes flowing even when parked.
             // With a minimum distance, GPS goes quiet while stationary, its last fix
             // ages out, and a coarse NETWORK fix takes over → the marker drifts.
-            // 500 ms (was 1000): twice as many fixes → fresher position + smoother camera (the
-            // predictor interpolates the gaps). minDistance=0 keeps fixes flowing when parked.
+            // Power policy requests 500 ms near turns/recovery, 1 s cruising and 2 s parked.
             for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
                 if (lm.isProviderEnabled(provider)) {
-                    lm.requestLocationUpdates(provider, 500L, 0f, listener, Looper.getMainLooper())
+                    val requestedMs = if (provider == LocationManager.NETWORK_PROVIDER) maxOf(2_000L, intervalMs) else intervalMs
+                    lm.requestLocationUpdates(provider, requestedMs, 0f, listener, Looper.getMainLooper())
                 }
             }
             running = true

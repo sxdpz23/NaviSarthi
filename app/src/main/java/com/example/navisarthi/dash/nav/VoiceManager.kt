@@ -128,6 +128,12 @@ class VoiceManager private constructor(context: Context) {
     /** Reset trip state when nav starts/stops so the next route announces cleanly. */
     fun resetTrip() { lastManeuverKey = -1.0; farDone = false; nearDone = false; arrived = false }
 
+    fun stopGuidance() {
+        runCatching { tts?.stop() }
+        runCatching { tone?.stopTone() }
+        resetTrip()
+    }
+
     fun shutdown() {
         runCatching { tts?.stop(); tts?.shutdown() }
         tts = null; ttsReady = false

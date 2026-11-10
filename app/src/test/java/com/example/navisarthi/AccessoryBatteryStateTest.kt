@@ -43,8 +43,10 @@ class AccessoryBatteryStateTest {
     @Test fun multipleAccessoriesRotateWithoutDroppingTheirPercentages() {
         val items = listOf(AccessoryBattery("a", "Helmet", 75), AccessoryBattery("b", "Earbuds", 40))
         assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 0))
-        assertEquals("BT Earbuds 40%", accessoryBatteryLabel(items, 5000))
-        assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 10000))
+        assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 5000))
+        assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 119999))
+        assertEquals("BT Earbuds 40%", accessoryBatteryLabel(items, 120000))
+        assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 240000))
         assertNull(accessoryBatteryLabel(emptyList(), 0))
     }
     @Test fun iconModeKeepsPercentagesAndSelectsMatchingDeviceTypes() {
@@ -52,7 +54,7 @@ class AccessoryBatteryStateTest {
             AccessoryBattery("b", "Watch", 75, AccessoryIcon.WATCH))
         assertEquals("75%", accessoryBatteryLabel(items, 0, iconsOnly = true))
         assertEquals(AccessoryIcon.HEADPHONES, selectedAccessoryBattery(items, 0)?.icon)
-        assertEquals(AccessoryIcon.WATCH, selectedAccessoryBattery(items, 5000)?.icon)
+        assertEquals(AccessoryIcon.WATCH, selectedAccessoryBattery(items, 120000)?.icon)
         assertEquals("BT Helmet 75%", accessoryBatteryLabel(items, 0, iconsOnly = false))
         assertNull(accessoryBatteryLabel(emptyList(), 0, iconsOnly = true))
     }
@@ -65,15 +67,15 @@ class AccessoryBatteryStateTest {
     @Test fun mobileCyclesWithAccessoriesInNameAndIconModes() {
         val items = combinedBatteryReadings(80, listOf(AccessoryBattery("a", "Helmet", 60, AccessoryIcon.HEADPHONES)))
         assertEquals("Mobile 80%", accessoryBatteryLabel(items, 0))
-        assertEquals("BT Helmet 60%", accessoryBatteryLabel(items, 5000))
-        assertEquals("Mobile 80%", accessoryBatteryLabel(items, 10000))
+        assertEquals("BT Helmet 60%", accessoryBatteryLabel(items, 120000))
+        assertEquals("Mobile 80%", accessoryBatteryLabel(items, 240000))
         assertEquals("80%", accessoryBatteryLabel(items, 0, iconsOnly = true))
         assertEquals(AccessoryIcon.MOBILE, selectedAccessoryBattery(items, 0)?.icon)
-        assertEquals(AccessoryIcon.HEADPHONES, selectedAccessoryBattery(items, 5000)?.icon)
+        assertEquals(AccessoryIcon.HEADPHONES, selectedAccessoryBattery(items, 120000)?.icon)
     }
     @Test fun mobileRemainsWhenNoAccessoryIsConnected() {
         val items = combinedBatteryReadings(0, emptyList())
-        assertEquals("Mobile 0%", accessoryBatteryLabel(items, 5000))
+        assertEquals("Mobile 0%", accessoryBatteryLabel(items, 120000))
         assertTrue(combinedBatteryReadings(null, emptyList()).isEmpty())
     }
     @Test fun phonePercentageHonorsScaleAndRejectsMissingReadings() {
@@ -92,7 +94,7 @@ class AccessoryBatteryStateTest {
         state.connections(emptyMap())
         val items = combinedBatteryReadings(80, state.readings())
         assertEquals(1, items.size)
-        listOf(0L, 5000L, 10000L, 60000L).forEach { time ->
+        listOf(0L, 120000L, 240000L, 360000L).forEach { time ->
             assertEquals("Mobile 80%", accessoryBatteryLabel(items, time))
             assertEquals("80%", accessoryBatteryLabel(items, time, iconsOnly = true))
             assertEquals(AccessoryIcon.MOBILE, selectedAccessoryBattery(items, time)?.icon)
@@ -103,6 +105,6 @@ class AccessoryBatteryStateTest {
         state.connections(mapOf("a" to "Helmet"))
         state.report("a", 60)
         state.clear()
-        assertEquals("Mobile 90%", accessoryBatteryLabel(combinedBatteryReadings(90, state.readings()), 5000))
+        assertEquals("Mobile 90%", accessoryBatteryLabel(combinedBatteryReadings(90, state.readings()), 120000))
     }
 }

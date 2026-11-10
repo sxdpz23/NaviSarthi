@@ -54,6 +54,8 @@ Dev06 validation: final debug build and 38 JVM tests passed with 0 failures. Art
 
 ## dev07: favorites, console dialing and missed-call-only count
 
+dev08 transport correction: native list responses originate in a Main-dispatcher callback, so the complete five-slot plus 05/23 response must switch to Dispatchers.IO before UDP writes. Android rejects network writes on Main; swallowed send failures previously caused the console to time out despite the working IO-dispatched missed-call badge. A failed send now aborts the transfer and prevents caching a completed list. Diagnostics report category and transfer result without contact names/numbers.
+
 Favorite requests use the existing AA/55 category; query starred phone contacts, choose one preferred number per contact and send five encrypted label slots. Names/phone numbers stay in memory. READ_CONTACTS, favorite sharing, CALL_PHONE and dialing are separate opt-ins. Existing READ_CALL_LOG/history sharing remains independent.
 
 Original r42.q maps 09/01 payload `[index:00..04][category:55/AA/BB/CC]` to favorites/incoming/missed/outgoing. NaviSarthi resolves that selection strictly against the last completed displayed snapshot, not a fresh query; numbers are invalidated during changed transfers and on access loss/disconnect. Unknown/empty/private rows are not dialed. TelecomManager.placeCall uses the selected tel number without audio-route overrides; a ten-second cooldown suppresses repeated selection events. Requests during an observed incoming/active call are blocked. Android may show SIM/account selection or deny a call; dispatch success is not a connected-call guarantee.
@@ -61,3 +63,18 @@ Original r42.q maps 09/01 payload `[index:00..04][category:55/AA/BB/CC]` to favo
 Original r42.n queries `type=3 AND new=1`; r42.e with signal 060A serializes the missed-call count as BE16. NaviSarthi clamps to 0..65535 and resets to zero when the badge is disabled or call-log access is unavailable. It does not update NEW/IS_READ on the phone. No 06/09 unread-message packets, SMS permissions or inbox access are added.
 
 Acceptance: favorite ordering/preferred numbers and fewer than five rows; native favorite/history selection calls the displayed contact; duplicate selections do not redial; grant/deny/revoke each permission independently; disable sharing before selecting a stale row; phone lock/background behavior; dual-SIM system selection; missed badge changes with phone call-log NEW flags and clears on disable/revocation. Real calling requires explicit device testing by the user and was not invoked by automated tests.
+
+
+### Pending artwork reliability correction
+
+OGRE djf.A1 sends changed metadata before invoking JPEG transfer. NaviSarthi now publishes track+art atomically and serializes metadata then JPEG fragments in its media IO loop, rather than sending artwork from a separate one-shot job before the music card may be ready. Local send failures leave the transfer pending; a ten-second metadata/art refresh also recovers unacknowledged UDP loss. No console acknowledgement or hardware rendering success is inferred from send success. Added local artwork-URI and matching media-notification icon fallbacks and software conversion for hardware bitmaps. No APK built or device validation under the current build hold.
+
+
+### Console stop-navigation command
+
+Original clk.S maps single-byte 09/00 value 12 to lz2.Z. NavigationRootFragment.Z posts the navigation-stop event and sends w2c.A2 (06/80 value 12); w2c.Q2 is 0900000112. NaviSarthi recognizes exactly that TLV, acknowledges it and invokes the existing app exit action on Main for the same live session. Other button codes and malformed/multi-byte values do not trigger this action. The app clears route/ETA/journey state, cancels route requests and stops spoken/chime guidance; the console connection remains available. Physical dialog behavior awaits hardware verification.
+
+
+### Artwork follow-up after dev09 device report
+
+A live player bitmap and queued JPEG are insufficient evidence of image display. Native metadata appears in the user's photo while the music-note placeholder remains. Original djf.e.f sends availability/playback on callbacks; sw2.i assigns byte-16 sequence and sends from one queue worker. NaviSarthi now refreshes state+metadata+art together on change or recovery refresh, avoids one-second reset-flag writes without art, and serializes sequence assignment/socket writes. This corrects sender differences; causation of native image resets has not been demonstrated on hardware. The 1423-byte report matches a 1024-byte first datagram plus 445-byte final datagram under c3c's format. New diagnostics expose real-vs-placeholder encoding source and completed local fragment counts. No 05/58 image acknowledgement has been established; do not claim queued or locally sent images were rendered.

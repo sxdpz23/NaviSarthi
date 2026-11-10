@@ -35,6 +35,12 @@ val InputShape   = RoundedCornerShape(12.dp)
 val ChipShape    = CircleShape
 val IconBtnShape = RoundedCornerShape(14.dp)
 
+object ControlSpacing {
+    val Item = 8.dp
+    val PageHorizontal = 20.dp
+    val PageBottom = 32.dp
+}
+
 // ---- Card ----
 @Composable
 fun NaviSarthiCard(
@@ -266,14 +272,20 @@ fun ControlSection(title: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ControlHint(text: String, modifier: Modifier = Modifier) {
+fun ControlHint(text: String, modifier: Modifier = Modifier, topPadding: Dp = 6.dp) {
     Text(
         text = text,
-        modifier = modifier.padding(top = 6.dp),
+        modifier = modifier.padding(top = topPadding),
         color = TextLo,
         fontSize = 12.sp,
         lineHeight = 17.sp,
     )
+}
+
+/** The parent supplies the 8 dp gap, keeping help text visually attached to its option. */
+@Composable
+fun SpacedControlHint(text: String, modifier: Modifier = Modifier) {
+    ControlHint(text, modifier, topPadding = 0.dp)
 }
 
 @Composable
