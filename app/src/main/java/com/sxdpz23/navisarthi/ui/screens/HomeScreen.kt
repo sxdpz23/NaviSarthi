@@ -1,0 +1,209 @@
+package com.sxdpz23.navisarthi.ui.screens
+
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sxdpz23.navisarthi.BuildConfig
+import com.sxdpz23.navisarthi.util.BuildId
+import com.sxdpz23.navisarthi.ui.NaviSarthiIcons
+import com.sxdpz23.navisarthi.ui.components.*
+import com.sxdpz23.navisarthi.ui.theme.*
+import com.sxdpz23.navisarthi.viewmodel.ConnectionState
+import com.sxdpz23.navisarthi.viewmodel.RouteViewModel
+
+@Composable
+fun HomeScreen(
+    conn: ConnectionState,
+    onNavigate: (String) -> Unit,
+    routeViewModel: RouteViewModel = viewModel(),
+) {
+    val saved by routeViewModel.saved.collectAsState()
+    val console = LocalVehicle.current.consoleType
+    val pod = console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_POD
+    val status = when (conn) {
+        ConnectionState.Connected -> Triple("Connected", if (pod) "Tripper Pod authorized" else "Streaming to Tripper Dash", Gold)
+        ConnectionState.Searching -> Triple("Searching…", "Connecting to ${console.label}", Warn)
+        ConnectionState.Offline   -> Triple("Offline", "${console.tabLabel} not connected", Offline)
+    }
+    val (statusLabel, statusSub, statusDot) = status
+
+    // Pulse animation for connected dot
+    val infiniteTransition = rememberInfiniteTransition(label = "dot-pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        1f, 0.35f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulse",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(18.dp)
+            .padding(bottom = 24.dp),
+    ) {
+        ScreenHeader(
+            wordmark = true,
+            trailing = { NaviSarthiIconBtn(NaviSarthiIcons.Gear, onClick = { onNavigate("settings") }) },
+        )
+
+        // Prominent build identity (debug/test only) — the same sha12 checksum that pull-diag and
+        // the "New test build" prompt use, so there's never any doubt which build is installed.
+        if (BuildConfig.DEBUG) {
+            val ctx = LocalContext.current
+            val buildSha = remember { BuildId.sha12(ctx) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Gold.copy(alpha = 0.10f))
+                    .border(1.dp, Gold.copy(alpha = 0.40f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    "TEST BUILD",
+                    color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    fontFamily = GeistMonoFamily, letterSpacing = 0.1.sp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    buildSha,
+                    color = TextHi, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    fontFamily = GeistMonoFamily,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    color = TextLo, fontSize = 11.sp, fontFamily = GeistMonoFamily,
+                )
+            }
+        }
+
+        // Connection hero card
+        NaviSarthiCard(
+            glow = conn == ConnectionState.Connected,
+            padding = 20.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (pod) {
+                    androidx.compose.material3.Icon(NaviSarthiIcons.Bt, "Tripper Pod", tint = Gold, modifier = Modifier.size(80.dp))
+                } else CircularDash(
+                    size = 118.dp,
+                    pan = Offset.Zero,
+                    zoom = 1f,
+                    compact = true,
+                    live = conn == ConnectionState.Connected,
+                )
+
+                Spacer(Modifier.width(18.dp))
+
+                Column(Modifier.weight(1f)) {
+                    Eyebrow(console.label)
+
+                    Spacer(Modifier.height(7.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(9.dp).clip(CircleShape).background(
+                                statusDot.copy(alpha = if (conn == ConnectionState.Connected) pulseAlpha else 1f)
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            statusLabel, color = TextHi, fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold, fontFamily = GeistFamily,
+                            letterSpacing = (-0.38).sp,
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(statusSub, color = TextMid, fontSize = 13.sp)
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NaviSarthiChip(LocalVehicle.current.label, ChipTone.Gold, icon = NaviSarthiIcons.Motor)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        ControlSection("Quick actions")
+        NaviSarthiBtn(
+            "Start navigation", onClick = { onNavigate("route") },
+            icon = NaviSarthiIcons.Navi, variant = BtnVariant.Primary, size = BtnSize.Lg,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        ControlHint("Choose destinations, order your stops, and preview the route.")
+        Spacer(Modifier.height(8.dp))
+        NaviSarthiBtn(
+            if (pod) "Open Tripper Pod" else "Open dash view", onClick = { onNavigate(if (pod) "pod" else "dash") },
+            icon = NaviSarthiIcons.Dash, variant = BtnVariant.Secondary, size = BtnSize.Md,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(18.dp))
+
+        ControlHint(if (pod) "Pair your Meteor's RE_DISP Pod and manage turn guidance." else "Connect to the TFT and adjust how the map appears.")
+        Spacer(Modifier.height(8.dp))
+        val mapsContext = LocalContext.current
+        NaviSarthiBtn(
+            "Open Google Maps",
+            onClick = { com.sxdpz23.navisarthi.util.openGoogleMaps(mapsContext) },
+            icon = NaviSarthiIcons.Pin, variant = BtnVariant.Secondary, size = BtnSize.Md,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+
+        ControlHint("Find a place in Google Maps and share it back to NaviSarthi.")
+        ControlSection("Saved destinations")
+
+        if (saved.isEmpty()) {
+            NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp) {
+                Text(
+                    "No saved destinations yet. Share a place from Google Maps, then tap “Save this destination”.",
+                    color = TextLo, fontSize = 13.sp,
+                )
+            }
+        } else {
+            NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+                saved.forEachIndexed { i, loc ->
+                    if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
+                    NaviSarthiRow(
+                        loc.name, icon = NaviSarthiIcons.LocationPin,
+                        sub = loc.note.ifBlank { "%.4f, %.4f".format(loc.lat, loc.lng) },
+                        trailingIcon = true,
+                        onClick = { routeViewModel.selectSaved(loc); onNavigate("route") },
+                    )
+                }
+            }
+        }
+    }
+}

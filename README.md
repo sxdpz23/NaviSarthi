@@ -2,11 +2,13 @@
 
 Private Android navigation companion built on [Northstar](https://github.com/adityadasika21/NorthStar).
 
-Targets Android 14+ and the existing Royal Enfield Tripper TFT connection. Intended motorcycle coverage: 2025+ Guerrilla 450, Himalayan 450, and Bear 650; each model/firmware requires hardware qualification. No console software changes or installation.
+Targets Android 14+. Meteor 350 selects Tripper Pod over Bluetooth; Himalayan 450, Guerrilla 450, Bear 650 and Himalayan 750 select Tripper Dash over Wi-Fi. Each model/firmware requires hardware qualification; Pod support is pending physical testing. No console software changes or installation.
+
+Kotlin namespace/source packages: `com.sxdpz23.navisarthi`. Installed Android application ID: `com.navisarthi.app`.
 
 ## Current status
 
-Version 0.2.0-dev01 adds stale-location rejection, monotonic position/video timing, encoder recovery and foreground-lock fixes on top of the 0.1.0 branding foundation. Debug build and JVM regression tests pass; screen-off and decoder performance still require bike qualification. Multi-stop navigation is planned for 0.3.0. Upstream APK update checks are disabled. NaviSarthi installs separately as `com.navisarthi.app`; existing Northstar data is not automatically migrated. Optional Firebase configuration must belong to this new application ID.
+Version 0.5.0 adds vehicle-specific Pod/Dash flows, Meteor's black-and-rose theme and the `com.sxdpz23.navisarthi` source namespace. Pod BLE interoperability and vehicle switching have JVM regression coverage; physical Pod/Dash qualification is still required. See [Pod evidence and acceptance](docs/tripper-pod.md). Upstream APK update checks are disabled. NaviSarthi installs as `com.navisarthi.app`; existing Northstar data is not automatically migrated. Optional Firebase configuration must belong to this application ID.
 
 ## Build
 

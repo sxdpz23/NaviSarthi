@@ -29,7 +29,7 @@ rootProject.file("signing.properties").let { f ->
 val hasReleaseSigning = signingProps.getProperty("storeFile")?.let { File(it).exists() } == true
 
 android {
-    namespace = "com.example.navisarthi"
+    namespace = "com.sxdpz23.navisarthi"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -42,8 +42,8 @@ android {
         minSdk = 34
         targetSdk = 36
         // Independent NaviSarthi version sequence.
-        versionCode = 28
-        versionName = "0.4.0-dev11"
+        versionCode = 29
+        versionName = "0.5.0"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for

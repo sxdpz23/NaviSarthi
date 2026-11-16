@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Passive accessory connection/battery reporting; no Bluetooth scanning. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Meteor 350 Tripper Pod discovery; never requested by the Dash flow. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <!-- startScan() to warm scan results so we resolve the exact dash SSID on the first try -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -89,6 +92,11 @@
                 <data android:scheme="geo" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".pod.PodKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|location" />
 
         <service
             android:name=".dash.DashKeepAliveService"
