@@ -5,4 +5,9 @@
     <files-path name="documents" path="documents/" />
     <!-- Downloaded APK handed to the system package installer by the in-app updater. -->
     <cache-path name="updates" path="updates/" />
+    <files-path name="navisarthi_engines" path="engines/" />
+    <files-path name="navisarthi_updates" path="updates/" />
+    <cache-path name="navisarthi_diag" path="diag/" />
+    <cache-path name="navisarthi_export" path="export/" />
+    <files-path name="navisarthi_crash" path="diag/crash/" />
 </paths>

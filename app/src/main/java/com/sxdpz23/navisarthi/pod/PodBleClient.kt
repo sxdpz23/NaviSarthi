@@ -82,7 +82,7 @@ class PodBleClient(context: Context) {
         }
         scan = callback
         // Some firmware omits the service UUID from advertisements; validate it after connection.
-        runCatching { manager.adapter.bluetoothLeScanner.startScan(null,
+        runCatching { checkNotNull(manager.adapter.bluetoothLeScanner) { "Bluetooth scanning unavailable" }.startScan(null,
             ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), callback) }
             .onFailure { fail("Could not scan: ${it.message}") }
         later(token, 20_000) {

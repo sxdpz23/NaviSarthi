@@ -4,6 +4,9 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(navigationLibs.plugins.kotlin.ksp)
+    alias(navigationLibs.plugins.kotlin.serialization)
+    alias(navigationLibs.plugins.hilt)
     // Firebase is OPTIONAL / bring-your-own-project: the Google Services plugin is only
     // applied when a google-services.json is present. Without it the app builds and runs
     // fully local (no sync) — a rider who doesn't want multi-device sync just omits the
@@ -31,8 +34,8 @@ val hasReleaseSigning = signingProps.getProperty("storeFile")?.let { File(it).ex
 android {
     namespace = "com.sxdpz23.navisarthi"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
+        version = release(37) {
+            minorApiLevel = 0
         }
     }
 
@@ -41,9 +44,22 @@ android {
         // NaviSarthi targets Android 14 and newer.
         minSdk = 34
         targetSdk = 36
+        buildConfigField("String", "MAPTILER_KEY", "\"\"")
+        buildConfigField("String", "OBF_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "OVERLAY_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "MAXSPEED_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "ADDRESS_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "PLACES_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "CELLS_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "BASEMAP_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "WORLD_BASEMAP_URL", "\"\"")
+        buildConfigField("String", "POI_PACK_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "FLOCK_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "ROAD_FEATURES_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "MAP_FONTS_URL", "\"\"")
         // Independent NaviSarthi version sequence.
-        versionCode = 29
-        versionName = "0.5.0"
+        versionCode = 31
+        versionName = "0.6.0"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for
@@ -88,8 +104,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -101,6 +117,40 @@ android {
 }
 
 dependencies {
+
+    implementation(project(mapOf("path" to ":navigation-runtime", "configuration" to "shadow")))
+    implementation(files("libs/navigation/osmand-shared-jvm.jar", "libs/navigation/gnu-trove-osmand.jar", "libs/navigation/kxml2-android.jar"))
+    implementation("commons-logging:commons-logging:1.4.0")
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation(navigationLibs.androidx.core.ktx)
+    implementation(navigationLibs.androidx.webkit)
+    implementation(navigationLibs.androidx.lifecycle.runtime.ktx)
+    implementation(navigationLibs.androidx.lifecycle.runtime.compose)
+    implementation(navigationLibs.androidx.lifecycle.viewmodel.compose)
+    implementation(navigationLibs.androidx.activity.compose)
+    implementation(navigationLibs.androidx.splashscreen)
+    implementation(navigationLibs.androidx.compose.ui)
+    implementation(navigationLibs.androidx.compose.ui.graphics)
+    implementation(navigationLibs.androidx.compose.ui.tooling.preview)
+    implementation(navigationLibs.androidx.compose.foundation)
+    implementation(navigationLibs.androidx.compose.material.icons.extended)
+    implementation(navigationLibs.androidx.material3)
+    implementation(navigationLibs.androidx.navigation.compose)
+    implementation(navigationLibs.hilt.android)
+    implementation(navigationLibs.hilt.navigation.compose)
+    implementation(navigationLibs.coil.compose)
+    implementation(navigationLibs.maplibre.android)
+    implementation(navigationLibs.androidx.car.app)
+    implementation(navigationLibs.androidx.car.app.projected)
+    implementation(navigationLibs.kotlinx.coroutines.android)
+    implementation(navigationLibs.kotlinx.serialization.json)
+    implementation(navigationLibs.androidx.datastore.preferences)
+    implementation(navigationLibs.okhttp)
+    implementation(navigationLibs.rhino.runtime)
+
+    ksp(navigationLibs.hilt.compiler)
+    implementation(files("libs/navigation/sherpa-onnx-1.13.3.aar", "libs/navigation/cronet-155.0.8059.16.aar"))
+
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation(platform(libs.androidx.compose.bom))
@@ -138,7 +188,7 @@ dependencies {
     implementation(libs.google.identity.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.maplibre)
-    implementation(libs.maplibre.annotation)
+    implementation(libs.maplibre.annotation) { exclude(group = "org.maplibre.gl", module = "android-sdk") }
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

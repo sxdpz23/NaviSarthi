@@ -50,6 +50,55 @@
         }
       },
       "projectId": "224da3cb-a450-40b9-89f2-2000b18f9716"
+    },
+    "v060-shell": {
+      "targetKind": "new-ui",
+      "projectId": "224da3cb-a450-40b9-89f2-2000b18f9716",
+      "activeDraftId": "2cd8f54b-6fe5-413b-85e1-6b0743746b33",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "ea8a6a77-20cc-4a2b-b70c-77aac262ad36",
+        "navisarthi-logo"
+      ],
+      "contextFiles": [
+        ".superdesign/v060-brief.md",
+        ".superdesign/design-system.md",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/navigation/AppNavigation.kt",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/NaviSarthiIcons.kt",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/theme/Color.kt",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/theme/Type.kt",
+        ".superdesign/helmet-intercom.svg"
+      ],
+      "fingerprints": {
+        ".superdesign/v060-brief.md": "8df3782b69a2b2a5038aa144814f3a19686bcbec47004d619e97b427e7f220a6",
+        ".superdesign/design-system.md": "320a94a1430768d92d4a5fdd8e8aa163fe32b7827edeb770bf0eea62f7acbed9",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/navigation/AppNavigation.kt": "9a950444ce16d1677156cc1da8d77f3b50604412dfd5699fd8ad5ec5f8fd6752",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/NaviSarthiIcons.kt": "34dd87485947147b82f1f3190c26c7ac3c09ad1399b71b8e875ad0ac9a81ecac",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/theme/Color.kt": "98788309ae769e6e69a9bbe3d51c1f7158e3236002fade55410d28b2fffafbb5",
+        "app/src/main/java/com/sxdpz23/navisarthi/ui/theme/Type.kt": "ab8335c72dab9ce1b2fdf5f50ba8a77d7aba13ca3f18136b447ed8373fdca6fb",
+        ".superdesign/helmet-intercom.svg": "e84554214a8f4e1829cc950a71a3b88838a47d45cfc0416308162a15968b4a00"
+      },
+      "brandAssets": {
+        "logo": {
+          "assetKey": "navisarthi-logo",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/224da3cb-a450-40b9-89f2-2000b18f9716/brand-assets/navisarthi-logo/navisarthi_logo.png",
+          "sourcePath": "app/src/main/res/drawable-nodpi/navisarthi_logo.png"
+        }
+      },
+      "drafts": {
+        "2cd8f54b-6fe5-413b-85e1-6b0743746b33": {
+          "title": "NaviSarthi 0.6.0 Shell",
+          "currentVersion": 7,
+          "visualDirection": "Deeper neutral glass with background-only edge refraction and moving selection; vehicle-accent Material icons and reference-inspired side-profile helmet silhouette with external boom mic for Groups; Vela reference map; optional Garage; Dash/Pod, Groups and Settings states. Approved web reference; native shell implemented with captured-background refraction. Device rendering validation pending."
+        }
+      },
+      "updatedAt": "2026-11-16T23:43:07.468747+00:00",
+      "implementationStatus": "native-integrated-release-built-device-validation-pending",
+      "approval": {
+        "draftId": "2cd8f54b-6fe5-413b-85e1-6b0743746b33",
+        "version": 7,
+        "decision": "Approve this revision"
+      }
     }
   },
   "schemaVersion": 1

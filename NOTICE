@@ -36,3 +36,15 @@ for interoperability with hardware the user already owns.
 Northstar streams a video feed to the Tripper display and reads its joystick; it
 does not modify, and cannot modify, the motorcycle, its ECU, or any safety system.
 Use at your own risk.
+
+--------------------------------------------------------------------------------
+Vela Maps navigation source (NaviSarthi 0.6.0)
+--------------------------------------------------------------------------------
+
+NaviSarthi navigation includes adapted Vela Maps app/core source and resources,
+https://github.com/PimpinPumpkin/Vela, revision
+6cab47ae81cf8988b12c02169dae72b22c8b815c, under GNU GPL version 3.
+The full license is bundled in app/src/main/assets/licenses/Navigation-GPL-3.0.txt.
+See docs/navigation-upstream.md for source provenance and local modifications,
+and Navigation-NOTICES.txt in the bundled license directory for data/font credits.
+The Apache-2.0 license on the original Northstar material is preserved separately.

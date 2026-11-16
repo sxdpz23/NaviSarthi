@@ -1,0 +1,12 @@
+NaviSarthi navigation notices
+
+Adapted from Vela Maps, https://github.com/PimpinPumpkin/Vela
+Revision: 6cab47ae81cf8988b12c02169dae72b22c8b815c
+License: GNU GPL version 3; see Navigation-GPL-3.0.txt.
+Local modifications: unified NaviSarthi Application and Activity, packages/resources,
+Settings, native navigation tabs, rendering insets, and Dash/Pod route transfer.
+
+Map/data providers include OpenStreetMap contributors (ODbL), OpenFreeMap,
+Overture Maps (CDLA Permissive 2.0), AllThePlaces, and UK fuel data (OGL v3).
+Google Sans Flex: SIL Open Font License; see GoogleSansFlex-OFL.txt.
+Material Icons: Apache License 2.0, Google.

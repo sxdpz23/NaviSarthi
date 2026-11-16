@@ -1,0 +1,64 @@
+package com.sxdpz23.navisarthi.navigation.core.data
+
+/**
+ * What actually happened when a user tried to import a file (issue #287).
+ *
+ * The stores used to answer with a bare `Int`, which collapsed four very different outcomes into
+ * "0": the file could not be read, it was not Navigation's format at all, it was Navigation's format but held
+ * nothing new, and it held nothing. The UI could then only say "Nothing to import", which is
+ * actively misleading when the real problem is that you exported the file from a different app.
+ */
+sealed interface ImportResult {
+    /** [count] entries were new and have been merged in. */
+    data class Added(val count: Int) : ImportResult
+
+    /** Valid Navigation data, but every entry was already saved - importing a backup twice. */
+    data object NothingNew : ImportResult
+
+    /** Readable, but not Navigation's own export. [format] names it when recognizable, so the message
+     *  can say what the file actually is instead of shrugging. */
+    /** [placesFile]: the file is one the saved places import reads (a lists import was handed it). */
+    data class WrongFormat(val format: String?, val placesFile: Boolean = false) : ImportResult
+
+    /** The file could not be opened or read at all. */
+    data object Unreadable : ImportResult
+
+    /** A Google Takeout list CSV became (or refreshed) the list [name]: [added] places in it,
+     *  [missed] rows whose place could not be found, [needGoogle] listing rows left unlooked-up
+     *  because Google is off. */
+    data class ListAdded(val name: String, val added: Int, val missed: Int, val needGoogle: Int) : ImportResult
+
+    /** A Takeout list is still being looked up; those imports run one at a time. */
+    data object Busy : ImportResult
+}
+
+/**
+ * Best-effort naming of a file the importer cannot use, so the app can say "that looks like a
+ * Google Takeout file" rather than "nothing to import".
+ *
+ * Deliberately shallow: it matches on distinctive markers rather than parsing, because the point
+ * is only to write a better sentence, never to decide whether an import succeeds.
+ */
+object ImportFormats {
+    fun describe(json: String): String? {
+        val head = json.take(4000)
+        return when {
+            // Google Takeout saved places: a GeoJSON FeatureCollection whose properties carry
+            // Google's own place fields.
+            // Takeout's distinctive markers: its own property name, and the two URL spellings
+            // Google actually emits (maps.google.com/?cid=... and google.com/maps/...).
+            head.contains("\"FeatureCollection\"") && (
+                head.contains("google_maps_url") ||
+                    head.contains("maps.google.com") ||
+                    head.contains("google.com/maps")
+                ) -> "Google Takeout"
+            head.contains("\"FeatureCollection\"") || head.contains("\"features\"") -> "GeoJSON"
+            // KML before GPX: both start with an XML prolog.
+            head.contains("<kml") || head.contains("<Placemark") -> "KML"
+            head.trimStart().startsWith("<?xml") || head.contains("<gpx") -> "GPX"
+            head.contains("\"bookmarks\"") || head.contains("\"organicmaps\"") -> "Organic Maps"
+            TakeoutCsv.isTakeoutCsv(head) -> "Google Takeout list"
+            else -> null
+        }
+    }
+}

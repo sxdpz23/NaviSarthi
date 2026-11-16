@@ -1,5 +1,17 @@
 package com.sxdpz23.navisarthi.ui.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.*
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,22 +51,15 @@ import com.sxdpz23.navisarthi.pod.PodViewModel
 sealed class Screen(val route: String) {
     object Home     : Screen("home")
     object Route    : Screen("route")
+    object Nav      : Screen("nav")
     object Dash     : Screen("dash")
     object Pod      : Screen("pod")
     object Garage   : Screen("garage")
     object Rides    : Screen("rides")
+    object Groups   : Screen("groups")
+    object NavigationSettings : Screen("navigation_settings")
     object Settings : Screen("settings")
 }
-
-private data class NavTab(val screen: Screen, val icon: ImageVector, val label: String)
-
-private val bottomTabs = listOf(
-    NavTab(Screen.Home,   NaviSarthiIcons.Home,    "Home"),
-    NavTab(Screen.Route,  NaviSarthiIcons.Navi,    "Route"),
-    NavTab(Screen.Dash,   NaviSarthiIcons.Dash,    "Dash"),
-    NavTab(Screen.Garage, NaviSarthiIcons.Wrench,  "Garage"),
-    NavTab(Screen.Rides,  NaviSarthiIcons.History, "Rides"),
-)
 
 @Composable
 fun AppNavigation(
@@ -63,6 +68,8 @@ fun AppNavigation(
     routeViewModel: RouteViewModel = viewModel(),
     podViewModel: PodViewModel,
     onVehicleSelected: (VehicleModel) -> Unit,
+    openNav: Boolean = false,
+    onNavOpened: () -> Unit = {},
 ) {
     val pod = LocalVehicle.current.consoleType == ConsoleType.TRIPPER_POD
     val consoleRoute = if (pod) Screen.Pod.route else Screen.Dash.route
@@ -75,8 +82,8 @@ fun AppNavigation(
     // Covers restored back stacks as well as disabling Garage from Settings.
     LaunchedEffect(garageEnabled, currentRoute) {
         if (!garageEnabled && currentRoute == Screen.Garage.route) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(Screen.Home.route) { inclusive = true }
+            navController.navigate(consoleRoute) {
+                popUpTo(consoleRoute) { inclusive = true }
                 launchSingleTop = true
             }
         }
@@ -89,23 +96,40 @@ fun AppNavigation(
         currentRoute?.let { com.sxdpz23.navisarthi.util.Telemetry.logScreen(it) }
     }
 
-    // Navigate to a top-level destination with ONE consistent pattern — whether the tap came from
-    // the bottom bar or a Home-screen button. The Home button used to do a plain navigate() while
-    // the bottom bar used saveState/restoreState; mixing them corrupted the back stack so that,
-    // after opening Dash from the Home button, tapping Home did nothing (target == start
-    // destination + a restoreState mismatch). Routing both through this fixes it.
     fun navigateTab(route: String) {
-        if (route == Screen.Home.route && navController.popBackStack(route, inclusive = false)) return
+        if (route == currentRoute) return
         navController.navigate(route) {
-            popUpTo(Screen.Home.route)
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
+            restoreState = true
         }
     }
-
-    val showBottomNav = currentRoute in listOf(
-        Screen.Home.route, Screen.Route.route, consoleRoute,
-        Screen.Garage.route, Screen.Rides.route,
+    val tabs = listOf(
+        GlassTab(consoleRoute, NaviSarthiIcons.Gauge, if (pod) "Pod" else "Dash"),
+        GlassTab(Screen.Nav.route, NaviSarthiIcons.Navi, "Nav"),
+    ) + (if (garageEnabled) listOf(GlassTab(Screen.Garage.route, NaviSarthiIcons.Wrench, "Garage")) else emptyList()) + listOf(
+        GlassTab(Screen.Groups.route, NaviSarthiIcons.HelmetIntercom, "Groups"),
+        GlassTab(Screen.Settings.route, NaviSarthiIcons.Gear, "Settings"),
     )
+    fun rank(route: String?) = tabs.indexOfFirst { it.route == route }.coerceAtLeast(0)
+    val activity = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
+    val navigationViewModel: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel = viewModel(viewModelStoreOwner = activity)
+    val backdrop = rememberGraphicsLayer()
+    var backdropOrigin by remember { mutableStateOf(Offset.Zero) }
+    var compactBar by remember { mutableStateOf(false) }
+    val barScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (consumed.y < -6f) compactBar = true
+                if (consumed.y > 6f) compactBar = false
+                return Offset.Zero
+            }
+        }
+    }
+    LaunchedEffect(currentRoute) { compactBar = false }
+    LaunchedEffect(openNav) {
+        if (openNav) { navigateTab(Screen.Nav.route); onNavOpened() }
+    }
 
     val garageTab by appViewModel.garageTab.collectAsState()
     val routeState by routeViewModel.state.collectAsState()
@@ -151,35 +175,54 @@ fun AppNavigation(
         }
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Box(Modifier.weight(1f)) {
+    if (com.sxdpz23.navisarthi.navigation.ui.PipMode.active.value) {
+        com.sxdpz23.navisarthi.navigation.ui.theme.NavigationTheme(darkTheme = com.sxdpz23.navisarthi.navigation.ui.theme.isAppInDarkTheme()) {
+            com.sxdpz23.navisarthi.navigation.ui.NavigationRoot(vm = navigationViewModel)
+        }
+        return
+    }
+
+    Box(Modifier.fillMaxSize().statusBarsPadding()) {
+        Box(Modifier.fillMaxSize().navigationBarsPadding().nestedScroll(barScroll).onGloballyPositioned { backdropOrigin = it.positionInRoot() }.drawWithContent {
+            backdrop.record { this@drawWithContent.drawContent() }
+            drawLayer(backdrop)
+        }) {
             NavHost(
                 navController = navController,
-                startDestination = Screen.Home.route,
+                startDestination = consoleRoute,
+                enterTransition = { slideInHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) 24 else -24 } + fadeIn(tween(220)) },
+                exitTransition = { slideOutHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) -24 else 24 } + fadeOut(tween(180)) },
             ) {
+                // Restore an older task directly into the new console-first shell.
                 composable(Screen.Home.route) {
-                    HomeScreen(
-                        conn = conn,
-                        onNavigate = { dest ->
-                            when (dest) {
-                                // Top-level destinations go through the shared tab navigation so the
-                                // back stack stays consistent with the bottom bar (see navigateTab).
-                                "route" -> navigateTab(Screen.Route.route)
-                                "dash", "pod" -> navigateTab(consoleRoute)
-                                "garage" -> if (garageEnabled) navigateTab(Screen.Garage.route)
-                                // Settings is a detail screen (its own back), not a tab.
-                                "settings" -> navController.navigate(Screen.Settings.route)
-                            }
-                        },
-                        routeViewModel = routeViewModel,
-                    )
+                    LaunchedEffect(Unit) {
+                        navController.navigate(consoleRoute) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
                 }
 
+                composable(Screen.Nav.route) {
+                    NavScreen(navigationViewModel, pod, onOpenSettings = { navigateTab(Screen.Settings.route) }) { stops, legs, offline ->
+                        if (pod) {
+                            podViewModel.startJourney(stops, com.sxdpz23.navisarthi.dash.nav.RouteMode.Car, legs, offline)
+                            if (podViewModel.ble.state.value.stage != PodStage.READY) {
+                                if (podViewModel.ble.savedAddress != null) podViewModel.ble.connect() else podViewModel.ble.discover()
+                            }
+                        } else {
+                            dashViewModel.startJourney(stops, com.sxdpz23.navisarthi.dash.nav.RouteMode.Car, legs, offline)
+                            dashViewModel.connect()
+                        }
+                        navigateTab(consoleRoute)
+                    }
+                }
                 composable(Screen.Route.route) {
                     RouteScreen(
                         routeViewModel = routeViewModel,
                         onBack = { navController.popBackStack() },
                         onSentToDash = { _ ->
+                            navigationViewModel.stopNav()
                             val plan = routeViewModel.state.value
                             if (pod) {
                                 podViewModel.startJourney(plan.stops, plan.mode, plan.legs, offline = plan.offline)
@@ -193,7 +236,7 @@ fun AppNavigation(
                                 dashViewModel.connect()
                             }
                             navController.navigate(consoleRoute) {
-                                popUpTo(Screen.Home.route)
+                                popUpTo(consoleRoute)
                             }
                         },
                     )
@@ -201,7 +244,15 @@ fun AppNavigation(
 
                 // The inactive console destination is absent from this vehicle's graph.
                 composable(consoleRoute) {
-                    if (pod) PodScreen(vm = podViewModel) else DashScreen(vm = dashViewModel)
+                    Column(Modifier.fillMaxSize()) {
+                        com.sxdpz23.navisarthi.ui.components.NaviSarthiBtn(
+                            "Console route", onClick = { navController.navigate(Screen.Route.route) },
+                            icon = NaviSarthiIcons.Route,
+                            variant = com.sxdpz23.navisarthi.ui.components.BtnVariant.Secondary,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                        Box(Modifier.weight(1f)) { if (pod) PodScreen(vm = podViewModel) else DashScreen(vm = dashViewModel) }
+                    }
                 }
 
                 composable(Screen.Garage.route) {
@@ -211,20 +262,24 @@ fun AppNavigation(
                     )
                 }
 
+                composable(Screen.Groups.route) { GroupsScreen() }
+
                 composable(Screen.Rides.route) {
                     RidesScreen()
                 }
 
+                composable(Screen.NavigationSettings.route) {
+                    NavigationSettingsScreen(navigationViewModel, onBack = { navController.popBackStack() })
+                }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
-                        conn = conn,
-                        onConnChange = { appViewModel.setConn(it) },
-                        dashViewModel = dashViewModel,
-                        podViewModel = podViewModel,
-                        onVehicleSelected = onVehicleSelected,
-                        garageEnabled = garageEnabled,
+                        conn = conn, onConnChange = appViewModel::setConn,
+                        dashViewModel = dashViewModel, podViewModel = podViewModel,
+                        onVehicleSelected = onVehicleSelected, garageEnabled = garageEnabled,
                         onGarageEnabledChange = appViewModel::setGarageEnabled,
-                        onBack = { navController.popBackStack() },
+                        onBack = { navigateTab(consoleRoute) },
+                        onOpenNavigationSettings = { navController.navigate(Screen.NavigationSettings.route) },
+                        onOpenRides = { navController.navigate(Screen.Rides.route) },
                     )
                 }
             }
@@ -234,73 +289,9 @@ fun AppNavigation(
         // version is published. Renders nothing otherwise.
         com.sxdpz23.navisarthi.ui.components.UpdatePrompt()
 
-        if (showBottomNav) {
-            NaviSarthiBottomNav(
-                currentRoute = currentRoute,
-                garageEnabled = garageEnabled,
-                pod = pod,
-                onNavSelect = { screen -> navigateTab(screen.route) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun NaviSarthiBottomNav(
-    currentRoute: String?,
-    garageEnabled: Boolean,
-    pod: Boolean,
-    onNavSelect: (Screen) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xE60D0F11))
-            .border(width = 1.dp, color = Line, shape = androidx.compose.ui.graphics.RectangleShape)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .navigationBarsPadding(),
-    ) {
-        bottomTabs.map { if (pod && it.screen == Screen.Dash) it.copy(screen = Screen.Pod, label = "Pod") else it }
-            .filter { garageEnabled || it.screen != Screen.Garage }.forEach { tab ->
-            val active = currentRoute == tab.screen.route
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onNavSelect(tab.screen) }
-                    .padding(vertical = 6.dp),
-            ) {
-                // Fixed-height container with the icon top-aligned and the active dot
-                // bottom-aligned — so reserving space for the dot doesn't shove the
-                // selected icon downward relative to the others.
-                Box(Modifier.height(29.dp), contentAlignment = Alignment.TopCenter) {
-                    Icon(
-                        tab.icon, contentDescription = tab.label,
-                        tint = if (active) Gold else TextLo,
-                        modifier = Modifier.size(23.dp),
-                    )
-                    if (active) {
-                        Box(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(Gold)
-                        )
-                    }
-                }
-                Text(
-                    tab.label,
-                    color = if (active) Gold else TextLo,
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = GeistFamily,
-                )
-            }
+        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            LiquidGlassBar(tabs, if (currentRoute in listOf(Screen.Rides.route, Screen.NavigationSettings.route)) Screen.Settings.route else if (currentRoute == Screen.Route.route) Screen.Nav.route else currentRoute ?: consoleRoute,
+                backdrop, backdropOrigin, compactBar, onSelect = { compactBar = false; navigateTab(it) })
         }
     }
 }

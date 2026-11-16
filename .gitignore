@@ -50,3 +50,9 @@ node_modules/
 !/version plans/**
 
 .superdesign/tmp/
+/.build-v060/
+
+/app/libs/navigation/*.aar
+/app/libs/navigation/*.jar
+
+/.kotlin/

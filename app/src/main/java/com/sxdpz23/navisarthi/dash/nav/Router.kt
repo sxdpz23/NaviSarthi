@@ -15,6 +15,7 @@ import java.net.URL
 enum class RouteMode { Car, Bike }
 
 object Router {
+    @Volatile var externalDriveRouter: (suspend (GeoPoint, GeoPoint, Int?) -> Route?)? = null
     private const val TAG = "Router"
     private const val BASE = "https://router.project-osrm.org/route/v1/driving"
     private const val UA = "NaviSarthi/1.0 (personal motorcycle nav; single user)"
@@ -23,6 +24,7 @@ object Router {
         departureHeading: Int? = null): Route? = withContext(Dispatchers.IO) {
         require(departureHeading == null || departureHeading in 0..359)
         if (mode == RouteMode.Bike) return@withContext motorcycleRoute(from, to, departureHeading)
+        externalDriveRouter?.let { return@withContext it(from, to, departureHeading) }
         val url = "$BASE/${from.lng},${from.lat};${to.lng},${to.lat}" +
                 "?overview=full&geometries=polyline&steps=true&annotations=false" +
                 (departureHeading?.let(DepartureDirection::osrmOption) ?: "")

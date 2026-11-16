@@ -45,7 +45,7 @@ fun RidesScreen(ridesViewModel: RidesViewModel = viewModel()) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(18.dp)
-            .padding(bottom = 24.dp),
+            .padding(bottom = ControlSpacing.PageBottom),
     ) {
         ScreenHeader(eyebrow = "Telemetry", title = "Ride history",
             hint = "Every connected ride is saved here — distance, duration, and the route you took.")

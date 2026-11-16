@@ -559,21 +559,19 @@ class DashSession(private val scope: CoroutineScope) {
                             musicSendAttempts++
                             val packets = music.art?.let { DashCommands.albumArtFrames(it) }.orEmpty()
                             if (packets.isNotEmpty()) artworkAttempts++
-                            var sentPackets = 0
-                            var completed = currentSocket.send(DashCommands.musicAvailable(true)) &&
-                                (music.playing?.let { currentSocket.send(DashCommands.musicPlaybackState(it)) } ?: true) &&
-                                currentSocket.send(DashCommands.nowPlaying(music.title, music.album, music.artist))
-                            if (completed) {
-                                for (packet in packets) {
-                                    ensureActive()
-                                    if (socket !== currentSocket || nativeMusic !== music || !currentSocket.send(packet)) {
-                                        completed = false
-                                        break
-                                    }
-                                    sentPackets++
-                                    delay(10)
-                                }
+                            val headers = buildList {
+                                add(DashCommands.musicAvailable(true))
+                                music.playing?.let { add(DashCommands.musicPlaybackState(it)) }
+                                add(DashCommands.nowPlaying(music.title, music.album, music.artist))
                             }
+                            val batch = headers + packets
+                            val transferContext = currentCoroutineContext()
+                            val sent = currentSocket.sendMediaBatch(batch) {
+                                transferContext.ensureActive()
+                                socket === currentSocket && com.sxdpz23.navisarthi.dash.protocol.sameMusicContent(nativeMusic, music)
+                            }
+                            val completed = sent == batch.size
+                            val sentPackets = (sent - headers.size).coerceAtLeast(0)
                             if (packets.isNotEmpty()) {
                                 if (completed) artworkCompleted++ else artworkFailed++
                                 lastArtworkPackets = "$sentPackets/${packets.size} locally sent, ${music.art?.size ?: 0} bytes"

@@ -8,4 +8,16 @@ internal class ControlPacketSender(private val write: (ByteArray) -> Boolean) {
         sequence = (sequence + 1) and 255
         return write(sequenced)
     }
+
+    /** Short media transaction: unrelated control packets cannot split an image. IO caller only. */
+    @Synchronized fun sendBatch(packets: List<ByteArray>, current: () -> Boolean,
+        pause: () -> Unit = { Thread.sleep(10) }): Int {
+        var sent = 0
+        for (packet in packets) {
+            if (!current() || !send(packet)) break
+            sent++
+            if (sent < packets.size) pause()
+        }
+        return sent
+    }
 }

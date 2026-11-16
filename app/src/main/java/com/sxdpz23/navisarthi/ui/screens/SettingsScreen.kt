@@ -41,9 +41,11 @@ fun SettingsScreen(
     garageEnabled: Boolean,
     onGarageEnabledChange: (Boolean) -> Unit,
     onBack: () -> Unit,
+    onOpenNavigationSettings: () -> Unit = {},
+    onOpenRides: () -> Unit = {},
 ) {
     if (LocalVehicle.current.consoleType == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_POD) {
-        PodSettingsScreen(podViewModel, onVehicleSelected, garageEnabled, onGarageEnabledChange, onBack)
+        PodSettingsScreen(podViewModel, onVehicleSelected, garageEnabled, onGarageEnabledChange, onBack, onOpenNavigationSettings, onOpenRides)
         return
     }
     val dashUi by dashViewModel.ui.collectAsState()
@@ -77,6 +79,11 @@ fun SettingsScreen(
             }, onDismiss = { showVehiclePicker = false })
         }
 
+        ControlSection("Navigation and rides")
+        NaviSarthiBtn("Navigation and maps", onClick = onOpenNavigationSettings,
+            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Navi, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        NaviSarthiBtn("Ride history", onClick = onOpenRides,
+            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.History, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         ControlSection("App features")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(NaviSarthiIcons.Wrench, "Enable Garage", "Maintenance, fuel diary and vehicle records",

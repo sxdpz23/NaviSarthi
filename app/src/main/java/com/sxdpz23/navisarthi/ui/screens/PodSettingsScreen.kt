@@ -22,7 +22,7 @@ import com.sxdpz23.navisarthi.util.DeviceReadiness
 
 @Composable
 internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleModel) -> Unit,
-    garageEnabled: Boolean, onGarageEnabledChange: (Boolean) -> Unit, onBack: () -> Unit) {
+    garageEnabled: Boolean, onGarageEnabledChange: (Boolean) -> Unit, onBack: () -> Unit, onOpenNavigationSettings: () -> Unit = {}, onOpenRides: () -> Unit = {}) {
     val ctx = LocalContext.current
     val state by vm.ble.state.collectAsState()
     val night by vm.night.collectAsState()
@@ -52,6 +52,11 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
         ControlHint("Changing vehicle stops navigation and disconnects the current device. Your planned route and saved devices are kept.")
         if (showPicker) VehiclePicker(LocalVehicle.current, onSelect = { onVehicleSelected(it); showPicker = false },
             onDismiss = { showPicker = false })
+        ControlSection("Navigation and rides")
+        NaviSarthiBtn("Navigation and maps", onClick = onOpenNavigationSettings,
+            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Navi, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+        NaviSarthiBtn("Ride history", onClick = onOpenRides,
+            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.History, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         ControlSection("App features")
         PodToggle("Enable Garage", "Maintenance, fuel diary and vehicle records", garageEnabled, onGarageEnabledChange)
         PodConnectionControls(vm)

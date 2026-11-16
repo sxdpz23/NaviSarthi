@@ -83,6 +83,9 @@ class DashSocket(private val network: android.net.Network? = null) : AutoCloseab
     /** Match OGRE's single sender: sequence assignment and UDP write are serialized. */
     fun send(data: ByteArray): Boolean = controlSender.send(data)
 
+    internal fun sendMediaBatch(packets: List<ByteArray>, current: () -> Boolean): Int =
+        controlSender.sendBatch(packets, current)
+
     fun sendRtp(data: ByteArray) {
         try {
             rtpSocket.send(DatagramPacket(data, data.size, dashAddr, RTP_PORT))

@@ -1,7 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
+<?xml version='1.0' encoding='utf-8'?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Console joystick adjusts the phone media stream, without changing its output route. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -10,15 +8,12 @@
     <!-- Passive accessory connection/battery reporting; no Bluetooth scanning. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Meteor 350 Tripper Pod discovery; never requested by the Dash flow. -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <!-- startScan() to warm scan results so we resolve the exact dash SSID on the first try -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <!-- Android 13+: WiFi connection without location permission -->
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
-        android:usesPermissionFlags="neverForLocation"
-        tools:targetApi="tiramisu" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" tools:targetApi="tiramisu" />
     <!-- Android 12 and below fallback -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Keep streaming to the dash with the screen off -->
@@ -31,12 +26,10 @@
          streaming behaves the same on every device. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
-        tools:targetApi="34" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:targetApi="34" />
     <!-- Without the location FGS type, Android 14+ freezes GPS updates as soon as
          the screen goes off — the rider position would stick at its first fix. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"
-        tools:targetApi="34" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:targetApi="34" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Answer / reject the live call from the dash joystick (TelecomManager). Runtime-granted. -->
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
@@ -48,35 +41,29 @@
          system package installer (the install itself still needs the user's tap + the
          per-app "install unknown apps" grant). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
     <!-- Backups disabled: app-private storage holds identity documents (insurance/RC with
          their numbers) and service invoices. allowBackup=true would funnel those into
          Google cloud auto-backup and adb backup. Cross-device continuity for the syncable
          data is already handled by Firestore (see data/SyncRepository.kt). -->
-    <application
-        android:name=".NaviSarthiApplication"
-        android:allowBackup="false"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.NaviSarthi">
-
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="android.car.permission.CAR_INFO" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+    <application android:name=".NaviSarthiApplication" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:fullBackupContent="@xml/backup_rules" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:roundIcon="@mipmap/ic_launcher_round" android:supportsRtl="true" android:theme="@style/Theme.NaviSarthi" android:networkSecurityConfig="@xml/network_security_config" android:largeHeap="true" android:enableOnBackInvokedCallback="true">
         <!-- Map is MapLibre + OpenFreeMap (keyless) — no Google Maps API key needed. -->
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:launchMode="singleTask"
-            android:theme="@style/Theme.NaviSarthi"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        <activity android:name=".MainActivity" android:exported="true" android:label="@string/app_name" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:theme="@style/Theme.NaviSarthi" android:windowSoftInputMode="adjustResize">
             <!-- Receive "Share" from Google Maps -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -91,51 +78,117 @@
                 <data android:scheme="https" android:host="goo.gl" />
                 <data android:scheme="geo" />
             </intent-filter>
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="google.navigation" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="www.google.com" />
+                <data android:host="google.com" />
+                <data android:host="goo.gl" />
+                <data android:pathPrefix="/maps" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="maps.google.com" />
+                <data android:host="maps.app.goo.gl" />
+            </intent-filter>
         </activity>
-
-        <service
-            android:name=".pod.PodKeepAliveService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice|location" />
-
-        <service
-            android:name=".dash.DashKeepAliveService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice|location" />
-
+        <activity-alias android:name="com.sxdpz23.navisarthi.navigation.Launcher" android:targetActivity="com.sxdpz23.navisarthi.MainActivity" android:label="@string/app_name" android:exported="true" android:enabled="true">
+            <!-- Android Automotive: a navigation app may stay on screen while the car moves. Without
+                 this the car greys Navigation out of its app list the moment it is in gear (seen on the
+                 emulator); a production car also wants the app to come from a store it trusts. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- "The maps app" to the system (issue #683): Android Automotive starts whatever
+                 answers MAIN + APP_MAPS in its map panel, and "open maps" requests resolve by it
+                 on a phone. A filter of its own WITH the DEFAULT category: the car launcher starts
+                 it by an implicit intent, which only matches a filter that declares DEFAULT (with
+                 the category on the launcher filter alone the start came back "not resolved"). -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.sxdpz23.navisarthi.navigation.LauncherMaps" android:targetActivity="com.sxdpz23.navisarthi.MainActivity" android:label="@string/app_name_generic" android:exported="true" android:enabled="false">
+            <!-- Android Automotive: a navigation app may stay on screen while the car moves. Without
+                 this the car greys Navigation out of its app list the moment it is in gear (seen on the
+                 emulator); a production car also wants the app to come from a store it trusts. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- "The maps app" to the system (issue #683): Android Automotive starts whatever
+                 answers MAIN + APP_MAPS in its map panel, and "open maps" requests resolve by it
+                 on a phone. A filter of its own WITH the DEFAULT category: the car launcher starts
+                 it by an implicit intent, which only matches a filter that declares DEFAULT (with
+                 the category on the launcher filter alone the start came back "not resolved"). -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+        </activity-alias>
+        <service android:name=".pod.PodKeepAliveService" android:exported="false" android:foregroundServiceType="connectedDevice|location" />
+        <service android:name=".dash.DashKeepAliveService" android:exported="false" android:foregroundServiceType="connectedDevice|location" />
         <!-- Notification listener: grants MediaSessionManager access (now-playing → dash TLV 05 0d)
              and reads CATEGORY_CALL notifications (caller name → dash TLV 05 22). User must enable it
              once under Settings → Notification access; nothing is read until then. -->
-        <service
-            android:name=".media.NaviSarthiNotificationListener"
-            android:exported="false"
-            android:label="NaviSarthi media &amp; calls"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+        <service android:name=".media.NaviSarthiNotificationListener" android:exported="false" android:label="NaviSarthi media &amp; calls" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-
         <!-- Firebase Cloud Messaging receiver. Dormant unless a Firebase project is wired up
              (google-services.json) and a push arrives. -->
-        <service
-            android:name=".data.NaviSarthiMessagingService"
-            android:exported="false">
+        <service android:name=".data.NaviSarthiMessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-
         <!-- Shares stored service invoices (image/PDF) with an external viewer. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+        <service android:name="com.sxdpz23.navisarthi.navigation.service.NavigationService" android:exported="false" android:foregroundServiceType="location" />
+        <service android:name="com.sxdpz23.navisarthi.navigation.service.TransitGuideService" android:exported="false" android:foregroundServiceType="location" />
+        <service android:name="com.sxdpz23.navisarthi.navigation.download.DownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
+        <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="1" />
+        <service android:name="com.sxdpz23.navisarthi.navigation.car.NavigationCarAppService" android:exported="true" android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="androidx.car.app.category.FEATURE_CLUSTER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.car.app.action.NAVIGATE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="geo" />
+            </intent-filter>
+        </service>
+        <meta-data android:name="android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED" android:value="${applicationId}" />
     </application>
-
 </manifest>

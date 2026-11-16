@@ -22,7 +22,16 @@ import com.google.firebase.auth.FirebaseAuth
 import com.sxdpz23.navisarthi.console.ConsoleType
 import com.sxdpz23.navisarthi.pod.PodViewModel
 
+@dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var openNav by mutableStateOf(false)
+    private val navigationViewModel: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel by viewModels()
+    private val navigation by lazy {
+        com.sxdpz23.navisarthi.navigation.NavigationActivityDelegate(this, navigationViewModel) {
+            if (dashViewModel.remainingJourney() != null) dashViewModel.exitNavigation()
+            if (podViewModel.remainingJourney() != null) podViewModel.exitNavigation()
+        }
+    }
     private val dashViewModel: DashViewModel by viewModels()
     private val routeViewModel: RouteViewModel by viewModels()
     private val podViewModel: PodViewModel by viewModels()
@@ -34,6 +43,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        navigation.onCreate(handleStartupIntent = activeJourney() == null)
+        if (navigationViewModel.state.value.navigating) openNav = true
         enableEdgeToEdge()
 
         val sync = SyncRepository.get(applicationContext)
@@ -84,7 +95,8 @@ class MainActivity : ComponentActivity() {
                     } else {
                         key(vehicle) {
                             AppNavigation(routeViewModel = routeViewModel, dashViewModel = dashViewModel,
-                                podViewModel = podViewModel, onVehicleSelected = ::chooseVehicle)
+                                podViewModel = podViewModel, onVehicleSelected = ::chooseVehicle,
+                                openNav = openNav, onNavOpened = { openNav = false })
                         }
                     }
                 }
@@ -94,10 +106,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        // An active console journey receives the share as its next stop in the route editor.
+        // Do not also apply the phone map's automatic-start link preference to the same share.
+        if (activeJourney() == null) navigation.handleIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
+        if ((intent?.action in listOf(Intent.ACTION_SEND, Intent.ACTION_VIEW, com.sxdpz23.navisarthi.navigation.ui.TripShortcut.ACTION)) && activeJourney() == null) {
+            openNav = true // The shared map ViewModel has received the link.
+            return
+        }
         when (intent?.action) {
             Intent.ACTION_SEND -> {
                 if (intent.type == "text/plain") {
@@ -114,4 +134,20 @@ class MainActivity : ComponentActivity() {
 
     private fun activeJourney() = if (getSharedPreferences("vehicle", MODE_PRIVATE).getString("model", null) == VehicleModel.Meteor350.name)
         podViewModel.remainingJourney() else dashViewModel.remainingJourney()
+
+    override fun onStart() { super.onStart(); navigation.onStart() }
+    override fun onStop() { navigation.onStop(); super.onStop() }
+    override fun onResume() { super.onResume(); navigation.onResume() }
+    override fun onPictureInPictureModeChanged(active: Boolean, config: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(active, config)
+        navigation.onPictureInPictureChanged(active)
+    }
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (!event.isPrintingKey && com.sxdpz23.navisarthi.navigation.ui.ZoomKeys.handle(event)) return true
+        return super.dispatchKeyEvent(event) || (event.isPrintingKey && com.sxdpz23.navisarthi.navigation.ui.ZoomKeys.handle(event))
+    }
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(com.sxdpz23.navisarthi.navigation.ui.AppLocale.wrap(
+            com.sxdpz23.navisarthi.navigation.ui.AdaptiveDensity.wrap(base)))
+    }
 }

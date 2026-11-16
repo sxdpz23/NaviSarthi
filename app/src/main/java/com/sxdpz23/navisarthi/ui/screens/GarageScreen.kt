@@ -27,11 +27,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sxdpz23.navisarthi.data.vehicleReferenceSpecs
 import com.sxdpz23.navisarthi.data.BikeIdentity
 import com.sxdpz23.navisarthi.data.FuelFillup
 import com.sxdpz23.navisarthi.data.MaintenanceItem
@@ -107,10 +110,10 @@ fun GarageScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(18.dp)
-            .padding(bottom = 24.dp),
+            .padding(bottom = ControlSpacing.PageBottom),
     ) {
         ScreenHeader(
-            eyebrow = "Himalayan 450 · ${"%,.1f".format(ui.odometerKm)} km",
+            eyebrow = "${LocalVehicle.current.label} · ${"%,.1f".format(ui.odometerKm)} km",
             title = "Garage",
             hint = "Track maintenance, fuel fill-ups and mileage, and service-due reminders. Tap Odometer to keep the distance current.",
             trailing = {
@@ -685,16 +688,18 @@ private fun GloveboxTab(
     }
 
     Spacer(Modifier.height(20.dp))
-    ControlSection("Reference · Himalayan 450")
+    val reference = vehicleReferenceSpecs(LocalVehicle.current)
+    val uriHandler = LocalUriHandler.current
+    ControlSection("Reference · ${reference.vehicle.label}")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth()) {
-        SpecRow("Tyre pressure", "32 psi front & rear")
-        SpecRow("Engine oil", "10W40 API SN / JASO MA2 · 2.1 L")
-        SpecRow("Coolant", "TOTAL COOLELF AUTO SUPRA")
-        SpecRow("Fork oil", "SS-47G · RH 589 / LH 507 ml")
-        SpecRow("Brake fluid", "DOT 4 · F 90 / R 80 ml")
-        SpecRow("Spark plug", "Champion · gap 0.8–0.9 mm")
-        SpecRow("Fuel", "17 L (low 3 L) · E20 ok")
-        SpecRow("Battery", "12 V 8 Ah VRLA")
+        reference.rows.forEach { (label, value) -> SpecRow(label, value) }
+        Spacer(Modifier.height(12.dp))
+        Text(reference.note, color = TextLo, fontSize = 12.sp, lineHeight = 17.sp)
+        reference.sources.forEach { source ->
+            TextButton(onClick = { uriHandler.openUri(source.url) }) {
+                Text(source.label, fontSize = 12.sp)
+            }
+        }
     }
 }
 
@@ -709,8 +714,8 @@ private fun IdRow(label: String, value: String) {
 @Composable
 private fun SpecRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-        Text(label, color = TextLo, fontSize = 13.sp)
-        Text(value, color = TextHi, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily, modifier = Modifier.padding(start = 12.dp))
+        Text(label, color = TextLo, fontSize = 13.sp, modifier = Modifier.weight(0.34f))
+        Text(value, color = TextHi, fontSize = 12.5.sp, lineHeight = 18.sp, textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily, modifier = Modifier.weight(0.66f).padding(start = 12.dp))
     }
 }
 

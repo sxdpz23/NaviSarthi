@@ -38,7 +38,7 @@ val IconBtnShape = RoundedCornerShape(14.dp)
 object ControlSpacing {
     val Item = 8.dp
     val PageHorizontal = 20.dp
-    val PageBottom = 32.dp
+    val PageBottom = 120.dp
 }
 
 // ---- Card ----

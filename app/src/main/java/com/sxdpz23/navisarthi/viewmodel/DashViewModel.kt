@@ -405,6 +405,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
 
     // Map-matched rider position: snapped onto the route while on it (kills the GPS
     // lane/road jitter), raw GPS when genuinely off-route. Drives the marker + camera.
+    private val routeMatchPolicy = com.sxdpz23.navisarthi.dash.nav.RouteMatchPolicy()
     private val routeCursor = com.sxdpz23.navisarthi.dash.nav.RouteCursor()
     @Volatile private var matchedLat: Double? = null
     @Volatile private var matchedLng: Double? = null
@@ -1221,6 +1222,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         var routeMatch: GeoPoint? = null
         var routeMatchedMeters: Double? = null
         powerMatched = false
+        if (r == null || loc == null || !navigationFixValid || arrived)
+            routeMatchPolicy.accepts(null, 0.0, 0f, null, false, false, true)
         powerNextTurnM = null
         if (navigationFixValid && loc != null && dLat != null && dLng != null) {
             val nearby = GeoPoint.distMeters(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)) <= 15.0
@@ -1280,10 +1283,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                 ns.snapDist > 70.0  -> headingOff // parallel/flyover band: off ONLY if heading diverges
                 else -> false                     // (stopped here → not off-route; decide once moving)
             }
-            val directionAgrees = if (headingKnown) angleDelta(loc.bearing, ns.heading) <= 40f
-                else loc.speed < BEARING_MIN_SPEED
-            if (!offRoute && directionAgrees && loc.accuracy <= 25f &&
-                ns.snapDist <= loc.accuracy.toDouble().coerceIn(6.0, 15.0)) {
+            if (routeMatchPolicy.accepts(r, ns.snapDist, loc.accuracy,
+                if (headingKnown) angleDelta(loc.bearing, ns.heading) else null,
+                loc.speed < BEARING_MIN_SPEED, navigationFixValid, offRoute)) {
                 routeMatch = ns.snapped
                 matchedLat = ns.snapped.lat
                 matchedLng = ns.snapped.lng
