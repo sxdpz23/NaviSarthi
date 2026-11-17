@@ -1,5 +1,7 @@
 # Liquid glass polish — 2026-11-18
 
+**Status: reverted at the user’s request.** The Apple-inspired material, corner, layering, pressure-feedback and scroll-fade changes described below are historical and no longer active. The separate Navigation leading-divider correction and consistent taskbar-page headings remain. Later Dash fixes and version metadata are preserved.
+
 Reference: [Meet Liquid Glass, WWDC25 session 219](https://developer.apple.com/videos/play/wwdc2025/219/), supplied by the user. This is a native Android adaptation of the reference, not Apple's system material or a claim of frame-identical rendering.
 
 Unslop by Damir Sokolovsky, [heydamir.design/unslop](https://heydamir.design/unslop), CC BY 4.0. Attribution remains in the app's notices.
@@ -39,3 +41,7 @@ Nav retains route planning, guidance, location and map-style ownership. No chang
 - The Settings hub no longer attaches an unused collapsing-app-bar scroll connection; content scrolling remains independent of its fixed shared header.
 - Delivered 0.6.6 APK SHA-256 remains `e36f8e2eb256516c734cfb4474d9a746921326f8aa4ee3fd144bd1f2b0baf9c3`. Its completed release lint report is filed with that build (zero errors, 2,610 warnings); that report predates this design pass.
 - Device rendering, shader execution, touch feedback and real console use remain unverified in this source pass. These require device validation; JVM tests cannot establish their visual quality. No new APK was built.
+
+## Rollback verification
+
+The selective rollback compiled successfully and passed 153 JVM tests across 34 suites, with zero failures/errors/skips. Six glass/rendering sources match the pre-pass revision exactly; shared card/control corners were restored separately while preserving the later header changes. No APK, version change or lint run was requested.

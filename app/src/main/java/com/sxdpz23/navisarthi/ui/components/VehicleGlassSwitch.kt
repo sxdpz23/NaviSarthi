@@ -37,22 +37,21 @@ fun VehicleGlassSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, 
         val from = travel.value
         val initialLens = lens.value
         val target = if (checked) 1f else 0f
-        // Reference sequence: lift/inflate, move as a clear lens, then contract.
+        // Lift, travel and settle overlap so the switch responds immediately.
         // Keyframes use Compose's duration scale, including instant reduced-motion updates.
         coroutineScope {
             launch { lens.animateTo(0f, keyframes {
-                durationMillis = 1550
-                initialLens at 0
-                1f at 300 using FastOutSlowInEasing
-                1f at 950 using FastOutSlowInEasing
-                0f at 1550
+                durationMillis = 360
+                initialLens at 0 using FastOutSlowInEasing
+                1f at 80 using FastOutSlowInEasing
+                1f at 220 using FastOutSlowInEasing
+                0f at 360
             }) }
             launch { travel.animateTo(target, keyframes {
-                durationMillis = 1550
-                from at 0
-                from at 650 using FastOutSlowInEasing
-                target at 950
-                target at 1550
+                durationMillis = 360
+                from at 0 using FastOutSlowInEasing
+                target at 220
+                target at 360
             }) }
         }
     }

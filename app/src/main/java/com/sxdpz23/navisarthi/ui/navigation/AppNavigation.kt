@@ -129,13 +129,6 @@ fun AppNavigation(
     val pageMotion = com.sxdpz23.navisarthi.navigation.ui.PageTransitions.enabled.value
     val backdrop = rememberGraphicsLayer()
     var backdropOrigin by remember { mutableStateOf(Offset.Zero) }
-    var navGlassSource by remember { mutableStateOf<com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSource?>(null) }
-    val observeNavGlass = remember {
-        { source: com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSource, active: Boolean ->
-            if (active) navGlassSource = source
-            else if (navGlassSource?.layer === source.layer) navGlassSource = null
-        }
-    }
     var compactBar by remember { mutableStateOf(false) }
     val barScroll = remember {
         object : NestedScrollConnection {
@@ -210,9 +203,7 @@ fun AppNavigation(
                 }
 
                 composable(Screen.Nav.route) {
-                    CompositionLocalProvider(com.sxdpz23.navisarthi.navigation.ui.map.LocalNavGlassObserver provides observeNavGlass) {
-                        NavScreen(navigationViewModel, pod, onOpenSettings = { navController.navigate(Screen.NavigationSettings.route) })
-                    }
+                    NavScreen(navigationViewModel, pod, onOpenSettings = { navController.navigate(Screen.NavigationSettings.route) })
                 }
                 // Compatibility with restored tasks; there is only one route editor now.
                 composable(Screen.Route.route) {
@@ -258,24 +249,13 @@ fun AppNavigation(
             }
         }
 
-        // Dissolve scrolling page content beneath the floating bar. Keep the map's
-        // docked panels and attribution untouched; this scrim never enters the backdrop.
-        if (currentRoute != Screen.Nav.route && currentRoute != Screen.Route.route) {
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(136.dp)
-                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(
-                    Color.Transparent, Color.Black.copy(alpha = .32f),
-                ))))
-        }
-
         // Checks GitHub Releases on app open; shows an update dialog only if a newer
         // version is published. Renders nothing otherwise.
         com.sxdpz23.navisarthi.ui.components.UpdatePrompt()
 
         Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)) {
             LiquidGlassBar(tabs, if (currentRoute in listOf(Screen.Rides.route, Screen.NavigationSettings.route)) Screen.Settings.route else if (currentRoute == Screen.Route.route) Screen.Nav.route else currentRoute ?: consoleRoute,
-                backdrop, backdropOrigin, compactBar,
-                mapSource = navGlassSource.takeIf { currentRoute == Screen.Nav.route },
-                onSelect = { compactBar = false; navigateTab(it) })
+                backdrop, backdropOrigin, compactBar, onSelect = { compactBar = false; navigateTab(it) })
         }
     }
 }

@@ -10,8 +10,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -41,10 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sxdpz23.navisarthi.ui.theme.*
-import com.sxdpz23.navisarthi.ui.components.GlassEdge
-import com.sxdpz23.navisarthi.ui.components.GlassWash
-import com.sxdpz23.navisarthi.ui.components.GlassUnderlay
-import com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSource
 import kotlin.math.roundToInt
 
 internal data class GlassTab(val route: String, val icon: ImageVector, val label: String)
@@ -55,13 +49,10 @@ internal data class GlassTab(val route: String, val icon: ImageVector, val label
 internal fun LiquidGlassBar(
     tabs: List<GlassTab>, selectedRoute: String, backdrop: GraphicsLayer,
     backdropOrigin: Offset, compact: Boolean,
-    modifier: Modifier = Modifier, mapSource: NavGlassSource? = null, onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier, onSelect: (String) -> Unit,
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val shader = remember { RuntimeShader(com.sxdpz23.navisarthi.ui.components.LIQUID_GLASS_SHADER) }
-    val interactions = tabs.map { tab -> key(tab.route) { remember { MutableInteractionSource() } } }
-    val pressed = interactions.map { it.collectIsPressedAsState().value }.any { it }
-    val pressure by animateFloatAsState(if (pressed) 1f else 0f, label = "tabPressure")
     // One progress value keeps the shell, selection and label space in proportion throughout collapse.
     val animatedExpansion by animateFloatAsState(if (compact) 0f else 1f, label = "glassExpansion")
     val expansion = animatedExpansion.coerceIn(0f, 1f)
@@ -70,24 +61,23 @@ internal fun LiquidGlassBar(
     BoxWithConstraints(modifier.widthIn(max = 480.dp).fillMaxWidth().height(height)
         .shadow(16.dp, CircleShape).clip(CircleShape)
         .onGloballyPositioned { origin = it.positionInRoot() }
-        .border(1.dp, GlassEdge, CircleShape)
+        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(.55f), Color.White.copy(.12f))), CircleShape)
     ) {
         Canvas(Modifier.matchParentSize().graphicsLayer {
             shader.setFloatUniform("resolution", size.width, size.height)
             shader.setFloatUniform("dark", 1f)
             shader.setFloatUniform("radius", size.height / 2f)
-            shader.setFloatUniform("thickness", 0f)
-            shader.setFloatUniform("pressure", pressure)
             renderEffect = RenderEffect.createChainEffect(
                 RenderEffect.createRuntimeShaderEffect(shader, "content"),
                 RenderEffect.createBlurEffect(8f, 8f, Shader.TileMode.CLAMP),
             ).asComposeRenderEffect()
         }) {
-            val sourceOrigin = mapSource?.rootOrigin ?: backdropOrigin
-            translate(sourceOrigin.x - origin.x, sourceOrigin.y - origin.y) { drawLayer(mapSource?.layer ?: backdrop) }
+            translate(backdropOrigin.x - origin.x, backdropOrigin.y - origin.y) { drawLayer(backdrop) }
         }
-        Box(Modifier.matchParentSize().background(GlassUnderlay))
-        Box(Modifier.matchParentSize().background(GlassWash))
+        Box(Modifier.matchParentSize().background(Color(0x223F4855)))
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
+            Color(0x32F3F1EC), Color(0x193F4855), Color(0x30323A46),
+        ))))
         val slot = (maxWidth - 12.dp) / tabs.size
         // Compose's animation clock honours the system animator duration scale.
         val left by animateDpAsState(slot * selected, spring(dampingRatio = .88f, stiffness = 480f), label = "glassSelection")
@@ -98,14 +88,12 @@ internal fun LiquidGlassBar(
                 .clip(CircleShape).background(Brush.verticalGradient(listOf(Color(0x32FFFFFF), Color(0x10FFFFFF))))
                 .border(1.dp, Color(0x38FFFFFF), CircleShape))
             Row(Modifier.fillMaxSize().selectableGroup()) {
-                tabs.forEachIndexed { index, tab ->
+                tabs.forEach { tab ->
                     val active = tab.route == selectedRoute
                     val tint by animateColorAsState(if (active) Gold else TextHi.copy(alpha = .84f), label = "tabTint")
                     Column(Modifier.weight(1f).fillMaxHeight().clip(CircleShape)
                         .semantics { contentDescription = tab.label }
-                        .selectable(active, interactionSource = interactions[index],
-                            indication = androidx.compose.foundation.LocalIndication.current,
-                            role = Role.Tab, onClick = { onSelect(tab.route) }),
+                        .selectable(active, role = Role.Tab, onClick = { onSelect(tab.route) }),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {

@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.sp
 import com.sxdpz23.navisarthi.ui.theme.*
 
 // ---- Shape constants ----
-val CardShape    = RoundedCornerShape(24.dp)
-val BtnShape     = RoundedCornerShape(16.dp)
-val InputShape   = RoundedCornerShape(16.dp)
+val CardShape    = RoundedCornerShape(16.dp)
+val BtnShape     = RoundedCornerShape(10.dp)
+val InputShape   = RoundedCornerShape(12.dp)
 val ChipShape    = CircleShape
-val IconBtnShape = RoundedCornerShape(16.dp)
+val IconBtnShape = RoundedCornerShape(10.dp)
 
 object ControlSpacing {
     val Item = 8.dp
@@ -395,9 +395,9 @@ fun ScreenHeader(
                 Column {
                     if (title != null) {
                         Text(
-                            title, color = TextHi, fontSize = 24.sp,
+                            title, color = TextHi, fontSize = 28.sp,
                             fontWeight = FontWeight.Medium, fontFamily = GeistFamily,
-                            letterSpacing = 0.sp, lineHeight = 32.sp,
+                            letterSpacing = 0.sp, lineHeight = 36.sp,
                         )
                     }
                     if (eyebrow != null) Eyebrow(eyebrow, Modifier.padding(top = 4.dp))

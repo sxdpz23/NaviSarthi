@@ -980,24 +980,20 @@ fun NavBarButton(onClick: () -> Unit, filled: Boolean = false, end: Boolean = fa
     ) { content() }
 }
 
-/** A floating glass control; only the background responds to pressure, keeping its glyph sharp. */
+/** A button floating over the nav map: a black circle with a white glyph, which reads on any
+ *  map; with wallpaper colors turned on (Settings > Appearance) it takes the theme's instead. */
 @Composable
 fun NavFab(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(modifier.size(56.dp), interactionSource = interaction) {
-        androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.fillMaxSize(),
-            interactionSource = interaction, content = content)
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(modifier.size(56.dp)) {
+        androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.fillMaxSize(), content = content)
     }
 }
 
 /** Google's Re-center: a labeled pill at the bottom left while the camera is away from the car. */
 @Composable
 fun NavRecenterPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
-        modifier.heightIn(min = 56.dp).dpadHighlight(CircleShape).clickable(
-            interactionSource = interaction, indication = null, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
-        interactionSource = interaction,
+        modifier.heightIn(min = 56.dp).dpadHighlight(CircleShape).clickable(onClick = onClick),
     ) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(SymOutlined.Navigation, contentDescription = null, modifier = Modifier.size(22.dp))
