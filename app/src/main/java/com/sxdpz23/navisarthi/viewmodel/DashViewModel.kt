@@ -157,6 +157,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
     init {
         viewModelScope.launch {
             yield() // let constructor fields initialize before observing an already-active drive
+            launch {
+                com.sxdpz23.navisarthi.dash.map.IdleWallpaperStore.get(getApplication()).bitmap.collect { invalidateMap() }
+            }
             var wasProjecting = false
             NavDisplaySession.state.collect { shared ->
                 val projecting = shared.active && shared.target == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH && consoleEnabled
@@ -172,7 +175,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                 if (!projecting && wasProjecting) {
                     projectionRoute = null; route = null; displayRoute = emptyList(); destLat = null; destLng = null
                     _ui.update { it.copy(destinationName = null, hasRoute = false, maneuver = null, remainingKm = null, etaMinutes = null) }
-                    disconnect() // no second free-roam map after the shared drive ends
+                    arrived = false; arrivalMini = false; etaArrivalMs = 0L
+                    location.stop()
+                    NavDisplaySession.setLocationInterval(1_000L)
+                    // Navigation lifetime is independent of the paired console connection.
                 }
                 wasProjecting = projecting
                 invalidateMap()
@@ -369,7 +375,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
 
     private fun refreshEtaRibbon() {
         val state = _ui.value
-        val caption = if (state.etaDisplayMode == EtaDisplayMode.RIBBON && destLat != null && !arrived) {
+        val caption = if (!state.navProjection || arrived) {
+            val phone = accessoryBattery.mobilePercent.value?.takeIf { it in 0..100 }?.let { "$it%" } ?: "--"
+            val bluetooth = if (accessoryBattery.enabled.value)
+                com.sxdpz23.navisarthi.media.selectedAccessoryBattery(accessoryBattery.readings.value, SystemClock.elapsedRealtime())
+            else null
+            if (bluetooth != null) "Phone $phone | BT ${bluetooth.percent}%" else "Phone $phone"
+        } else if (state.etaDisplayMode == EtaDisplayMode.RIBBON && destLat != null && !arrived) {
             val clock = if (state.etaMinutes != null && etaArrivalMs > 0L)
                 java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT).format(java.util.Date(etaArrivalMs)) else null
             etaRibbonText(clock, state.etaMinutes, state.recalculating)
@@ -1242,6 +1254,18 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
      */
     private fun tick(): Boolean {
         if (_ui.value.navProjection) return tickNavProjection()
+        if (sharedRendererInstalled) {
+            val changed = lastSignature != "nav-idle"
+            if (changed) {
+                lastSignature = "nav-idle"
+                session.clearNavInfo()
+                frameRiderLat = null; frameRiderLng = null
+                powerMatched = false; powerNextTurnM = null
+                redrawFrame(0.0, 0.0, 0f, null)
+            }
+            refreshEtaRibbon()
+            return changed
+        }
         // Revert to follow mode after the rider stops nudging the joystick.
         if (!followMode && System.currentTimeMillis() - lastManualPanAt > MANUAL_IDLE_MS) {
             panX = 0f; panY = 0f; followMode = true
@@ -1696,7 +1720,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         val turn = route?.maneuvers?.getOrNull(ns.nav.stepIndex)
         val (pv,pu) = toDashDistance(ns.nav.distanceToNextManeuver)
         val (tv,tu) = toDashDistance(remaining)
-        session.updateNavInfo(turn?.dashCode ?: DashCommands.NAV_MANEUVER_CONTINUE,pv,pu,tv,tu)
+        if (ns.arrived) session.clearNavInfo()
+        else session.updateNavInfo(turn?.dashCode ?: DashCommands.NAV_MANEUVER_CONTINUE,pv,pu,tv,tu)
         refreshEtaRibbon()
         redrawFrame(position.lat,position.lng,heading,remaining)
         return true

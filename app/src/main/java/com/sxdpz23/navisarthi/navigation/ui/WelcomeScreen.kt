@@ -281,7 +281,7 @@ private fun CameraChoices(avoid: Boolean, warn: Boolean, onAvoid: (Boolean) -> U
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 20.dp, end = 10.dp, top = 16.dp, bottom = 6.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp)) {
             // The badge itself, so a new user knows the purple square when it appears on the map.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PlateCameraBadge()
@@ -315,7 +315,7 @@ private fun TripChoices(save: Boolean, clear: Boolean, onSave: (Boolean) -> Unit
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 20.dp, end = 10.dp, top = 16.dp, bottom = 6.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp)) {
             Text(stringResource(R.string.welcome_trips_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(2.dp))
             Text(
@@ -344,7 +344,7 @@ private fun CameraSwitch(label: String, checked: Boolean, onChange: (Boolean) ->
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(end = 8.dp))
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = null)
+        com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -370,7 +370,7 @@ private fun ChoiceCard(selected: Boolean, title: String, gives: String, sends: S
             Modifier.padding(start = 8.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(horizontal = 10.dp))
+            RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
             Column {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(2.dp))

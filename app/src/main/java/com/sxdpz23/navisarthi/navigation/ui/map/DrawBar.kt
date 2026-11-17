@@ -75,7 +75,7 @@ fun BoxScope.DrawBar(draw: DrawState, vm: MapViewModel) {
         shadowElevation = 6.dp,
         modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp).fillMaxWidth(),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(selected = !draw.closed, onClick = { vm.drawSetClosed(false) }, label = { Text(stringResource(R.string.shape_line)) }, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape))
                 Spacer(Modifier.width(8.dp))
@@ -83,7 +83,7 @@ fun BoxScope.DrawBar(draw: DrawState, vm: MapViewModel) {
                 Spacer(Modifier.weight(1f))
                 DRAW_COLORS.forEach { c ->
                     Box(
-                        Modifier.padding(start = 6.dp).size(26.dp).background(Color(c), CircleShape)
+                        Modifier.padding(start = 8.dp).size(26.dp).background(Color(c), CircleShape)
                             .border(if (c == draw.color) 3.dp else 1.dp, if (c == draw.color) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant, CircleShape)
                             .dpadHighlight(CircleShape).clickable { vm.drawSetColor(c) },
                     )

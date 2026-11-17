@@ -152,7 +152,7 @@ fun NavigationRoot(vm: MapViewModel = hiltViewModel(), onOpenAppSettings: () -> 
     val uiScale = com.sxdpz23.navisarthi.navigation.ui.UiScale.factor.value
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
-            baseDensity.density * uiScale,
+            baseDensity.density,
             baseDensity.fontScale,
         ),
     ) {

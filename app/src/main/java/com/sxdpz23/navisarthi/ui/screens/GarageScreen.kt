@@ -252,7 +252,7 @@ private fun MaintenanceTab(
                     if (row.svc.targetMonths > 0) { if (isNotEmpty()) append(" / "); append("${row.svc.targetMonths} mo") }
                 }
                 val overdue = !row.availed && row.svc.targetKm in 1..ui.odometerKm.toInt()
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 11.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 11.dp)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(34.dp).clip(CircleShape).background(if (row.availed) GoldTint else Surf2).border(1.dp, if (row.availed) Gold else Line, CircleShape)) {
                         Icon(if (row.availed) NaviSarthiIcons.Check else NaviSarthiIcons.Wrench, null, tint = if (row.availed) Gold else if (overdue) Alert else TextMid, modifier = Modifier.size(16.dp))
                     }
@@ -294,7 +294,7 @@ private fun MaintenanceTab(
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
             val color = toneColor[row.tone] ?: Gold
             val fill = row.fraction.coerceIn(0.06f, 1f)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(Surf2).border(1.dp, Line, RoundedCornerShape(11.dp))) {
                     Icon(iconFor(row.item.iconKey), null, tint = color, modifier = Modifier.size(20.dp))
                 }
@@ -315,7 +315,7 @@ private fun MaintenanceTab(
     }
 
     Spacer(Modifier.height(14.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         NaviSarthiBtn("Log a service", onClick = { onLogVisit(VisitCtx()) }, icon = NaviSarthiIcons.Check, variant = BtnVariant.Ghost, size = BtnSize.Md, modifier = Modifier.weight(1f))
         NaviSarthiBtn("Add interval", onClick = onAdd, icon = NaviSarthiIcons.Plus, variant = BtnVariant.Ghost, size = BtnSize.Md, modifier = Modifier.weight(1f))
     }
@@ -327,7 +327,7 @@ private fun MaintenanceTab(
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             ui.services.take(12).forEachIndexed { i, rec ->
                 if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 11.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 11.dp)) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(rec.title.ifBlank { "Service" }, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
@@ -378,7 +378,7 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
         }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 20.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(bottom = 20.dp)) {
         listOf(
             Pair("₹${"%,.0f".format(ui.spent30)}", "Spent · 30 days"),
             Pair("%.1f l".format(ui.litres30), "Fuel · ${ui.fills30} fills"),
@@ -398,7 +398,7 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
         ui.fuel.forEachIndexed { i, row ->
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
             val f = row.fill
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onDelete(f) }.padding(horizontal = 6.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onDelete(f) }.padding(horizontal = 8.dp, vertical = 12.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(Surf2).border(1.dp, Line, RoundedCornerShape(11.dp))) {
                     Icon(NaviSarthiIcons.Fuel, null, tint = TextMid, modifier = Modifier.size(20.dp))
                 }
@@ -471,7 +471,7 @@ private fun AddServiceDialog(onAdd: (String, String, Int, Int) -> Unit, onDismis
                 Text("Set km, months, or both (whichever comes first).", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 Spacer(Modifier.height(10.dp))
                 Eyebrow("Icon")
-                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     icons.forEach { key ->
                         Box(
                             contentAlignment = Alignment.Center,
@@ -643,7 +643,7 @@ private fun GloveboxTab(
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
             val days = if (d.expiryMs > 0) (d.expiryMs - now) / 86_400_000L else null
             val expColor = when { days == null -> TextLo; days < 0 -> Alert; days < 14 -> Warn; else -> TextLo }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onEditDoc(d) }.padding(horizontal = 6.dp, vertical = 11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onEditDoc(d) }.padding(horizontal = 8.dp, vertical = 11.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(Surf2).border(1.dp, Line, RoundedCornerShape(11.dp))) {
                     Icon(NaviSarthiIcons.Wrench, null, tint = TextMid, modifier = Modifier.size(18.dp))
                 }
@@ -746,10 +746,10 @@ private fun DocumentDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Eyebrow("Type")
-                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DOC_TYPES.take(4).forEach { (key, lbl) -> DocTypeChip(lbl, key == type) { type = key } }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DOC_TYPES.drop(4).forEach { (key, lbl) -> DocTypeChip(lbl, key == type) { type = key } }
                 }
                 OutlinedTextField(title, { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))

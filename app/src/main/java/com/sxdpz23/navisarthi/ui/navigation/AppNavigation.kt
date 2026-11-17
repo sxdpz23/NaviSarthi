@@ -72,6 +72,18 @@ fun AppNavigation(
     onNavOpened: () -> Unit = {},
 ) {
     val pod = LocalVehicle.current.consoleType == ConsoleType.TRIPPER_POD
+    val allowScreenOff by com.sxdpz23.navisarthi.dash.DashPreferences.screenOff.collectAsState()
+    val displaySession by com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.collectAsState()
+    val screenActivity = androidx.compose.ui.platform.LocalContext.current.let { context ->
+        var current: android.content.Context = context
+        while (current is android.content.ContextWrapper && current !is android.app.Activity) current = current.baseContext
+        current as? android.app.Activity
+    }
+    DisposableEffect(screenActivity, allowScreenOff, displaySession.active, pod) {
+        val hold = displaySession.active && !pod && !allowScreenOff
+        if (hold) screenActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { if (hold) screenActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
     val consoleRoute = if (pod) Screen.Pod.route else Screen.Dash.route
     LaunchedEffect(pod) { if (pod) podViewModel.autoConnectSaved() }
     val navController = rememberNavController()
@@ -167,8 +179,10 @@ fun AppNavigation(
         return
     }
 
-    Box(Modifier.fillMaxSize().statusBarsPadding()) {
-        Box(Modifier.fillMaxSize().navigationBarsPadding().nestedScroll(barScroll).onGloballyPositioned { backdropOrigin = it.positionInRoot() }.drawWithContent {
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize()
+            .then(if (currentRoute == Screen.Nav.route || currentRoute == Screen.Route.route) Modifier else Modifier.statusBarsPadding())
+            .nestedScroll(barScroll).onGloballyPositioned { backdropOrigin = it.positionInRoot() }.drawWithContent {
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
         }) {
@@ -217,16 +231,18 @@ fun AppNavigation(
                 }
 
                 composable(Screen.NavigationSettings.route) {
-                    NavigationSettingsScreen(navigationViewModel, onBack = { navController.popBackStack() })
+                    LaunchedEffect(Unit) { navController.navigate(Screen.Settings.route) {
+                        popUpTo(Screen.NavigationSettings.route) { inclusive = true }; launchSingleTop = true
+                    } }
                 }
                 composable(Screen.Settings.route) {
-                    SettingsScreen(
+                    UnifiedSettingsScreen(
+                        navigation = navigationViewModel,
                         conn = conn, onConnChange = appViewModel::setConn,
-                        dashViewModel = dashViewModel, podViewModel = podViewModel,
+                        dash = dashViewModel, pod = podViewModel,
                         onVehicleSelected = onVehicleSelected, garageEnabled = garageEnabled,
                         onGarageEnabledChange = appViewModel::setGarageEnabled,
                         onBack = { navigateTab(consoleRoute) },
-                        onOpenNavigationSettings = { navController.navigate(Screen.NavigationSettings.route) },
                         onOpenRides = { navController.navigate(Screen.Rides.route) },
                     )
                 }
@@ -237,7 +253,7 @@ fun AppNavigation(
         // version is published. Renders nothing otherwise.
         com.sxdpz23.navisarthi.ui.components.UpdatePrompt()
 
-        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)) {
             LiquidGlassBar(tabs, if (currentRoute in listOf(Screen.Rides.route, Screen.NavigationSettings.route)) Screen.Settings.route else if (currentRoute == Screen.Route.route) Screen.Nav.route else currentRoute ?: consoleRoute,
                 backdrop, backdropOrigin, compactBar, onSelect = { compactBar = false; navigateTab(it) })
         }

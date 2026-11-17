@@ -135,7 +135,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         NaviSarthiChip(LocalVehicle.current.label, ChipTone.Gold, icon = NaviSarthiIcons.Motor)
                     }
                 }

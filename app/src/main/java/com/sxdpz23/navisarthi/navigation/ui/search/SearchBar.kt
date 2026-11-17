@@ -109,7 +109,7 @@ fun SearchBar(
         modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 6.dp),
+            Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // A back arrow while the full-screen search page is open, else the
@@ -126,7 +126,7 @@ fun SearchBar(
                 Icon(
                     Sym.Search,
                     contentDescription = null,
-                    modifier = Modifier.padding(start = 6.dp, end = 4.dp),
+                    modifier = Modifier.padding(start = 8.dp, end = 4.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -145,7 +145,7 @@ fun SearchBar(
                                 // Inset the text INSIDE the focus ring - with none, the first
                                 // letter started at the Box edge and the 2dp ring stroke drew
                                 // straight through it (keypad phones see this on every search).
-                                .padding(horizontal = 10.dp)
+                                .padding(horizontal = 12.dp)
                         } else {
                             Modifier
                         },
@@ -252,7 +252,7 @@ fun SearchBar(
                     modifier = Modifier
                         .then(if (onOfflineTap != null) Modifier.dpadHighlight(CircleShape).clip(CircleShape)
                             .clickable(onClickLabel = recheckLabel) { onOfflineTap() } else Modifier)
-                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
                 ) {
                     Icon(
                         Sym.PublicOff,
@@ -296,9 +296,9 @@ fun SearchBar(
             }
             if (searching) {
                 // padding BEFORE size: sizing the indicator itself to 22dp keeps it a true circle.
-                // The old `.size(22.dp).padding(end=10.dp)` squeezed the arc into a 12x22 box, so it
+                // The old `.size(22.dp).padding(end=12.dp)` squeezed the arc into a 12x22 box, so it
                 // drew as an ellipse and looked like it was spinning off-axis (user report).
-                CircularProgressIndicator(Modifier.padding(end = 10.dp).size(22.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(Modifier.padding(end = 12.dp).size(22.dp), strokeWidth = 2.dp)
             }
         }
     }

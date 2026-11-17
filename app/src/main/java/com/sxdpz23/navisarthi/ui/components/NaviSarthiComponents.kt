@@ -183,15 +183,8 @@ fun NaviSarthiChip(
 // ---- Toggle ----
 @Composable
 fun NaviSarthiToggle(on: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    androidx.compose.material3.Switch(
-        checked = on, enabled = enabled, onCheckedChange = onChange,
-        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-        colors = androidx.compose.material3.SwitchDefaults.colors(
-            checkedThumbColor = OnGold, checkedTrackColor = Gold,
-            uncheckedThumbColor = TextMid, uncheckedTrackColor = Surf3,
-            uncheckedBorderColor = Line3,
-        ),
-    )
+    VehicleGlassSwitch(on, onChange, enabled = enabled)
+
 }
 
 // ---- Segmented control ----

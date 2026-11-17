@@ -498,11 +498,11 @@ fun NavigationSwitch(
     // Switch keeps its full 48dp touch target - it overflows the shorter, non-clipping ring box.
     Box(
         modifier
-            .requiredHeight(32.dp)
+            .requiredHeight(48.dp)
             .dpadHighlight(androidx.compose.foundation.shape.CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        androidx.compose.material3.Switch(
+        com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,

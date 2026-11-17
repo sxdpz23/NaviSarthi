@@ -41,25 +41,13 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ScreenHeader(title = "Settings", onBack = onBack, hint = "Meteor 350 · Tripper Pod, Bluetooth and display preferences")
-        ControlSection("Vehicle")
-        NaviSarthiBtn(LocalVehicle.current.label, onClick = { showPicker = true }, variant = BtnVariant.Secondary,
-            modifier = Modifier.fillMaxWidth())
-        ControlHint("Changing vehicle stops navigation and disconnects the current device. Your planned route and saved devices are kept.")
-        if (showPicker) VehiclePicker(LocalVehicle.current, onSelect = { onVehicleSelected(it); showPicker = false },
-            onDismiss = { showPicker = false })
-        ControlSection("Navigation and rides")
-        NaviSarthiBtn("Navigation and maps", onClick = onOpenNavigationSettings,
-            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Navi, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        NaviSarthiBtn("Ride history", onClick = onOpenRides,
-            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.History, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        ControlSection("App features")
-        PodToggle("Enable Garage", "Maintenance, fuel diary and vehicle records", garageEnabled, onGarageEnabledChange)
+    com.sxdpz23.navisarthi.navigation.ui.settings.SettingsScaffold("Pod", onBack) { _ ->
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
+            com.sxdpz23.navisarthi.navigation.ui.settings.SettingsActionRow("Ride history", onClick = onOpenRides)
+        }
         PodConnectionControls(vm)
         PodToggle("Auto-connect saved Pod", "Reconnect at app start and after a dropped Bluetooth link", auto, vm::setAutoConnect)
-        ControlSection("Pod display")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Pod display")
         PodToggle("Night mode", "Use the Pod's dark navigation background", night, vm::setNight)
         Text("Journey information", color = TextHi)
         NaviSarthiSegmented(listOf("Distance", "Time left", "Arrival"), when (bottom) {
@@ -71,12 +59,12 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
             "Arrival" -> PodBottomLine.ARRIVAL_TIME
             else -> PodBottomLine.DISTANCE
         }) }, Modifier.fillMaxWidth())
-        ControlSection("Pod clock")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Pod clock")
         PodToggle("24-hour clock", "Clock syncs automatically when the Pod authorizes", clock24, vm::setClock24)
         NaviSarthiBtn("Sync time now", onClick = vm.ble::syncClock, enabled = state.stage == PodStage.READY,
             variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         ControlHint("After stopping guidance, the Pod may briefly reconnect to return to its native clock. Restart the ignition if it is no longer discoverable.")
-        ControlSection("Device information")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Device information")
         NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
             Text("Tripper Pod · ${state.address ?: vm.ble.savedAddress ?: "Not paired"}", color = TextHi)
             Text("Firmware: ${state.firmware ?: "Not reported"}", color = TextMid)
@@ -87,38 +75,13 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
                 android.content.ClipData.newPlainText("Tripper Pod diagnostics",
                     "NaviSarthi ${com.sxdpz23.navisarthi.BuildConfig.VERSION_NAME}\nStage: ${state.stage}\nFirmware: ${state.firmware}\nSent packets: ${state.sent}\nMalformed replies: ${state.malformed}\nError: ${state.error ?: "none"}"))
         }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        ControlSection("Battery & background usage")
-        ControlHint(if (restricted) "Allow unrestricted battery and background usage so Pod guidance can continue with the phone locked." else "No Android battery restrictions detected.")
-        NaviSarthiBtn("Review background usage", onClick = {
-            settingsError = runCatching { settings.launch(DeviceReadiness.appSettingsIntent(ctx)) }.isFailure
-        }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        if (settingsError) ControlHint("Open Android Settings → Apps → NaviSarthi → Battery and allow background usage.")
-        SharedUnitsSettings(pod = true)
-        DriveBackupSettings()
-        TestBuildCard()
-        Text("NAVISARTHI v${com.sxdpz23.navisarthi.BuildConfig.VERSION_NAME}", color = TextLo)
+
     }
 }
 
 @Composable
 private fun PodToggle(title: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) { Text(title, color = TextHi); Text(hint, color = TextMid) }
-            NaviSarthiToggle(checked, onChange = onChange)
-        }
+    com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
+        com.sxdpz23.navisarthi.navigation.ui.settings.ToggleRow(title, checked, onChange, hint = hint)
     }
-}
-
-@Composable
-internal fun SharedUnitsSettings(pod: Boolean = false) {
-    val ctx = LocalContext.current
-    ControlSection("Units")
-    // Units here describe phone-side summaries. Pod wire distances remain the verified metric format.
-    val prefs = remember { ctx.getSharedPreferences("guidance", android.content.Context.MODE_PRIVATE) }
-    var units by remember { mutableStateOf(prefs.getString("units", "Kilometres") ?: "Kilometres") }
-    NaviSarthiSegmented(listOf("Kilometres", "Miles"), units, {
-        units = it; prefs.edit().putString("units", it).apply()
-    }, Modifier.fillMaxWidth())
-    if (pod) ControlHint("Phone summaries follow this setting. Pod distances use metres and kilometres.")
 }

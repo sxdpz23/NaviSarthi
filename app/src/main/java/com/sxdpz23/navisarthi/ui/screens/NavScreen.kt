@@ -21,7 +21,7 @@ fun NavScreen(vm: MapViewModel, pod: Boolean, onOpenSettings: () -> Unit) {
     val mapBottomSpace = if (placeOpen) 0.dp else 112.dp
     val console = if (pod) "Pod" else "Dash"
     BackHandler(shared.active && shared.phoneVisible) { NavDisplaySession.hidePhone() }
-    Column(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.statusBars).padding(bottom = mapBottomSpace)) {
+    Column(Modifier.fillMaxSize().padding(bottom = mapBottomSpace)) {
         if (shared.active && !shared.phoneVisible) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 ScreenHeader(title = "Navigation is on $console", hint = "Nav is handling the route and voice guidance. You can lock the phone while riding.")

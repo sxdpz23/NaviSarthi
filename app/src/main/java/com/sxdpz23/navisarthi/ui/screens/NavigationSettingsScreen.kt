@@ -25,8 +25,8 @@ fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         }
     }
     BackHandler(entry?.destination?.route == SettingsSection.HUB.route, onBack)
-    Box(Modifier.fillMaxSize().padding(bottom = 112.dp)) {
-        com.sxdpz23.navisarthi.navigation.ui.theme.NavigationTheme {
+    Box(Modifier.fillMaxSize().padding(bottom = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageBottom)) {
+        com.sxdpz23.navisarthi.navigation.ui.theme.NavigationTheme(darkTheme = true, dynamicColor = false) {
             com.sxdpz23.navisarthi.navigation.ui.settings.SettingsScreen(vm, controller)
         }
     }

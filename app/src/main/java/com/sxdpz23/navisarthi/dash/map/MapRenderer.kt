@@ -238,7 +238,7 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
             val source = navigationMap
             if (source != null) source.draw(canvas, f) else canvas.drawColor(Color.BLACK)
             val ink = f.routeColor ?: if (f.goldenRoute) Color.rgb(212, 177, 92) else routeBlue
-            drawChrome(canvas, f, ink, congestionNearRider = false)
+            if (com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.value.active) drawChrome(canvas, f, ink, congestionNearRider = false)
             return
         }
         val w = canvas.width

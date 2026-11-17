@@ -29,7 +29,10 @@ private fun colorScheme(vehicle: VehicleModel) = darkColorScheme(
 fun NaviSarthiTheme(vehicle: VehicleModel = VehicleModel.Himalayan450, content: @Composable () -> Unit) {
     val scheme = remember(vehicle) { colorScheme(vehicle) }
     val typography = remember(vehicle) { vehicleTypography(vehicle.accent) }
-    CompositionLocalProvider(LocalVehicle provides vehicle) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    CompositionLocalProvider(LocalVehicle provides vehicle,
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+            density.density * com.sxdpz23.navisarthi.navigation.ui.UiScale.factor.value, density.fontScale)) {
         MaterialTheme(colorScheme = scheme, typography = typography, shapes = CraftShapes, content = content)
     }
 }

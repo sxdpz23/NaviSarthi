@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
@@ -448,24 +449,6 @@ fun MapScreen(
     // composition, so the screen sleeps normally again everywhere else.
     // Not while the drive is paused: a car pulled over with the drive held kept the screen on
     // for as long as it sat there.
-    val keepAwakeOn = remember(state.navigating, state.navPaused) {
-        state.navigating && !state.navPaused &&
-            context.getSharedPreferences("navigation_settings", android.content.Context.MODE_PRIVATE)
-                .getBoolean("keep_screen_on_nav", true)
-    }
-    val activityWindow = remember(context) {
-        var c: android.content.Context? = context
-        while (c is ContextWrapper && c !is Activity) c = c.baseContext
-        (c as? Activity)?.window
-    }
-    DisposableEffect(keepAwakeOn, activityWindow) {
-        if (keepAwakeOn) {
-            activityWindow?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        onDispose { activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-    }
 
     var searchFocused by remember { mutableStateOf(false) }
     // The ribbon button's own menu: Your lists live here now, not inside the search page.
@@ -1463,7 +1446,7 @@ fun MapScreen(
                 // Landscape: the open search page keeps clear of the camera cutout's strip, in line
                 // with the keyboard and the status bar, which the system already insets.
                 Column(
-                    Modifier.then(if (!landscapeChrome && !searchOpen) Modifier.widthIn(max = 512.dp) else Modifier).statusBarsPadding()
+                    Modifier.then(if (!landscapeChrome && !searchOpen) Modifier.widthIn(max = 512.dp) else Modifier).statusBarsPadding().displayCutoutPadding()
                         .then(if (searchOpen && landscapeChrome) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start)) else Modifier)
                         .padding(16.dp),
                 ) {
@@ -1611,7 +1594,7 @@ fun MapScreen(
                         // beside the bar above).
                         !landscapeOneLine && state.selected == null && state.results.isEmpty() -> CategoryChips(
                             onPick = vm::quickSearch,
-                            modifier = Modifier.padding(top = 8.dp),
+                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                         )
                     }
 
@@ -1652,7 +1635,7 @@ fun MapScreen(
         // (the sheet reaches the turn banner; they would sit on top of it).
         if (state.navigating && state.results.isEmpty() && !state.showSteps && !state.editingStops) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 // END, not centered: the hold control grows to the LEFT when its mute button slides
                 // out, and a centered column re-centers every sibling on the new width - so opening
                 // it slid the recenter, overview and search buttons sideways (user 2026-09-18).
@@ -2259,7 +2242,7 @@ fun MapScreen(
                 // Landscape: left side panel like the place sheet (see its modifier note).
                 modifier = Modifier
                     .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
-                    .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp).navGlassPanel(landscapeChrome).imePadding(),
               )
             // Imported Google list preview: offer to save (nothing persisted until tapped).
             // A pill under the search bar, clear of the results sheet at the bottom.
@@ -2291,7 +2274,7 @@ fun MapScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .statusBarsPadding()
+                        .statusBarsPadding().displayCutoutPadding()
                         .padding(top = 76.dp)
                         .dpadHighlight(RoundedCornerShape(20.dp))
                         .clickable {
@@ -2300,7 +2283,7 @@ fun MapScreen(
                         },
                 ) {
                     Row(
-                        Modifier.padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+                        Modifier.padding(start = 16.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Sym.BookmarkBorder, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -2663,7 +2646,7 @@ fun MapScreen(
                     .then(
                         if (state.navigating && navBannerBottomPx > 0) {
                             // positionInRoot already spans the status bar — no statusBarsPadding here.
-                            Modifier.padding(top = bannerBottom + 10.dp, start = 12.dp, end = 12.dp)
+                            Modifier.padding(top = bannerBottom + 12.dp, start = 12.dp, end = 12.dp)
                         } else if (state.directionsOpen && !searchOpen && topCardBottomPx > 0) {
                             // Below the endpoints card, which is taller than the search bar the
                             // 132dp constant was tuned for (cards printed over it otherwise).
@@ -2672,7 +2655,7 @@ fun MapScreen(
                                 start = 12.dp, end = 12.dp,
                             )
                         } else {
-                            Modifier.statusBarsPadding().padding(top = 132.dp, start = 12.dp, end = 12.dp)
+                            Modifier.statusBarsPadding().displayCutoutPadding().padding(top = 132.dp, start = 12.dp, end = 12.dp)
                         },
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -3166,17 +3149,15 @@ private fun SearchResults(
         )
     }
     // Same fixed sheet gray as the place sheet, not the wallpaper-tinted Material card.
-    val dark = isAppInDarkTheme()
+    val dark = true
     Box(modifier) {
-    Card(
+    NavGlassCard(
         // statusBarsPadding caps the sheet's growth below the status bar, so the handle pill
         // never slides under the clock / camera cutout when expanded (user 2026-07-09).
-        Modifier.statusBarsPadding().padding(top = 8.dp).fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = SheetPalette.ink(dark)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        Modifier.statusBarsPadding().displayCutoutPadding().padding(top = 8.dp).fillMaxWidth(),
+        shape = RoundedCornerShape(36.dp),
     ) {
-        Column(Modifier.navigationBarsPadding()) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = 104.dp)) {
             // Handle, the place sheet's exact grammar for a bottom sheet: TAP steps one
             // detent UP (minimized→peek, peek↔expanded). Drag UP grows a detent, drag
             // DOWN shrinks one (expanded→peek→minimized). No hide button; the minimized
@@ -3445,7 +3426,7 @@ private fun SearchResults(
                 state = listState,
             ) {
                 items(shown) { place ->
-                    if (place === shown.firstOrNull()) Spacer(Modifier.fillMaxWidth().height(8.dp).background(if (dark) Color.Black else Color(0xFFE8EAED)))
+                    if (place === shown.firstOrNull()) Spacer(Modifier.fillMaxWidth().height(8.dp).background(Color.White.copy(alpha = 0.12f)))
                     ResultPlaceCard(
                         place = place,
                         dark = dark,
@@ -3466,7 +3447,7 @@ private fun SearchResults(
                         Modifier
                             .fillMaxWidth()
                             .height(8.dp)
-                            .background(if (dark) Color.Black else Color(0xFFE8EAED)),
+                            .background(Color.White.copy(alpha = 0.12f)),
                     )
                 }
                 // Next pages of the same search, on demand (the first fetch is three pages).
@@ -3534,15 +3515,15 @@ private fun ResultPlaceCard(
                 if (selected) Sym.CheckCircle else SymOutlined.RadioButtonUnchecked,
                 contentDescription = null,
                 tint = if (selected) MaterialTheme.colorScheme.primary else SheetPalette.dim(dark),
-                modifier = Modifier.padding(end = 10.dp).size(22.dp),
+                modifier = Modifier.padding(end = 12.dp).size(22.dp),
             )
             // A custom map's marker leads with its own icon, or a dot in its color.
             if (place.pinIconUrl != null) {
-                coil.compose.AsyncImage(model = place.pinIconUrl, contentDescription = null, modifier = Modifier.padding(end = 10.dp).size(26.dp))
+                coil.compose.AsyncImage(model = place.pinIconUrl, contentDescription = null, modifier = Modifier.padding(end = 12.dp).size(26.dp))
             } else if (place.pinColor != null) {
-                Box(Modifier.padding(end = 10.dp).size(14.dp).background(Color(place.pinColor!!), androidx.compose.foundation.shape.CircleShape))
+                Box(Modifier.padding(end = 12.dp).size(14.dp).background(Color(place.pinColor!!), androidx.compose.foundation.shape.CircleShape))
             } else if (place.id.startsWith(MapViewModel.ROUTE_ROW_ID)) {
-                Icon(Sym.Directions, contentDescription = null, tint = SheetPalette.dim(dark), modifier = Modifier.padding(end = 10.dp).size(22.dp))
+                Icon(Sym.Directions, contentDescription = null, tint = SheetPalette.dim(dark), modifier = Modifier.padding(end = 12.dp).size(22.dp))
             }
             Text(place.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium, color = SheetPalette.ink(dark))
         }
@@ -3678,7 +3659,7 @@ private fun ResultPlaceCard(
         // The photos come after the facts, as on Google's cards: name, rating and hours lead.
         if (gallery.isNotEmpty()) {
             Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp),
+                Modifier.fillMaxWidth().padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 gallery.forEachIndexed { i, url ->
@@ -4388,7 +4369,7 @@ private fun BoxScope.PipNavOverlay(state: MapUiState, pipUi: Boolean) {
                     Box(
                         Modifier.fillMaxHeight()
                             .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f))
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(com.sxdpz23.navisarthi.navigation.ui.nav.maneuverIconFor(next), contentDescription = null, modifier = Modifier.size(26.dp))
@@ -4432,7 +4413,7 @@ private fun BoxScope.PipTurnCardOverlay(state: MapUiState) {
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
             Row(
-                Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (next != null) {
@@ -4475,7 +4456,7 @@ private fun BoxScope.PipTurnCardOverlay(state: MapUiState) {
         ) {
             val secs = state.nav.remainingDuration
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -4527,7 +4508,7 @@ private fun BoxScope.BuildingDebugBadge(overlayDebugState: String) {
             .align(Alignment.BottomStart)
             .padding(start = 8.dp, bottom = 92.dp)
             .background(androidx.compose.ui.graphics.Color(0xCC000000), RoundedCornerShape(4.dp))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text("$fps fps", color = androidx.compose.ui.graphics.Color.White, fontSize = 12.sp)
         Text(label, color = androidx.compose.ui.graphics.Color.White, fontSize = 12.sp)
@@ -4612,7 +4593,7 @@ private fun BoxScope.NavTurnBanner(
         modifier = Modifier
             .align(if (landscapeChrome) Alignment.TopStart else Alignment.TopCenter)
             .landscapeColumn(landscapeChrome, sidePanelWidthDp)
-            .statusBarsPadding()
+            .statusBarsPadding().displayCutoutPadding()
             .padding(start = if (landscapeChrome) NAV_LAND_EDGE_DP else 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
             // Report the banner's bottom edge so the compass can drop just below it (any height),
             // and to the drive camera, which keeps the road ahead out from under it.
@@ -4717,7 +4698,7 @@ private fun CategoryChips(onPick: (String) -> Unit, modifier: Modifier = Modifie
             var open by remember { mutableStateOf(false) }
             Box(modifier) {
                 NavGlassChip(stringResource(R.string.cat_menu), { open = true },
-                    Modifier.dpadHighlight(CircleShape)) {
+                    Modifier.dpadHighlight(CircleShape), gap = 12.dp) {
                     Icon(Sym.Category, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
@@ -4768,7 +4749,7 @@ private fun ChooseOnMapOverlay(
             tonalElevation = 3.dp,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
+                .statusBarsPadding().displayCutoutPadding()
                 .padding(12.dp)
                 .fillMaxWidth(),
         ) {
@@ -5189,7 +5170,7 @@ private fun ShortcutCell(
         modifier
             .dpadHighlight(RoundedCornerShape(8.dp))
             .clickable { if (place != null) onPick(kind) else onAssign(kind) }
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Google's tinted disc behind the glyph - at this size a bare icon beside two lines of
@@ -5443,7 +5424,7 @@ private fun PickStopBanner(@Suppress("UNUSED_PARAMETER") onCancel: () -> Unit) {
 @Composable
 private fun SavedPinTip(onDismiss: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(SymOutlined.Bookmarks, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
@@ -5511,7 +5492,7 @@ private fun SuggestionBadge(text: String) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 RoundedCornerShape(6.dp),
             )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }
 
@@ -5687,7 +5668,7 @@ private fun InfoCard(
 ) {
     // Fixed sheet palette so this banner reads as the same gray as the place sheet
     // and results list, not a wallpaper-tinted Material card.
-    val dark = isAppInDarkTheme()
+    val dark = true
     val left = remember(body, autoMs) { androidx.compose.animation.core.Animatable(1f) }
     val dismiss = rememberUpdatedState(onAction)
     var held by remember(body) { mutableStateOf(false) }
@@ -5699,18 +5680,18 @@ private fun InfoCard(
             dismiss.value()
         }
     }
-    Card(
+    NavGlassCard(
         modifier.fillMaxWidth().onFocusChanged { held = it.hasFocus },
-        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark)),
+        shape = RoundedCornerShape(28.dp),
     ) {
         if (pillLabel != null && onPill != null) {
             // With a primary action the card takes the UpdateCard layout: text block, then a
             // trailing row of quiet-dismiss + filled pill (reads by shape/fill, color-blind safe).
-            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)) {
                 Text(title, fontWeight = FontWeight.SemiBold, color = SheetPalette.ink(dark))
                 Text(body, style = MaterialTheme.typography.bodySmall, color = SheetPalette.dim(dark))
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -5737,7 +5718,7 @@ private fun InfoCard(
             }
         }
         if (autoMs != null) {
-            com.sxdpz23.navisarthi.navigation.ui.NavigationProgressBarOf({ left.value }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp))
+            com.sxdpz23.navisarthi.navigation.ui.NavigationProgressBarOf({ left.value }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
         }
     }
 }
@@ -5870,10 +5851,10 @@ private fun UpdateCard(
                         }
                     }
                 }
-                com.sxdpz23.navisarthi.navigation.ui.NavigationProgressBar(downloadPct / 100f, Modifier.padding(top = 6.dp, bottom = 8.dp))
+                com.sxdpz23.navisarthi.navigation.ui.NavigationProgressBar(downloadPct / 100f, Modifier.padding(top = 8.dp, bottom = 8.dp))
             } else {
                 Row(
-                    Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -6074,7 +6055,7 @@ private fun ListsSheet(
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.padding(vertical = 16.dp).widthIn(max = 420.dp)) {
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val pickedNowLists = pickedLists
@@ -6208,7 +6189,7 @@ private fun ListsSheet(
                                 },
                                 ink = MaterialTheme.colorScheme.onSurface,
                                 onChange = { pickedSaved = it },
-                                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 6.dp),
+                                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 8.dp),
                             ) else Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) { SheetSectionLabel(stringResource(R.string.saved_sheet_places)) }
                                 // The key path to selecting (a long press on a row is the touch one).
@@ -6320,7 +6301,7 @@ private fun ParkingHistorySheet(
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.padding(vertical = 16.dp).widthIn(max = 420.dp)) {
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -6432,7 +6413,7 @@ private fun IconPicker(icon: String, color: Long, onPick: (String) -> Unit) {
     var emojiOpen by remember { mutableStateOf(false) }
     var emojiText by remember { mutableStateOf("") }
     Column {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LIST_ICONS.forEach { (key, vec) ->
                 val sel = key == icon
                 Surface(
@@ -6463,7 +6444,7 @@ private fun IconPicker(icon: String, color: Long, onPick: (String) -> Unit) {
         }
         if (emojiOpen) {
             Spacer(Modifier.height(10.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LIST_EMOJI.forEach { e ->
                     val sel = icon == "emoji:$e"
                     Surface(
@@ -6789,7 +6770,7 @@ private fun RoadPillText(name: String) {
         onTextLayout = { if (it.hasVisualOverflow && scale.floatValue > 0.8f) scale.floatValue = (scale.floatValue * 0.94f).coerceAtLeast(0.8f) },
         modifier = Modifier
             .onSizeChanged { NavChromeEdges.pill(it.height, pillKey) }
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
@@ -6848,7 +6829,7 @@ private fun SpeedWidget(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
             if (limitDisp != null) {
                 if (imperial) {
@@ -7015,14 +6996,14 @@ private fun BoxScope.AreaPickOverlay(state: MapUiState, vm: MapViewModel, zoomBu
         )
     }
     Surface(
-        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().displayCutoutPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Text(
             stringResource(R.string.area_pick_hint),
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }
     Surface(
@@ -7047,7 +7028,7 @@ private fun BoxScope.AreaPickOverlay(state: MapUiState, vm: MapViewModel, zoomBu
                     stringResource(R.string.settings_area_confirm_region_have, region.name),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             } else if (plan != null && region != null) {
                 val cellsOffered = plan.cells.isNotEmpty()
@@ -7144,7 +7125,7 @@ private fun SavedSheetRow(
             .fillMaxWidth()
             .dpadHighlight(RoundedCornerShape(8.dp))
             .combinedClickable(onClick = onOpen, onLongClick = onLongPress)
-            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))

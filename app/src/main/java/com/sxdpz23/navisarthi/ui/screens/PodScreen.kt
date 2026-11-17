@@ -29,8 +29,8 @@ fun PodScreen(vm: PodViewModel) {
     val nav by vm.navigation.collectAsState()
     val connection by vm.ble.state.collectAsState()
     val ctx = LocalContext.current
-    val miles = ctx.getSharedPreferences("guidance", android.content.Context.MODE_PRIVATE).getString("units", "Kilometres") == "Miles"
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 112.dp),
+    val miles = com.sxdpz23.navisarthi.navigation.ui.Units.imperial.value
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageBottom),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ScreenHeader(title = "Meteor 350 · Tripper Pod", hint = "Turn-by-turn guidance over Bluetooth")
         if (!nav.navProjection) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

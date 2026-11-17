@@ -53,7 +53,7 @@ fun CircularDash(
             .border(2.dp, Color(0xFF232729), CircleShape)
             .padding(2.dp)
             .border(6.dp, Color(0xFF0D0F10), CircleShape)
-            .padding(6.dp)
+            .padding(8.dp)
             .clip(CircleShape)
             .background(Bg0),
     ) {

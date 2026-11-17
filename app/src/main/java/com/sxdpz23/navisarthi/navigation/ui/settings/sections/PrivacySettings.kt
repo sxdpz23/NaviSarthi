@@ -131,7 +131,7 @@ internal fun PrivacySettingsScreen(vm: com.sxdpz23.navisarthi.navigation.ui.map.
         Spacer(Modifier.height(8.dp))
         var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         SettingsGroup {
-        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().settingsAnchor(stringResource(R.string.settings_clear_history)).padding(horizontal = 16.dp, vertical = 10.dp)) {
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().settingsAnchor(stringResource(R.string.settings_clear_history)).padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(stringResource(R.string.settings_clear_history), style = MaterialTheme.typography.bodyLarge)
             Text(
                 stringResource(R.string.settings_clear_history_hint),
@@ -181,7 +181,7 @@ private fun GoogleUsageGroup() {
             Text(
                 stringResource(R.string.settings_google_usage_summary, today.sumOf { it.second }, avg),
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             val todayMap = today.toMap()
             week.forEach { (kind, n) ->

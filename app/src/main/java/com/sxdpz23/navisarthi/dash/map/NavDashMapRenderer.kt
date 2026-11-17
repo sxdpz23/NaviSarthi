@@ -58,6 +58,7 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
     private var styleKey = ""
     private var generation = 0L
     private var rendering = false
+    private var renderStartedAt = 0L
     private var themed = false
     private var spec: NavSnapshotStyle? = null
     private var trafficRoute: com.sxdpz23.navisarthi.navigation.core.model.Route? = null
@@ -76,7 +77,13 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         val session = com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.value
         if (!session.active || session.target != com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH) {
             text.color = if (dark) Color.LTGRAY else Color.DKGRAY
-            canvas.drawText("Start navigation in Nav", canvas.width / 2f, canvas.height / 2f, text)
+            val wallpaper = IdleWallpaperStore.get(context).bitmap.value
+            if (wallpaper != null) {
+                rect.set(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat())
+                canvas.drawBitmap(wallpaper, null, rect, bitmapPaint)
+                return
+            }
+            drawDefaultIdle(canvas)
             return
         }
         val current = ready
@@ -117,12 +124,14 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
             if (!frame.arrived && frame.riderLat != null && frame.riderLng != null) {
                 point(current, frame.riderLat, frame.riderLng)?.let { p ->
                     val marker = when { frame.gpsLost -> Color.GRAY; frame.gpsWeak -> Color.rgb(251, 188, 5); else -> color }
-                    fill.color = Color.WHITE; canvas.drawCircle(p.x, p.y, 12f, fill)
+                    // Larger route-coloured disc keeps the white rider arrow readable over imagery.
+                    fill.color = Color.argb(100, 0, 0, 0); canvas.drawCircle(p.x, p.y + 2f, 22f, fill)
+                    fill.color = marker; canvas.drawCircle(p.x, p.y, 20f, fill)
                     val saveMarker = canvas.save()
                     canvas.rotate(frame.heading - current.camera.bearing.toFloat(), p.x, p.y)
                     path.reset(); path.moveTo(p.x, p.y - 15f); path.lineTo(p.x - 10f, p.y + 10f)
                     path.lineTo(p.x, p.y + 5f); path.lineTo(p.x + 10f, p.y + 10f); path.close()
-                    fill.color = marker; canvas.drawPath(path, fill); canvas.restoreToCount(saveMarker)
+                    fill.color = Color.WHITE; canvas.drawPath(path, fill); canvas.restoreToCount(saveMarker)
                 }
             }
             canvas.restoreToCount(save)
@@ -139,6 +148,60 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         canvas.drawText(attribution, canvas.width / 2f, canvas.height - 7f, text)
         wanted = Request(frame, canvas.width, canvas.height)
         enqueue()
+    }
+
+    /** Only the reference's upper display artwork; the bike retains its native lower instruments. */
+    private fun drawDefaultIdle(canvas: Canvas) {
+        canvas.drawColor(Color.BLACK)
+        val w = canvas.width.toFloat()
+        val h = canvas.height.toFloat()
+        val cx = w / 2f
+        val gold = Color.rgb(224, 188, 89)
+        text.textAlign = Paint.Align.CENTER
+        text.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        text.color = gold
+        text.textSize = w * .025f
+        canvas.drawText("N A V I S A R T H I", cx, h * .23f, text)
+        line.color = gold; line.strokeWidth = 1.2f
+        canvas.drawLine(cx - w * .055f, h * .29f, cx + w * .055f, h * .29f, line)
+
+        text.textSize = w * .052f
+        text.textAlign = Paint.Align.LEFT
+        val lead = "Ready for "
+        val leadWidth = text.measureText(lead)
+        text.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD_ITALIC)
+        val tailWidth = text.measureText("Adventure")
+        val left = cx - (leadWidth + tailWidth) / 2f
+        text.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        text.color = Color.WHITE
+        canvas.drawText(lead, left, h * .48f, text)
+        text.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD_ITALIC)
+        text.color = Color.rgb(48, 218, 40)
+        canvas.drawText("Adventure", left + leadWidth, h * .48f, text)
+
+        text.typeface = android.graphics.Typeface.DEFAULT
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = w * .030f
+        text.color = Color.LTGRAY
+        canvas.drawText("Start a route on your phone.", cx, h * .59f, text)
+        text.textSize = w * .025f
+        val labels = listOf("Open Nav", "Choose destination", "Tap Start")
+        val centres = listOf(w * .22f, w * .5f, w * .78f)
+        for (index in labels.indices) {
+            val number = "0${index + 1}  "
+            val numberWidth = text.measureText(number)
+            val labelWidth = text.measureText(labels[index])
+            val x = centres[index] - (numberWidth + labelWidth) / 2f
+            text.textAlign = Paint.Align.LEFT
+            text.color = gold
+            canvas.drawText(number, x, h * .79f, text)
+            text.color = Color.LTGRAY
+            canvas.drawText(labels[index], x + numberWidth, h * .79f, text)
+        }
+        for (x in listOf(w * .345f, w * .655f))
+            canvas.drawLine(x, h * .735f, x, h * .81f, line)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 11f
     }
 
     private fun point(ready: Ready, lat: Double, lng: Double): android.graphics.PointF? = runCatching {
@@ -221,7 +284,18 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
             return
         }
         val snapshotter = snapshotter ?: return
-        if (rendering) return
+        if (rendering) {
+            if (SystemClock.elapsedRealtime() - renderStartedAt > 20_000L) {
+                // Native snapshots may wait indefinitely on tiles requested during Wi-Fi handover.
+                generation++
+                runCatching { snapshotter.cancel() }
+                this.snapshotter = null
+                rendering = false
+                styleKey = ""
+                enqueue()
+            }
+            return
+        }
         val zoom = (f.zoom - 1.0).coerceIn(1.0, 22.0) // preserve existing 256px-based Dash zoom steps
         val bearing = if (f.headingUp) f.heading.toDouble() else 0.0
         val tilt = if (f.headingUp && f.tilt3d) navTiltCap(zoom) else 0.0
@@ -237,6 +311,7 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         val last = ready
         if (last?.key == key && last.camera == camera && SystemClock.elapsedRealtime() - last.at < 30_000L) return
         rendering = true
+        renderStartedAt = SystemClock.elapsedRealtime()
         val token = generation
         runCatching {
             snapshotter.setCameraPosition(camera)

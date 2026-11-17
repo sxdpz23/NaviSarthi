@@ -55,20 +55,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val prefs = remember { context.getSharedPreferences("navigation_settings", android.content.Context.MODE_PRIVATE) }
     SettingsScaffold(stringResource(R.string.settings_navigation), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
-        var keepAwake by remember { mutableStateOf(prefs.getBoolean("keep_screen_on_nav", true)) }
         SettingsGroup {
-        ToggleRow(
-            label = stringResource(R.string.settings_keep_screen_on),
-            checked = keepAwake,
-            onCheckedChange = {
-                keepAwake = it
-                prefs.edit().putBoolean("keep_screen_on_nav", it).apply()
-            },
-            hint = stringResource(R.string.settings_keep_screen_on_hint),
-            // The top focusable control: Back routes its DOWN here, UP from here goes back to Back.
-            switchModifier = topRow,
-        )
-
         // Which route chooser Directions opens. The Google-style picker graduated from an
         // experiment to the default on 2026-09-18; the classic panel stays one toggle away.
         GroupDivider()
@@ -118,7 +105,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(stringResource(R.string.settings_zoom_to_turn_floor), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                     val floorFocus = remember { List(3) { FocusRequester() } }
                     val picked = com.sxdpz23.navisarthi.navigation.ui.ZoomToTurn.floor.value.takeIf { it > 0.0 } ?: NavFraming.ZOOM_TURN_MIN
                     listOf(
@@ -229,25 +216,6 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 onClick = { com.sxdpz23.navisarthi.navigation.ui.PuckStyle.setSize(context, id) },
             )
         }
-        if (com.sxdpz23.navisarthi.navigation.ui.PuckStyle.shape.value == com.sxdpz23.navisarthi.navigation.ui.PuckStyle.SHAPE_ARROW) {
-        GroupDivider()
-        Text(
-            stringResource(R.string.settings_puck_style),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.settingsAnchor(stringResource(R.string.settings_puck_style)).padding(start = 20.dp, top = 12.dp, bottom = 4.dp),
-        )
-        listOf(
-            com.sxdpz23.navisarthi.navigation.ui.PuckStyle.STYLE_BLUE to stringResource(R.string.settings_puck_style_blue),
-            com.sxdpz23.navisarthi.navigation.ui.PuckStyle.STYLE_WHITE to stringResource(R.string.settings_puck_style_white),
-        ).forEach { (id, label) ->
-            SelectableRow(
-                label = label,
-                selected = com.sxdpz23.navisarthi.navigation.ui.PuckStyle.style.value == id,
-                onClick = { com.sxdpz23.navisarthi.navigation.ui.PuckStyle.setStyle(context, id) },
-            )
-        }
-        }
-
         // The nav icon (discussion #611): the arrow above, or a car in one of a few colors.
         GroupDivider()
         Text(
@@ -365,7 +333,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         // wrapping onto a second line keeps every chip fully visible instead.
         androidx.compose.foundation.layout.FlowRow(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // The ROOT swallows bare LEFT/RIGHT (SettingsScaffold), so this horizontal row drives
             // its OWN LEFT/RIGHT via FocusRequesters - requestFocus (not moveFocus) never clears at

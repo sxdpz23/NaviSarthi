@@ -100,6 +100,9 @@ fun SettingsScreen(vm: MapViewModel, navController: androidx.navigation.NavHostC
                             onOpen = open,
                             onBack = close,
                         )
+                        SettingsSection.SYSTEM -> LocalAppSettingsPages.current?.system?.invoke(toHub)
+                        SettingsSection.DASH -> if (LocalAppSettingsPages.current?.console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH) LocalAppSettingsPages.current?.dash?.invoke(toHub)
+                        SettingsSection.POD -> if (LocalAppSettingsPages.current?.console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_POD) LocalAppSettingsPages.current?.pod?.invoke(toHub)
                         SettingsSection.APPEARANCE -> AppearanceSettingsScreen(vm, onBack = toHub)
                         SettingsSection.MAP -> MapSettingsScreen(onBack = toHub, homeSet = state.home != null)
                         SettingsSection.PLACES -> PlacesSettingsScreen(onBack = toHub)

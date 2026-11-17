@@ -157,6 +157,12 @@ class DashSession(private val scope: CoroutineScope) {
         navActive = true
     }
 
+    /** Keep projection connected while replacing any retained turn with the no-maneuver code. */
+    fun clearNavInfo() {
+        etaRibbonTitle = null
+        updateNavInfo(0xFF, 0, DashCommands.NAV_UNIT_METERS, 0, DashCommands.NAV_UNIT_METERS, "0000")
+    }
+
     /**
      * Route card with the LIVE nav figures patched in. The template's captured
      * values (7.9 km / glyph 0x3C / ETA 03:03) must never reach the dash once

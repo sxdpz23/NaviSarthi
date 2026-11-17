@@ -226,7 +226,7 @@ fun RouteScreen(
                 }
             }
 
-            Eyebrow("Destination", Modifier.padding(bottom = 6.dp))
+            Eyebrow("Destination", Modifier.padding(bottom = 8.dp))
 
             Row(verticalAlignment = Alignment.Top) {
                 Box(
@@ -260,7 +260,7 @@ fun RouteScreen(
                 Triple(if (routing) "…" else (routeState.durationText ?: "—"), "", "Duration"),
                 Triple(if (routing) "…" else (routeState.etaText ?: "—"), "", "Arrive"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 statsList.forEach { (v, u, k) ->
                     Column(
                         modifier = Modifier
@@ -449,12 +449,12 @@ fun RouteScreen(
                 NaviSarthiBtn("Save itinerary", onClick = {
                     itineraryName = ""
                     showSaveItinerary = true
-                }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
             }
 
             if (itineraries.isNotEmpty()) {
                 ControlSection("Saved itineraries")
-                ControlHint("Open a saved stop list, or download its route while online to follow it without data.", Modifier.padding(bottom = 6.dp))
+                ControlHint("Open a saved stop list, or download its route while online to follow it without data.", Modifier.padding(bottom = 8.dp))
                 if (downloadStatus.isNotBlank()) Text(downloadStatus, color = TextLo)
                 itineraries.forEach { item ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -479,7 +479,7 @@ fun RouteScreen(
             // ── Saved destinations ──
             if (savedList.isNotEmpty()) {
                 ControlSection("Saved destinations")
-                ControlHint("Tap a saved place to use it in your itinerary.", Modifier.padding(bottom = 6.dp))
+                ControlHint("Tap a saved place to use it in your itinerary.", Modifier.padding(bottom = 8.dp))
                 NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
                     savedList.forEachIndexed { i, loc ->
                         if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -489,7 +489,7 @@ fun RouteScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { routeViewModel.selectSaved(loc) }
-                                .padding(horizontal = 6.dp, vertical = 12.dp),
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,

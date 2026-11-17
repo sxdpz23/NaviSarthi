@@ -211,7 +211,7 @@ private fun SavedRoutesGroup(vm: MapViewModel, onOpen: (com.sxdpz23.navisarthi.n
         state.savedRoutes.forEachIndexed { i, r ->
             if (i > 0) com.sxdpz23.navisarthi.navigation.ui.settings.GroupDivider()
             Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // The row opens the route on the map (a run with its stops loaded).

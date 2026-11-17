@@ -32,7 +32,7 @@ import com.sxdpz23.navisarthi.viewmodel.DashViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(
+internal fun DashSettingsPage(
     conn: ConnectionState,
     onConnChange: (ConnectionState) -> Unit,
     dashViewModel: DashViewModel,
@@ -44,59 +44,23 @@ fun SettingsScreen(
     onOpenNavigationSettings: () -> Unit = {},
     onOpenRides: () -> Unit = {},
 ) {
-    if (LocalVehicle.current.consoleType == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_POD) {
-        PodSettingsScreen(podViewModel, onVehicleSelected, garageEnabled, onGarageEnabledChange, onBack, onOpenNavigationSettings, onOpenRides)
-        return
-    }
     val dashUi by dashViewModel.ui.collectAsState()
     var showSwitchDialog by remember { mutableStateOf(false) }
-    var autoConnect by remember { mutableStateOf(true) }
-    var screenOff   by remember { mutableStateOf(true) }
-    var keepAwake   by remember { mutableStateOf(true) }
+    val autoConnect by com.sxdpz23.navisarthi.dash.DashPreferences.autoConnect.collectAsState()
+    val screenOff by com.sxdpz23.navisarthi.dash.DashPreferences.screenOff.collectAsState()
+    val keepAwake by com.sxdpz23.navisarthi.dash.DashPreferences.keepAwake.collectAsState()
     val ctx = LocalContext.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 20.dp)
-            .padding(bottom = ControlSpacing.PageBottom),
-        verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
-    ) {
-        ScreenHeader(title = "Settings", onBack = onBack,
-            hint = "Connection, music, phone and calls, and background battery usage.")
-
-        val vehicle = LocalVehicle.current
-        var showVehiclePicker by remember { mutableStateOf(false) }
-        ControlSection("Vehicle")
-        NaviSarthiBtn(vehicle.label, onClick = { showVehiclePicker = true },
-            icon = NaviSarthiIcons.Motor, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        ControlHint("Change vehicle, connection type and colour theme. Active navigation stops when you save a different vehicle.")
-        if (showVehiclePicker) {
-            VehiclePicker(current = vehicle, onSelect = {
-                onVehicleSelected(it)
-                showVehiclePicker = false
-            }, onDismiss = { showVehiclePicker = false })
+    com.sxdpz23.navisarthi.navigation.ui.settings.SettingsScaffold("Dash", onBack) { _ ->
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
+            com.sxdpz23.navisarthi.navigation.ui.settings.SettingsActionRow("Ride history", onClick = onOpenRides)
         }
-
-        ControlSection("Navigation and rides")
-        NaviSarthiBtn("Navigation and maps", onClick = onOpenNavigationSettings,
-            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Navi, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        NaviSarthiBtn("Ride history", onClick = onOpenRides,
-            icon = com.sxdpz23.navisarthi.ui.NaviSarthiIcons.History, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
-        ControlSection("App features")
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
-            SettingRow(NaviSarthiIcons.Wrench, "Enable Garage", "Maintenance, fuel diary and vehicle records",
-                control = { NaviSarthiToggle(garageEnabled) { onGarageEnabledChange(it) } }, last = true)
-        }
-        ControlHint("Enable to show Garage in the bottom bar. Turn it off to hide Garage; your saved garage records are kept.")
-
-        ControlSection("Connection")
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Connection")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(NaviSarthiIcons.Bt, "Tripper Dash",
                 sub = when (conn) { ConnectionState.Connected -> "Connected"; ConnectionState.Searching -> "Connecting…"; ConnectionState.Offline -> "Not connected" },
                 control = { NaviSarthiChip(if (conn == ConnectionState.Connected) "Linked" else "Off", if (conn == ConnectionState.Connected) ChipTone.Gold else ChipTone.Off, dot = true) })
-            NaviSarthiDivider(Modifier.padding(horizontal = 6.dp))
+            NaviSarthiDivider(Modifier.padding(horizontal = 8.dp))
             // Switch to a different bike's dash. The app pins to the first dash it pairs with; this
             // forgets it so the next connect re-discovers and pairs with whichever RE dash is nearby.
             SettingRow(NaviSarthiIcons.Motor, "Switch bike",
@@ -104,10 +68,10 @@ fun SettingsScreen(
                       else "Not paired — pairs with any nearby Royal Enfield dash",
                 control = { Icon(NaviSarthiIcons.ChevronRight, null, tint = TextLo, modifier = Modifier.size(18.dp)) },
                 onClick = if (dashUi.ssid.isNotBlank()) ({ showSwitchDialog = true }) else null)
-            NaviSarthiDivider(Modifier.padding(horizontal = 6.dp))
+            NaviSarthiDivider(Modifier.padding(horizontal = 8.dp))
             SettingRow(NaviSarthiIcons.Sync, "Auto-connect on start", "Link when the bike is near",
-                control = { NaviSarthiToggle(autoConnect) { autoConnect = it } })
-            NaviSarthiDivider(Modifier.padding(horizontal = 6.dp))
+                control = { NaviSarthiToggle(autoConnect) { com.sxdpz23.navisarthi.dash.DashPreferences.setAutoConnect(it) } })
+            NaviSarthiDivider(Modifier.padding(horizontal = 8.dp))
             SettingRow(NaviSarthiIcons.Zap, "Stream quality", "Balanced · saves battery",
                 control = { Icon(NaviSarthiIcons.ChevronRight, null, tint = TextLo, modifier = Modifier.size(18.dp)) }, last = true)
         }
@@ -137,21 +101,23 @@ fun SettingsScreen(
             )
         }
 
-        ControlSection("During a ride")
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
-            SettingRow(NaviSarthiIcons.Power, "Turn phone screen off", "Map keeps streaming to the dash",
-                control = { NaviSarthiToggle(screenOff) { screenOff = it } })
-            NaviSarthiDivider(Modifier.padding(horizontal = 6.dp))
-            SettingRow(NaviSarthiIcons.Dash, "Keep dash awake", "Prevent Tripper sleep",
-                control = { NaviSarthiToggle(keepAwake) { keepAwake = it } }, last = true)
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("During a ride")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
+            SettingRow(NaviSarthiIcons.Power, "Turn phone screen off", "Allow the phone display to sleep while the map keeps streaming",
+                control = { NaviSarthiToggle(screenOff) { com.sxdpz23.navisarthi.dash.DashPreferences.setScreenOff(it) } })
+            NaviSarthiDivider(Modifier.padding(horizontal = 8.dp))
+            SettingRow(NaviSarthiIcons.Dash, "Keep dash awake", "Keep the phone connection awake while streaming",
+                control = { NaviSarthiToggle(keepAwake) { com.sxdpz23.navisarthi.dash.DashPreferences.setKeepAwake(it)
+                    if (dashUi.stage == com.sxdpz23.navisarthi.viewmodel.ConnStage.STREAMING) com.sxdpz23.navisarthi.dash.DashKeepAliveService.start(ctx)
+                } }, last = true)
         }
 
-        ControlSection("Music on console")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Music on console")
         val musicEnabled by dashViewModel.musicEnabled.collectAsState()
         val playing by dashViewModel.nowPlaying.collectAsState()
         val musicStatus by dashViewModel.musicStatus.collectAsState()
 
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(NaviSarthiIcons.Zap, "Enable music controls", musicStatus,
                 control = { NaviSarthiToggle(musicEnabled) { dashViewModel.setMusicEnabled(it) } }, last = true)
         }
@@ -160,7 +126,7 @@ fun SettingsScreen(
             val actions = track.actions
             val playAction = if (track.isPlaying) android.media.session.PlaybackState.ACTION_PAUSE
                 else android.media.session.PlaybackState.ACTION_PLAY
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 NaviSarthiBtn("Previous", onClick = { dashViewModel.musicPrevious() },
                     enabled = actions and android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L,
                     modifier = Modifier.weight(1f))
@@ -183,7 +149,7 @@ fun SettingsScreen(
             }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         }
 
-        ControlSection("Bluetooth accessories")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Bluetooth accessories")
         val accessoryEnabled by dashViewModel.accessoryBatteryEnabled.collectAsState()
         val accessoryStatus by dashViewModel.accessoryBatteryStatus.collectAsState()
         val accessoryIconsOnly by dashViewModel.accessoryIconsOnly.collectAsState()
@@ -192,7 +158,7 @@ fun SettingsScreen(
             accessoryPermissionGranted = it
             dashViewModel.refreshAccessoryBattery()
         }
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(NaviSarthiIcons.Bt, "Battery pill on console", accessoryStatus,
                 control = { NaviSarthiToggle(accessoryEnabled) { enabled ->
                     dashViewModel.setAccessoryBatteryEnabled(enabled)
@@ -206,7 +172,7 @@ fun SettingsScreen(
         }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         ControlHint("Mobile battery and connected accessory batteries alternate every two minutes in one map pill. Phone battery works without Bluetooth access. Accessory levels appear when reported by the device.")
 
-        ControlSection("Phone & calls")
+        com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Phone & calls")
         ControlHint("Caller information, recent calls, favorite contacts, console dialing and missed-call reminders.")
         // Re-check the grant on ON_RESUME so the chip flips to "On" the moment the user comes back
         // from the system notification-access screen (the Settings value isn't observable on its own).
@@ -265,7 +231,7 @@ fun SettingsScreen(
         val callPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             callAnswerGranted = it
         }
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(
                 NaviSarthiIcons.Zap,
                 "Caller & music information",
@@ -281,7 +247,7 @@ fun SettingsScreen(
                     { runCatching { ctx.startActivity(com.sxdpz23.navisarthi.media.MediaInfoProvider.accessSettingsIntent()) } }
                 },
             )
-            NaviSarthiDivider(Modifier.padding(horizontal = 6.dp))
+            NaviSarthiDivider(Modifier.padding(horizontal = 8.dp))
             SettingRow(
                 NaviSarthiIcons.Bt,
                 "Answer calls from joystick",
@@ -307,7 +273,7 @@ fun SettingsScreen(
             dashViewModel.refreshCallHistoryAccess()
         }
         LaunchedEffect(Unit) { dashViewModel.refreshCallHistoryAccess() }
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(NaviSarthiIcons.Bt, "Share recent calls", historyStatus,
                 control = { NaviSarthiToggle(historyEnabled) { enabled ->
                     dashViewModel.setCallHistoryEnabled(enabled)
@@ -333,7 +299,7 @@ fun SettingsScreen(
             dialGranted = it
             dashViewModel.refreshCallHistoryAccess()
         }
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        com.sxdpz23.navisarthi.navigation.ui.settings.SettingsGroup {
             SettingRow(NaviSarthiIcons.Bt, "Share favorite contacts",
                 if (!favoriteSharing) "Off" else if (!favoritesGranted) "Contacts permission needed" else "Five starred contacts from your phone",
                 control = { NaviSarthiToggle(favoriteSharing) { enabled ->
@@ -364,37 +330,7 @@ fun SettingsScreen(
         }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         ControlHint("Star contacts in your phone's Contacts app. Select a displayed favorite or recent call on the console to call it. The missed-call badge follows your phone's new-call flag; viewing it here does not mark calls read.")
 
-        ControlSection("Battery & background usage")
-        NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
-            SettingRow(NaviSarthiIcons.Power, "Background battery usage",
-                if (batteryRestricted) "Battery or background restrictions detected" else "No Android battery restrictions detected",
-                control = { NaviSarthiChip(if (batteryRestricted) "Review" else "Allowed",
-                    if (batteryRestricted) ChipTone.Off else ChipTone.Gold) },
-                onClick = { openBackgroundSettings() }, last = true)
-        }
-        if (batteryRestricted) ControlHint("Set NaviSarthi to Unrestricted or No restrictions and allow background activity so navigation can continue with the screen off.")
-        if (batterySettingsUnavailable) ControlHint("Open Android Settings → Apps → NaviSarthi → Battery to review background usage.")
 
-        SharedUnitsSettings()
-
-        DriveBackupSettings()
-
-        TestBuildCard()
-
-        val appVersion = remember { com.sxdpz23.navisarthi.data.UpdateChecker.currentVersionName(ctx) }
-        Text(
-            "NAVISARTHI v$appVersion",
-            color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp),
-        )
-        Text(
-            "Independent community project — not affiliated with, endorsed by, or supported by " +
-                "Royal Enfield. \"Royal Enfield\", \"Himalayan\" and \"Tripper\" are trademarks of " +
-                "their respective owners, used here only to describe compatible hardware. The dash " +
-                "link is unofficial and exists solely for interoperability with hardware you own — use at your own risk.",
-            color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp, start = 8.dp, end = 8.dp),
-        )
     }
 }
 
@@ -485,20 +421,13 @@ private fun SettingRow(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().heightIn(min = 64.dp)
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 6.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Surf2).border(1.dp, Line, RoundedCornerShape(11.dp)),
-        ) {
-            Icon(icon, contentDescription = null, tint = TextMid, modifier = Modifier.size(19.dp))
-        }
-        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-            if (sub != null) Text(sub, color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(title, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+            if (sub != null) Text(sub, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
         control()
     }

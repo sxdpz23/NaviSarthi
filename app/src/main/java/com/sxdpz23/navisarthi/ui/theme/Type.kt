@@ -16,18 +16,12 @@ private val provider = GoogleFont.Provider(
 )
 
 val GeistFamily = FontFamily(
-    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.Normal),
-    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(R.font.google_sans_flex, weight = FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(R.font.google_sans_flex, weight = FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(R.font.google_sans_flex, weight = FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(R.font.google_sans_flex, weight = FontWeight.Bold),
 )
-
-val GeistMonoFamily = FontFamily(
-    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Normal),
-    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.SemiBold),
-)
+val GeistMonoFamily = GeistFamily
 
 /** Shared phone typography. Map labels, road shields and console pixels have their own scales. */
 val CraftTypography = Typography(

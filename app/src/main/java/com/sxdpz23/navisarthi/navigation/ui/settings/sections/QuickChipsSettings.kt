@@ -48,7 +48,7 @@ internal fun QuickChipsRow(onOpen: () -> Unit) {
     val label = stringResource(R.string.settings_quick_chips)
     Row(
         Modifier.fillMaxWidth().settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).dpadClickable(onClick = onOpen)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
@@ -139,7 +139,7 @@ private fun ChipRow(
             .onSizeChanged { onHeight(it.height.toFloat()) }
             .focusProperties { enter = { switchFocus } }
             .focusGroup()
-            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(

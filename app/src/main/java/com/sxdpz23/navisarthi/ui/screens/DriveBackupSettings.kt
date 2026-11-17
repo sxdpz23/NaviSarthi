@@ -98,7 +98,7 @@ internal fun DriveBackupSettings() {
         } else perform(action, checkNotNull(auth.accessToken))
     }
 
-    ControlSection("Google Drive backup")
+    com.sxdpz23.navisarthi.navigation.ui.settings.SubHead("Google Drive backup")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
         Text(
             if (connected) prefs.getString("email", "")?.ifBlank { "Google Drive connected" }.orEmpty()

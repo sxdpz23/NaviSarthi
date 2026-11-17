@@ -295,7 +295,7 @@ fun StepsSheet(
                     header(dismiss)
                 } else {
                     // Grab handle - signals the sheet drags like the others.
-                    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
                         Box(
                             Modifier
                                 .size(width = 36.dp, height = 4.dp)
@@ -493,7 +493,7 @@ fun NavStopsRow(
                 .fillMaxWidth()
                 .dpadHighlight(RoundedCornerShape(12.dp))
                 .clickable(onClick = onEdit)
-                .padding(top = 10.dp, bottom = 10.dp, end = 12.dp),
+                .padding(top = 12.dp, bottom = 12.dp, end = 12.dp),
         ) {
             val measurer = androidx.compose.ui.text.rememberTextMeasurer()
             val density = androidx.compose.ui.platform.LocalDensity.current
@@ -556,7 +556,7 @@ fun StopDividerRow(name: String, modifier: Modifier = Modifier, passed: Boolean 
             Modifier
                 .fillMaxWidth()
                 .background(accent.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
-                .padding(top = 10.dp, bottom = 10.dp, start = 4.dp, end = 12.dp),
+                .padding(top = 12.dp, bottom = 12.dp, start = 4.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -634,7 +634,7 @@ fun StepRow(
                             val signs = roadSigns(m.instruction, m.ref)
                             if (signs.isNotEmpty()) {
                                 FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                     modifier = Modifier.padding(top = 3.dp).then(fade),
                                 ) { signs.forEach { SignChip(it) } }

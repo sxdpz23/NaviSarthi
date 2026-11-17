@@ -21,7 +21,9 @@ import com.sxdpz23.navisarthi.navigation.ui.settings.*
 internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     var license by remember { mutableStateOf<String?>(null) }
-    SettingsScaffold(stringResource(R.string.navigation_credits_title), onBack) { _ ->
+    SettingsScaffold("Data and licenses", onBack) { _ ->
+        LocalAppSettingsPages.current?.backup?.invoke()
+        com.sxdpz23.navisarthi.ui.screens.TestBuildCard()
         PageIntro(stringResource(R.string.navigation_credits_intro))
         SettingsGroup(title = stringResource(R.string.settings_map_data)) {
             Hint(stringResource(R.string.settings_map_data_hint))

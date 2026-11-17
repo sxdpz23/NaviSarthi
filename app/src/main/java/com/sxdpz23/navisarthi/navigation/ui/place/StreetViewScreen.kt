@@ -300,7 +300,7 @@ fun StreetViewScreen(
                 var open by remember(pano.panoId) { mutableStateOf(false) }
                 Column(
                     horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     // Raised clear of the attribution row so the chip and its expanded date list
                     // never sit on top of the copyright text (user 2026-07-15).
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 56.dp),
@@ -315,7 +315,7 @@ fun StreetViewScreen(
                         val topReserve = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 200.dp
                         Column(
                             horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
                                 .heightIn(max = (paneH - topReserve).coerceAtLeast(96.dp))
                                 .verticalScroll(rememberScrollState()),

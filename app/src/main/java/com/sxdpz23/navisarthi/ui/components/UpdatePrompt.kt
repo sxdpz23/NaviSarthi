@@ -65,7 +65,7 @@ fun UpdatePrompt() {
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     "NaviSarthi ${r.versionName}",
                     color = Gold,

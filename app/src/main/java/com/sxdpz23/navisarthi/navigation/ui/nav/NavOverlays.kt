@@ -327,7 +327,7 @@ fun ManeuverBanner(
                     }
                     if (signs.isNotEmpty()) {
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.padding(top = 2.dp, bottom = 1.dp),
                         ) { signs.forEach { SignChip(it, onBanner = true) } }
@@ -416,7 +416,7 @@ fun ManeuverBanner(
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
             ) {
                 Row(
-                    Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 8.dp),
+                    Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(stringResource(R.string.nav_compound_then).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
@@ -520,7 +520,7 @@ internal fun SignChip(sign: Sign, onBanner: Boolean = false) {
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
     } else {
@@ -591,7 +591,7 @@ private fun LaneGuide(hint: String, type: ManeuverType, on: Color = MaterialThem
             shape = RoundedCornerShape(6.dp),
         ) {
             Row(
-                Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 repeat(laneArrowCount(hint)) {
@@ -628,8 +628,8 @@ internal fun LaneDiagram(
     val target = maneuverBucket(maneuver)
     Surface(color = on.copy(alpha = 0.10f), shape = RoundedCornerShape(8.dp), modifier = modifier) {
         Row(
-            Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             lanes.take(8).forEach { lane ->
@@ -832,7 +832,7 @@ fun NavSearchChips(
                         recents.take(6).forEach { r ->
                             Row(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).dpadHighlight(RoundedCornerShape(10.dp))
-                                    .clickable { onPick(r.query) }.padding(horizontal = 4.dp, vertical = 10.dp),
+                                    .clickable { onPick(r.query) }.padding(horizontal = 4.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(Sym.History, contentDescription = null, tint = SheetPalette.dim(dark), modifier = Modifier.size(20.dp))
@@ -1104,7 +1104,7 @@ fun NavBarTop(
             }
         }
         Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1350,7 +1350,7 @@ fun NavStopOffer(
         shadowElevation = 6.dp,
     ) {
         Row(
-            Modifier.padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+            Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -1534,7 +1534,7 @@ private fun HoldChoice(
             .background(if (filled) MaterialTheme.colorScheme.primary else Color.Transparent)
             .dpadHighlight(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

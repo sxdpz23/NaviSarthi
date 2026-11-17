@@ -242,7 +242,7 @@ private fun GroupTitle(text: String) {
         text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp),
     )
 }
 
@@ -310,7 +310,7 @@ private fun SwitchRow(text: String, checked: Boolean, onToggle: (Boolean) -> Uni
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = null)
+        com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = checked, onCheckedChange = null)
     }
 }
 

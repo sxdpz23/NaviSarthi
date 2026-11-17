@@ -168,7 +168,7 @@ internal fun PlacesOnMapGroup() {
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
                 modifier = Modifier.settingsAnchor(stringResource(R.string.settings_poi_icon_size)).padding(top = 4.dp),
             )
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val sizeFocus = remember { List(3) { FocusRequester() } }
                 listOf(
                     R.string.settings_poi_size_small to 0.7f,
@@ -328,7 +328,7 @@ internal fun ParkingHistoryGroup(vm: com.sxdpz23.navisarthi.navigation.ui.map.Ma
                 if (pi > 0) GroupDivider()
                 val isCurrent = entry.savedAtMillis == state.parkedAtMillis
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(

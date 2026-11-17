@@ -65,6 +65,7 @@ internal fun SettingsScaffold(
     title: String,
     onBack: () -> Unit,
     autoFocusBack: Boolean = true,
+    showBack: Boolean = true,
     content: @Composable ColumnScope.(topRow: Modifier) -> Unit,
 ) {
     val backFocus = remember { FocusRequester() }
@@ -91,7 +92,7 @@ internal fun SettingsScaffold(
     // in the session, this loop lands Back on open and re-lands it when the soft-key bar teardown's
     // window churn steals it.
     val dpadFirst = com.sxdpz23.navisarthi.navigation.ui.rememberDpadFirstDevice()
-    if (autoFocusBack && dpadFirst && LocalSettingsPageActive.current) {
+    if (showBack && autoFocusBack && dpadFirst && LocalSettingsPageActive.current) {
         androidx.compose.runtime.LaunchedEffect(Unit) {
             // No fixed horizon: a 2s window LOST the race when the soft-key bar teardown's focus
             // steal landed late under load (audit_dynamic: "opened unfocused" on some runs, ring
@@ -112,15 +113,15 @@ internal fun SettingsScaffold(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            androidx.compose.material3.LargeTopAppBar(
-                title = { Text(title) },
+            androidx.compose.material3.TopAppBar(
+                title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
                 scrollBehavior = scrollBehavior,
                 colors = androidx.compose.material3.TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 navigationIcon = {
-                    IconButton(
+                    if (showBack) IconButton(
                         onClick = onBack,
                         modifier = Modifier
                             .dpadHighlight(androidx.compose.foundation.shape.CircleShape)
@@ -150,7 +151,7 @@ internal fun SettingsScaffold(
                 .dpadContainVertical()
                 .onKeyEvent { ev ->
                     if (ev.type == KeyEventType.KeyDown) userDrove = true
-                    if (ev.key == Key.DirectionUp && atTopItem) {
+                    if (showBack && ev.key == Key.DirectionUp && atTopItem) {
                         if (ev.type == KeyEventType.KeyDown) runCatching { backFocus.requestFocus() }
                         true
                     } else false
@@ -163,7 +164,7 @@ internal fun SettingsScaffold(
             // chips (user report, large-screen phone). 44dp keeps a comfortable touch target;
             // D-pad focus/rings are unaffected (the ring helpers pin to the control's REAL size).
             androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 44.dp,
+                androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 48.dp,
             ) {
                 content(Modifier.focusRequester(topRowFocus).onFocusEvent { atTopItem = it.isFocused })
             }

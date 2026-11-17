@@ -248,7 +248,7 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
                     Hint(stringResource(R.string.settings_storage_moving, moving))
                     androidx.compose.material3.LinearProgressIndicator(
                         progress = { moving / 100f },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                     androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 8.dp)) {
                         androidx.compose.material3.TextButton(
@@ -741,9 +741,9 @@ private fun CacheRow(
         else -> fmtMb((bytes / 1048576).toInt())
     }
     androidx.compose.foundation.layout.FlowRow(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
     ) {
         Text(
             stringResource(usedRes, sizeText),

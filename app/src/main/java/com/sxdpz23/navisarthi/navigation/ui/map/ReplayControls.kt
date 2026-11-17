@@ -65,7 +65,7 @@ fun BoxScope.ReplayControls(state: MapUiState, vm: MapViewModel) {
         modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(bottom = 150.dp, start = 12.dp, end = 88.dp).fillMaxWidth()
             .offset { IntOffset(0, movedPx.roundToInt()) },
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Box(
                 Modifier.fillMaxWidth().height(18.dp).pointerInput(Unit) {
                     detectDragGestures { change, drag ->
@@ -87,7 +87,7 @@ fun BoxScope.ReplayControls(state: MapUiState, vm: MapViewModel) {
                 )
                 Text(replayClock(state.replayTotalS), style = MaterialTheme.typography.labelMedium)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = { vm.setReplayPaused(!state.replayPaused) }, modifier = Modifier.dpadHighlight(CircleShape)) {
                     Icon(if (state.replayPaused) Sym.PlayArrow else Sym.Pause, contentDescription = stringResource(if (state.replayPaused) R.string.replay_play else R.string.replay_pause))
                 }

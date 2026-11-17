@@ -767,7 +767,7 @@ fun PlaceSheet(
                 val shown = remember(place.photoUrls) { place.photoUrls.indices.toList() }
                 LazyRow(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(shown, key = { it }) { i ->
                         AsyncImage(
@@ -908,7 +908,7 @@ fun PlaceSheet(
                 Spacer(Modifier.height(RATING_ROW_DP.dp))
             }
             if (place.rating != null && !resolving) {
-                Row(Modifier.padding(top = 6.dp).then(ratingReveal), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(top = 8.dp).then(ratingReveal), verticalAlignment = Alignment.CenterVertically) {
                     // Google leads with a bold rating number; keep it prominent.
                     Text(
                         String.format(Locale.US, "%.1f", place.rating),
@@ -1159,7 +1159,7 @@ fun PlaceSheet(
                 Text(stringResource(R.string.place_also_at_location), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
                 placesHere.forEach { other ->
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onOpenPlace(other) }.padding(vertical = 10.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onOpenPlace(other) }.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1254,7 +1254,7 @@ fun PlaceSheet(
             // ("this restaurant's fish is better than its chicken") — the part of a shared
             // list Google itself throws away on export, kept front and center here.
             place.savedNote?.let { note ->
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.Top) {
                     Icon(Sym.FormatQuote, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(note, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = ink)
@@ -1280,7 +1280,7 @@ fun PlaceSheet(
             } else if (place.category != null && !place.permanentlyClosed && !isTransitStop && !resolving) {
                 // Not while the listing is still being looked up: the map's data lacking hours
                 // says nothing about Google's, which usually has them.
-                Text(stringResource(R.string.place_hours_not_listed), style = MaterialTheme.typography.bodySmall, color = dim, modifier = Modifier.padding(top = 10.dp))
+                Text(stringResource(R.string.place_hours_not_listed), style = MaterialTheme.typography.bodySmall, color = dim, modifier = Modifier.padding(top = 12.dp))
             }
 
             // Phone + website as their own tappable rows showing the actual number / domain — placed
@@ -1325,7 +1325,7 @@ fun PlaceSheet(
             // as a prominent button. Rendered only when the parse found a real URL + label.
             if (place.actionUrl != null && !place.actionLabel.isNullOrBlank() && !com.sxdpz23.navisarthi.navigation.ui.HideExternalLinks.on.value) {
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 10.dp)
+                    Modifier.fillMaxWidth().padding(top = 12.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f))
                         .dpadHighlight(RoundedCornerShape(12.dp))
@@ -1750,7 +1750,7 @@ fun DirectionsPanel(
                     .fillMaxWidth()
                     .dpadHighlight(RoundedCornerShape(3.dp)) // D-pad: OK toggles (docs/dpad.md)
                     .clickable { collapsed.value = !collapsed.value }
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(dim.copy(alpha = 0.4f)))
@@ -1965,7 +1965,7 @@ fun DirectionsPanel(
             } else {
                 Spacer(Modifier.height(12.dp))
                 if (routes.isEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         Text(stringResource(R.string.place_finding_route), style = MaterialTheme.typography.bodyMedium, color = dim)
                     }
@@ -2158,7 +2158,7 @@ internal fun DepartTimeChooser(
         onTimeSelected(mode, if (mode == 0) null else epoch())
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Mode chips — scroll horizontally so 3–4 chips never clip on a narrow phone.
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
@@ -2269,7 +2269,7 @@ private fun PickerDialog(onConfirm: () -> Unit, onDismiss: () -> Unit, content: 
             Column(Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 content()
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 6.dp, end = 6.dp),
+                    Modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -2315,7 +2315,7 @@ private fun RouteOption(r: Route, selected: Boolean, fastestEtaSeconds: Double, 
             .background(bg)
             .dpadHighlight(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -2330,7 +2330,7 @@ private fun RouteOption(r: Route, selected: Boolean, fastestEtaSeconds: Double, 
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
                     )
                 } else if (deltaMin >= 1) {
                     // "+5 min" vs the fastest — a quiet tag so the fastest still reads as primary.
@@ -2341,7 +2341,7 @@ private fun RouteOption(r: Route, selected: Boolean, fastestEtaSeconds: Double, 
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(ink.copy(alpha = 0.08f))
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
                     )
                 }
             }
@@ -2409,7 +2409,7 @@ private fun TransitBoard(
     when {
         loading -> Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
             Text(stringResource(R.string.place_finding_transit), style = MaterialTheme.typography.bodyMedium, color = dim)
@@ -2489,7 +2489,7 @@ fun TransitNavSheet(
                 // one card whose list was short (issue #831).
                 Column(
                     Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) { remaining.forEach { TransitStepRow(it, ink, dim) } }
             } else {
                 Spacer(Modifier.weight(1f))
@@ -2553,8 +2553,8 @@ private fun TransitRow(t: TransitItinerary, nowSec: Long, ink: Color, dim: Color
             .clip(RoundedCornerShape(12.dp))
             .background(SheetPalette.row(dark))
             .then(if (canExpand) Modifier.dpadHighlight(RoundedCornerShape(12.dp)).clickable { com.sxdpz23.navisarthi.navigation.ui.TransitExpanded.open[expandedKey] = !expanded; onPreview(t, !expanded) } else Modifier)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (countdown != null || boardDelay != null) {
             Row(
@@ -2609,7 +2609,7 @@ private fun TransitRow(t: TransitItinerary, nowSec: Long, ink: Color, dim: Color
         }
         if (t.lines.isNotEmpty()) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 t.lines.take(4).forEachIndexed { i, line ->
@@ -2636,14 +2636,14 @@ private fun TransitRow(t: TransitItinerary, nowSec: Long, ink: Color, dim: Color
                     Text(stringResource(R.string.place_start))
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 t.steps.forEach { TransitStepRow(it, ink, dim, onWalkDirections) }
             }
             // Service alerts (detours / info) for the ridden lines.
             if (t.alerts.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     t.alerts.take(4).forEach { alert ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                             Icon(Sym.Info, contentDescription = null, tint = SheetPalette.TrafficAmber, modifier = Modifier.padding(top = 2.dp).size(15.dp))
                             Text(alert, style = MaterialTheme.typography.labelSmall, color = dim)
                         }
@@ -2690,7 +2690,7 @@ private fun TransitStepRow(s: TransitStep, ink: Color, dim: Color, onWalkDirecti
         if (open && canExpand) {
             LaunchedEffect(from, to) { steps = onWalkDirections(from!!, to!!) }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             Icon(transitModeIcon(s.mode), null, tint = dim, modifier = Modifier.padding(top = 2.dp).size(18.dp))
             Column(Modifier.fillMaxWidth()) {
                 Row(
@@ -2727,10 +2727,10 @@ private fun TransitStepRow(s: TransitStep, ink: Color, dim: Color, onWalkDirecti
     val line = s.line ?: return // unreachable (walk branch returned) — re-narrows the cross-module type
     val lineColor = parseHexColor(line.colorHex) ?: dim
     var stopsOpen by remember { mutableStateOf(false) }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
         Icon(transitModeIcon(s.mode), null, tint = lineColor, modifier = Modifier.padding(top = 2.dp).size(18.dp))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LinePill(line)
                 s.headsign?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = ink, maxLines = 2) }
             }
@@ -2834,7 +2834,7 @@ private fun StopDepartureBoard(
         Row(
             Modifier.padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(stringResource(R.string.place_finding_transit), style = MaterialTheme.typography.bodyMedium, color = dim)
@@ -2846,7 +2846,7 @@ private fun StopDepartureBoard(
     }
     // Google-style clean list: plain tappable rows separated by hairline dividers (no per-row
     // chevron - the row itself opens the route, and its Material ripple is the affordance).
-    Column(Modifier.padding(top = 6.dp)) {
+    Column(Modifier.padding(top = 8.dp)) {
         val lines = d.lines.take(24)
         lines.forEachIndexed { i, line ->
             DepartureLineRow(line, nowSec, ink, dim, onTapRoute)
@@ -2875,7 +2875,7 @@ private fun DepartureLineRow(
             .clip(RoundedCornerShape(10.dp))
             .dpadHighlight(RoundedCornerShape(10.dp))
             .clickable { onTapRoute(line) }
-            .padding(vertical = 10.dp, horizontal = 2.dp),
+            .padding(vertical = 12.dp, horizontal = 2.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2907,7 +2907,7 @@ private fun DepartureLineRow(
             }
         }
         if (line.upcoming.isNotEmpty()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val next = line.upcoming.first()
                 val live = next.realtime
                 val countdown = departsInLabel(next.epochSec, nowSec)
@@ -2939,7 +2939,7 @@ private fun DepartureLineRow(
                 val shown = if (showAll) rest else rest.take(5)
                 Column(Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     shown.forEach { dep ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(dep.clockText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = dim)
                             departsInLabel(dep.epochSec, nowSec)?.let {
                                 Text("· $it", style = MaterialTheme.typography.bodySmall, color = dim)
@@ -3008,9 +3008,9 @@ fun RouteDetailSheet(
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Header: back + the route pill + headsign.
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 IconButton(onClick = onClose, modifier = Modifier.focusRequester(backFocus).dpadHighlight()) {
                     Icon(Sym.ArrowBack, contentDescription = stringResource(R.string.place_close), tint = ink)
@@ -3079,7 +3079,7 @@ private fun RouteStopRow(
             .clickable(onClick = onClick),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 6.dp, end = 16.dp),
+            Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Vertical rail + node, drawn so the line is continuous between rows. Board/alight get a
@@ -3118,7 +3118,7 @@ private fun RouteStopRow(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = dim,
                                 textDecoration = TextDecoration.LineThrough,
-                                modifier = Modifier.padding(end = 6.dp),
+                                modifier = Modifier.padding(end = 8.dp),
                             )
                         }
                         Text(
@@ -3528,9 +3528,9 @@ internal fun sharePlaceUrl(place: Place): String {
  *  (user 2026-07-11); the full-screen viewer shows the same date in its caption. */
 @Composable
 private fun MenuTab(place: Place, menuIndices: List<Int>, dim: Color, onOpen: (Int) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         menuIndices.chunked(2).forEach { rowIdx ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 rowIdx.forEach { i ->
                     Box(
                         Modifier
@@ -3555,7 +3555,7 @@ private fun MenuTab(place: Place, menuIndices: List<Int>, dim: Color, onOpen: (I
                                 maxLines = 1,
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(6.dp)
+                                    .padding(8.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color.Black.copy(alpha = 0.55f))
                                     .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -3617,7 +3617,7 @@ private fun PanelControls(
     if (chips == null) return // nothing to control yet — the panel is still booting
     // NOTE: an EMPTY list is meaningful — the business has no auto-parsed topics; search + sort
     // still render (they exist on every panel), only the chip row is skipped.
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         OutlinedTextField(
             value = query,
             onValueChange = onQuery,
@@ -3656,7 +3656,7 @@ private fun PanelControls(
         }
     }
     if (chips.isNotEmpty()) LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
         items(chips.size) { i ->
@@ -3789,7 +3789,7 @@ private fun PlaceTabs(
                 modifier = Modifier.onGloballyPositioned { onTabRowY(it.positionInWindow().y) },
             )
         }
-        Column(Modifier.padding(top = 10.dp)) {
+        Column(Modifier.padding(top = 12.dp)) {
             when (tabs[selected]) {
                 "Overview" -> {
                     overview()
@@ -4008,7 +4008,7 @@ private fun ReviewsTab(
             // between the tabs and the button (user 2026-07-10).
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp),
             ) {
                 Text(
                     String.format(Locale.US, "%.1f", r),
@@ -4059,7 +4059,7 @@ private fun ReviewsTab(
         onReadAll?.let { open ->
             FilledTonalButton(
                 onClick = open, shape = CircleShape,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).dpadHighlight(CircleShape),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).dpadHighlight(CircleShape),
             ) {
                 Text(place.reviewCount?.let { stringResource(R.string.place_all_n_reviews_open, it) } ?: stringResource(R.string.place_all_reviews_short))
                 Spacer(Modifier.width(8.dp))
@@ -4119,7 +4119,7 @@ private fun ReviewsTab(
         if (loading) {
             // What the scrape can at most deliver: the place's own count, capped like the scraper.
             val target = (place.reviewCount ?: 0).coerceAtMost(50)
-            Column(Modifier.padding(vertical = 6.dp)) {
+            Column(Modifier.padding(vertical = 8.dp)) {
                 if (found > 0 && target > 0) {
                     LinearProgressIndicator(progress = { found.toFloat() / maxOf(target, found) }, modifier = Modifier.fillMaxWidth())
                 } else {
@@ -4268,7 +4268,7 @@ private fun ReviewRow(review: Review, ink: Color, dim: Color, onPhotoTap: (List<
                 maxLines = if (expanded) Int.MAX_VALUE else REVIEW_COLLAPSED_LINES,
                 overflow = TextOverflow.Ellipsis,
                 onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 8.dp)
                     // Touch-only convenience: the More label below is the focusable D-pad path,
                     // so the body tap must not become an invisible focus stop (dpad audit).
                     .then(
@@ -4300,7 +4300,7 @@ private fun ReviewRow(review: Review, ink: Color, dim: Color, onPhotoTap: (List<
             val caption = listOfNotNull(review.author.ifBlank { null }, review.relativeTime).joinToString(" · ").ifBlank { null }
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 review.photos.forEachIndexed { i, url ->
                     AsyncImage(
@@ -4503,7 +4503,7 @@ private fun PopularTimesSection(pt: com.sxdpz23.navisarthi.navigation.core.model
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text(stringResource(R.string.place_popular_times), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
+            Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             pt.days.forEach { d ->
@@ -4515,14 +4515,14 @@ private fun PopularTimesSection(pt: com.sxdpz23.navisarthi.navigation.core.model
                     color = if (sel) accent else dim,
                     fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.clip(CircleShape).dpadHighlight(CircleShape).clickable { selectedDow = d.dayOfWeek }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
         }
         if (nowOcc != null) {
             Text(stringResource(R.string.place_busyness_right_now, busynessLabel(nowOcc)), style = MaterialTheme.typography.bodySmall, color = dim)
         }
-        Canvas(Modifier.fillMaxWidth().height(64.dp).padding(top = 6.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(64.dp).padding(top = 8.dp)) {
             val hrs = day.hours
             if (hrs.isEmpty()) return@Canvas
             val bw = size.width / hrs.size
@@ -4623,7 +4623,7 @@ private fun upcomingHoliday(hours: List<String>, today: java.time.LocalDate): Ho
  *  interaction/shape as [HoursSection] so the block reads as part of the hours area. */
 @Composable
 private fun DepartmentsSection(departments: List<com.sxdpz23.navisarthi.navigation.core.model.Department>, ink: Color, dim: Color) {
-    Column(Modifier.padding(top = 6.dp)) {
+    Column(Modifier.padding(top = 8.dp)) {
         Text(
             stringResource(R.string.place_departments),
             style = MaterialTheme.typography.bodySmall,
@@ -4862,7 +4862,7 @@ private fun PlaceTabRow(
 private fun ReviewSummaryCard(place: Place, ink: Color, dim: Color, onOpen: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(top = 20.dp).clip(RoundedCornerShape(12.dp))
-            .background(dim.copy(alpha = 0.08f)).padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+            .background(dim.copy(alpha = 0.08f)).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
     ) {
         // A flow, not a row with a weighted middle: in German the button reads "Bewertungen
         // anzeigen", and on a large font it took the row and squeezed the stars and the count
@@ -4889,12 +4889,12 @@ private fun ReviewSummaryCard(place: Place, ink: Color, dim: Color, onOpen: () -
             }
         }
         place.ratingHistogram?.takeIf { it.isNotEmpty() }?.let {
-            RatingHistogram(it, dim, Modifier.padding(top = 8.dp, end = 10.dp))
+            RatingHistogram(it, dim, Modifier.padding(top = 8.dp, end = 12.dp))
         }
         place.featuredReview?.let {
             Text(
                 "\u201C$it\u201D", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = ink,
-                maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, end = 10.dp),
+                maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, end = 12.dp),
             )
         }
     }

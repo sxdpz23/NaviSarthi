@@ -95,10 +95,10 @@ internal fun NavGlassSurface(
 }
 
 @Composable
-internal fun NavGlassChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: @Composable () -> Unit) {
+internal fun NavGlassChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, gap: androidx.compose.ui.unit.Dp = 8.dp, icon: @Composable () -> Unit) {
     NavGlassSurface(modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick)) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(gap)) {
             icon()
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
         }
@@ -121,12 +121,12 @@ internal fun NavGlassCard(
 ) {
     val portrait = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenHeightDp >= it.screenWidthDp }
     NavGlassSurface(modifier, if (docked) androidx.compose.foundation.shape.RoundedCornerShape(36.dp) else shape, darkTint = true) {
-        Column(Modifier.then(if (docked && portrait) Modifier.padding(bottom = 96.dp) else Modifier), content = content)
+        Column(Modifier.then(if (docked && portrait) Modifier.padding(bottom = 104.dp) else Modifier), content = content)
     }
 }
 
 internal fun Modifier.navGlassPanel(landscape: Boolean): Modifier =
-    if (landscape) this else padding(horizontal = 16.dp, vertical = 12.dp).widthIn(max = 480.dp)
+    if (landscape) this else padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp).widthIn(max = 480.dp)
 
 @Composable
 internal fun NavViewToggle() {

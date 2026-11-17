@@ -58,8 +58,8 @@ android {
         buildConfigField("String", "ROAD_FEATURES_MANIFEST_URL", "\"\"")
         buildConfigField("String", "MAP_FONTS_URL", "\"\"")
         // Independent NaviSarthi version sequence.
-        versionCode = 34
-        versionName = "0.6.3"
+        versionCode = 37
+        versionName = "0.6.6"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for

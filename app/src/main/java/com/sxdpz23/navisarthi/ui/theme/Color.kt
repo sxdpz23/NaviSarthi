@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 
 // ---- Surfaces (warm-neutral near-black) ----
-val Bg0    = Color(0xFF0A0B0C)
-val Bg1    = Color(0xFF111315)
+val Bg0    = Color(0xFF000000)
+val Bg1    = Color(0xFF000000)
 val Surf1  = Color(0xFF181A1D)
 val Surf2  = Color(0xFF202326)
 val Surf3  = Color(0xFF2A2E32)

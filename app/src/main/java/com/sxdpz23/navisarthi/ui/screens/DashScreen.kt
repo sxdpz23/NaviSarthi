@@ -144,7 +144,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
     // reconnect after the rider deliberately disconnected.
     var autoConnectTried by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (!autoConnectTried && ui.stage == ConnStage.OFFLINE && hasEssentialPermissions()) {
+        if (com.sxdpz23.navisarthi.dash.DashPreferences.autoConnect.value && !autoConnectTried && ui.stage == ConnStage.OFFLINE && hasEssentialPermissions()) {
             autoConnectTried = true
             vm.connect()
         }
@@ -193,11 +193,11 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             title = "Dash",
             hint = "Nav owns your route, voice guidance and map. Dash keeps the connection and power-saving display controls.",
             trailing = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (streaming && ui.gpsStatus != com.sxdpz23.navisarthi.viewmodel.GpsStatus.GOOD) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (streaming && (!ui.navProjection || ui.gpsStatus != com.sxdpz23.navisarthi.viewmodel.GpsStatus.GOOD)) {
                         NaviSarthiChip(
-                            if (ui.gpsStatus == com.sxdpz23.navisarthi.viewmodel.GpsStatus.LOST) "GPS lost" else "GPS weak",
-                            if (ui.gpsStatus == com.sxdpz23.navisarthi.viewmodel.GpsStatus.LOST) ChipTone.Alert else ChipTone.Warn,
+                            if (!ui.navProjection) "GPS OFF" else if (ui.gpsStatus == com.sxdpz23.navisarthi.viewmodel.GpsStatus.LOST) "GPS lost" else "GPS weak",
+                            if (!ui.navProjection) ChipTone.Neutral else if (ui.gpsStatus == com.sxdpz23.navisarthi.viewmodel.GpsStatus.LOST) ChipTone.Alert else ChipTone.Warn,
                         )
                     }
                     if (streaming && ui.thermal != "OK") {
@@ -363,7 +363,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
             }
 
             // Live info strip — real remaining distance, ETA, zoom
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf(
                     Triple(
                         ui.remainingKm?.let { if (it >= 10) "%.0f".format(it) else "%.1f".format(it) } ?: "—",
@@ -397,6 +397,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
 
         if (streaming) ControlHint("Automatic power profile: ${ui.powerProfile}. Precision and console connection remain active.")
+        DashWallpaperControls()
         ControlSection("ETA display")
         NaviSarthiSegmented(
             options = EtaDisplayMode.entries.map { it.label },
@@ -432,7 +433,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
         if (ui.stopCount > 1) {
             Text("Stop ${ui.stopNumber} of ${ui.stopCount}: ${ui.destinationName.orEmpty()}",
-                color = TextHi, modifier = Modifier.padding(top = 10.dp))
+                color = TextHi, modifier = Modifier.padding(top = 12.dp))
             if (ui.stopNumber < ui.stopCount) {
                 NaviSarthiBtn("Skip this stop", onClick = vm::skipStop,
                     variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
@@ -491,7 +492,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 NaviSarthiIconBtn(NaviSarthiIcons.Plus,  onClick = { vm.zoomIn() }, contentDescription = "Zoom in", size = 52.dp)
                 Text("z${ui.mapZoom}", color = Gold, fontSize = 12.sp, fontFamily = GeistMonoFamily, fontWeight = FontWeight.SemiBold)

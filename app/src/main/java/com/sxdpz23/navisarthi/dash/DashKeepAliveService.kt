@@ -115,6 +115,7 @@ class DashKeepAliveService : Service() {
     }
 
     private fun acquireLocks() {
+        if (!DashPreferences.keepAwake.value) { releaseLocks(); return }
         if (wakeLock?.isHeld == true && wifiLock?.isHeld == true) return
         releaseLocks()
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager

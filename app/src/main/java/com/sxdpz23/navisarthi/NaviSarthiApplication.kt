@@ -72,6 +72,8 @@ class NaviSarthiApplication : Application(), coil.ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        com.sxdpz23.navisarthi.navigation.ui.UnifiedSettingsPolicy.apply(this)
+        com.sxdpz23.navisarthi.dash.DashPreferences.init(this)
         // Hash the installed APK off-thread so the build identity is ready to stamp into ride logs.
         BuildId.warm(this)
         // Firebase is auto-initialized from google-services.json via the Google Services plugin.
@@ -162,6 +164,7 @@ class NaviSarthiApplication : Application(), coil.ImageLoaderFactory {
         }
         AppTheme.init(this)
         DynamicColor.init(this)
+        DynamicColor.set(this, false)
         AppLocale.init(this) // resolve the app language (system default) → drives the nav-text locale
         Traffic.init(this)
         TransitLayer.init(this)
@@ -208,7 +211,8 @@ class NaviSarthiApplication : Application(), coil.ImageLoaderFactory {
         com.sxdpz23.navisarthi.navigation.ui.SimLocation.init(this)
         com.sxdpz23.navisarthi.navigation.ui.UiScale.init(this)
         com.sxdpz23.navisarthi.navigation.ui.PageTransitions.init(this)
-        com.sxdpz23.navisarthi.navigation.ui.AppFont.init(this) // user-supplied UI font (issue #252)
+        com.sxdpz23.navisarthi.navigation.ui.AppFont.init(this)
+        com.sxdpz23.navisarthi.navigation.ui.AppFont.setBuiltin(this) // user-supplied UI font (issue #252)
         com.sxdpz23.navisarthi.navigation.ui.MapColors.init(this)
         com.sxdpz23.navisarthi.navigation.ui.MapButtonShape.init(this) // round or square map buttons (issue #797)
         com.sxdpz23.navisarthi.navigation.ui.TurnArrows.init(this) // arrows on the route at the turns ahead (issue #804)

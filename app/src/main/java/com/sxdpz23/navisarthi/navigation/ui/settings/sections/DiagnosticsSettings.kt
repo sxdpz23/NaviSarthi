@@ -269,7 +269,7 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 ) {
                     // Two single lines: when (the thing people scan by) on top, then the figures
                     // and the name. The name goes last so a long street address is what gets cut.
-                    Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                         Text(
                             if (t.startedAt > 0L) tripWhen(context, t.startedAt) else t.label,
                             style = MaterialTheme.typography.bodyMedium,

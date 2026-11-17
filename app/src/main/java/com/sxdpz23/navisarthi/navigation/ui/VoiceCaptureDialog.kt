@@ -164,6 +164,6 @@ private fun DoneButton(onClick: () -> Unit) {
             }
             .focusable()
             .pointerInput(Unit) { detectTapGestures { onClick() } }
-            .padding(horizontal = 28.dp, vertical = 10.dp),
+            .padding(horizontal = 28.dp, vertical = 12.dp),
     )
 }

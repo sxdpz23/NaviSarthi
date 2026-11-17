@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         navigation.onCreate()
         if (navigationViewModel.state.value.navigating) openNav = true
         enableEdgeToEdge()
+        restoreSystemBars()
 
         val sync = SyncRepository.get(applicationContext)
         // Drop any legacy account session while retaining the local database.
@@ -125,7 +126,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() { super.onStart(); navigation.onStart() }
     override fun onStop() { navigation.onStop(); super.onStop() }
-    override fun onResume() { super.onResume(); navigation.onResume() }
+    override fun onResume() { super.onResume(); navigation.onResume(); restoreSystemBars() }
+
+    private fun restoreSystemBars() {
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+    }
     override fun onPictureInPictureModeChanged(active: Boolean, config: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(active, config)
         navigation.onPictureInPictureChanged(active)

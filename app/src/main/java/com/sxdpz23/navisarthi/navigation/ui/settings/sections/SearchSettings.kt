@@ -176,7 +176,7 @@ internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQu
                     // Remove is a SEPARATE full-width row (its own single focus stop), never a nested
                     // target inside the row above - the anti-pattern the audits reject.
                     Row(
-                        Modifier.fillMaxWidth().dpadHighlight(DpadShape(6.dp)).dpadClickable { vm.deleteAsrEngine(engine) }.padding(start = 56.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
+                        Modifier.fillMaxWidth().dpadHighlight(DpadShape(6.dp)).dpadClickable { vm.deleteAsrEngine(engine) }.padding(start = 56.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(stringResource(R.string.settings_voice_search_remove), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)

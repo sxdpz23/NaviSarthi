@@ -16,6 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.res.stringResource
@@ -145,7 +147,7 @@ internal fun SettingsGroup(
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         androidx.compose.foundation.layout.Column(
-            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
             content = content,
         )
     }
@@ -162,7 +164,7 @@ internal fun SubHead(text: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.settingsAnchor(text).padding(top = 10.dp, bottom = 4.dp, start = 16.dp),
+        modifier = Modifier.settingsAnchor(text).padding(top = 24.dp, bottom = 8.dp, start = 16.dp),
     )
 }
 
@@ -173,7 +175,7 @@ internal fun PageIntro(text: String) {
         text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
@@ -196,11 +198,8 @@ internal fun Hint(text: String) {
 @Composable
 internal fun GroupDivider() {
     androidx.compose.foundation.layout.Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 1.dp)
-            .height(3.dp)
-            .background(MaterialTheme.colorScheme.surface),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = .16f)),
     )
 }
 
@@ -222,7 +221,7 @@ internal fun ToggleRow(
     leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        Modifier.fillMaxWidth().settingsAnchor(label).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).settingsAnchor(label).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
@@ -242,7 +241,7 @@ internal fun ToggleRow(
         NavigationSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            modifier = switchModifier,
+            modifier = switchModifier.semantics { contentDescription = label },
         )
     }
 }
@@ -260,3 +259,19 @@ internal fun settingsFieldColors() = androidx.compose.material3.OutlinedTextFiel
     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
 )
+
+/** Quiet full-width action with the same label column and touch bounds as switch rows. */
+@Composable
+internal fun SettingsActionRow(label: String, hint: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).settingsAnchor(label)
+        .dpadHighlight(DpadShape(12.dp))
+        .then(if (enabled) Modifier.dpadClickable(onClick = onClick) else Modifier)
+        .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Sym.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
+    }
+}

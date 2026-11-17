@@ -112,7 +112,7 @@ fun NavigationMenuScope.toggleItem(text: String, checked: Boolean, onToggle: (Bo
         ) {
             Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(16.dp))
-            Switch(checked = checked, onCheckedChange = onToggle)
+            com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = checked, onCheckedChange = onToggle)
         }
         return
     }
@@ -147,7 +147,7 @@ fun NavigationMenuScope.toggleItem(text: String, checked: Boolean, onToggle: (Bo
     ) {
         Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(16.dp))
-        Switch(checked = checked, onCheckedChange = onToggle)
+        com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = checked, onCheckedChange = onToggle)
     }
 }
 

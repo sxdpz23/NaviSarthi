@@ -55,9 +55,10 @@ internal fun SettingsHub(
 ) {
     val returnFocus = remember { FocusRequester() }
     SettingsScaffold(
-        title = stringResource(R.string.navigation_settings_title),
+        title = "Settings",
         onBack = onBack,
         autoFocusBack = returnTo == null,
+        showBack = false,
     ) { topRow ->
         Spacer(Modifier.height(4.dp))
         // Settings search, rebuilt for hub-and-spoke: the old single page scrolled to the matched
@@ -81,6 +82,9 @@ internal fun SettingsHub(
             modifier = topRow.fillMaxWidth().padding(vertical = 4.dp).dpadFieldEscape(),
         )
         val sectionTitles = mapOf(
+            SettingsSection.SYSTEM to "System",
+            SettingsSection.DASH to "Dash",
+            SettingsSection.POD to "Pod",
             SettingsSection.APPEARANCE to stringResource(R.string.settings_appearance),
             SettingsSection.MAP to stringResource(R.string.settings_map),
             SettingsSection.PLACES to stringResource(R.string.settings_places),
@@ -92,10 +96,16 @@ internal fun SettingsHub(
             SettingsSection.PRIVACY to stringResource(R.string.settings_privacy),
             SettingsSection.PERFORMANCE to stringResource(R.string.settings_performance),
             SettingsSection.DIAGNOSTICS to stringResource(R.string.settings_diagnostics),
-            SettingsSection.ABOUT to stringResource(R.string.navigation_credits_title),
+            SettingsSection.ABOUT to "Data and licenses",
         )
         if (searchQuery.isNotBlank()) {
-            val matches = SEARCH_INDEX.map { (res, section) -> stringResource(res) to section }
+            val appMatches = LocalAppSettingsPages.current?.let { host ->
+                listOf("Vehicle type" to SettingsSection.SYSTEM, "Enable Garage" to SettingsSection.SYSTEM,
+                    "Google Drive backup" to SettingsSection.ABOUT, "Battery and background usage" to SettingsSection.PERFORMANCE,
+                    "Ride history" to if (host.console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH) SettingsSection.DASH else SettingsSection.POD,
+                    "Connection" to if (host.console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH) SettingsSection.DASH else SettingsSection.POD)
+            }.orEmpty()
+            val matches = (SEARCH_INDEX.map { (res, section) -> stringResource(res) to section } + appMatches)
                 .filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
                 .take(10)
             if (matches.isEmpty()) {
@@ -110,12 +120,12 @@ internal fun SettingsHub(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 3.dp)
+                        .padding(vertical = 4.dp)
                         .clip(DpadShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .dpadHighlight(DpadShape(16.dp))
                         .dpadClickable { searchQuery = ""; onOpen(section, label) }
-                        .padding(vertical = 10.dp, horizontal = 12.dp),
+                        .padding(vertical = 12.dp, horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -136,6 +146,12 @@ internal fun SettingsHub(
             var m: Modifier = Modifier
             if (section == returnTo && LocalSettingsPageActive.current) m = m.dpadAutoFocus(returnFocus)
             return m
+        }
+        LocalAppSettingsPages.current?.let { host ->
+            HubRow(SymOutlined.Settings, "System", "Vehicle type and optional Garage", onClick = { onOpen(SettingsSection.SYSTEM, null) })
+            val dash = host.console == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH
+            HubRow(SymOutlined.Navigation, if (dash) "Dash" else "Pod", "Connection, display and ride history",
+                onClick = { onOpen(if (dash) SettingsSection.DASH else SettingsSection.POD, null) })
         }
         HubRow(
             icon = SymOutlined.Palette,
@@ -221,7 +237,7 @@ internal fun SettingsHub(
         )
         HubRow(
             icon = SymOutlined.Info,
-            title = stringResource(R.string.navigation_credits_title),
+            title = "Data and licenses",
             subtitle = stringResource(R.string.settings_hub_about_sub),
             modifier = rowModifier(SettingsSection.ABOUT, first = false),
             onClick = { onOpen(SettingsSection.ABOUT, null) },
@@ -241,28 +257,28 @@ private fun HubRow(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp)
+            .padding(vertical = 4.dp)
             // Filled M3 card per category row, no outline (the bordered boxes read dated - user
             // 2026-07-23). surfaceContainer is a theme token, so Material You tints it and the
             // AMOLED scheme's stepped near-blacks keep the rows visible on true black. The focus
             // ring draws over the same rounded shape when the row is focused.
-            .clip(DpadShape(26.dp))
+            .clip(DpadShape(24.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .dpadHighlight(DpadShape(26.dp))
+            .dpadHighlight(DpadShape(24.dp))
             .dpadClickable(onClick = onClick)
             .padding(vertical = 16.dp, horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Outlined stock-style glyph in the quiet ink (single-ink rule - never the teal primary).
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -276,30 +292,18 @@ private fun HubRow(
  */
 private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     // Appearance
-    R.string.settings_follow_system to SettingsSection.APPEARANCE,
-    R.string.settings_theme_light to SettingsSection.APPEARANCE,
-    R.string.settings_theme_dark to SettingsSection.APPEARANCE,
-    R.string.settings_map_theme_title to SettingsSection.APPEARANCE,
-    R.string.settings_theme_amoled to SettingsSection.APPEARANCE,
     R.string.settings_ui_scale to SettingsSection.APPEARANCE,
-    R.string.settings_page_transitions to SettingsSection.APPEARANCE,
     R.string.settings_map_look to SettingsSection.APPEARANCE,
     R.string.settings_map_colors to SettingsSection.APPEARANCE,
     R.string.settings_map_buttons to SettingsSection.APPEARANCE,
-    R.string.settings_dynamic_color to SettingsSection.APPEARANCE,
-    R.string.settings_app_name_generic to SettingsSection.APPEARANCE,
     R.string.settings_clock to SettingsSection.APPEARANCE,
     R.string.settings_link_action to SettingsSection.NAVIGATION,
     R.string.settings_units to SettingsSection.APPEARANCE,
     R.string.settings_units_imperial to SettingsSection.APPEARANCE,
     R.string.settings_units_metric to SettingsSection.APPEARANCE,
     R.string.settings_language to SettingsSection.APPEARANCE,
-    R.string.settings_follow_system_language to SettingsSection.APPEARANCE,
     R.string.settings_directions_language to SettingsSection.APPEARANCE,
-    R.string.settings_theme_auto to SettingsSection.APPEARANCE,
     R.string.settings_nav_day_night to SettingsSection.APPEARANCE,
-    R.string.settings_font to SettingsSection.APPEARANCE,
-    R.string.settings_app_name_title to SettingsSection.APPEARANCE,
     // Map
     R.string.settings_live_traffic to SettingsSection.MAP,
     R.string.settings_transit_layer to SettingsSection.MAP,
@@ -353,7 +357,6 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_hide_adult to SettingsSection.PLACES,
     R.string.settings_hide_external_links to SettingsSection.PLACES,
     // Navigation
-    R.string.settings_keep_screen_on to SettingsSection.NAVIGATION,
     R.string.settings_route_picker to SettingsSection.NAVIGATION,
     R.string.settings_turn_arrows to SettingsSection.NAVIGATION,
     R.string.settings_route_bar to SettingsSection.NAVIGATION,
@@ -376,7 +379,6 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_car_speed to SettingsSection.NAVIGATION,
     R.string.settings_speeding_alert to SettingsSection.NAVIGATION,
     R.string.settings_puck_size to SettingsSection.NAVIGATION,
-    R.string.settings_puck_style to SettingsSection.NAVIGATION,
     R.string.settings_demo_drive to SettingsSection.DIAGNOSTICS,
     R.string.settings_trip_auto_clear to SettingsSection.DIAGNOSTICS,
     R.string.settings_sim_location to SettingsSection.DIAGNOSTICS,

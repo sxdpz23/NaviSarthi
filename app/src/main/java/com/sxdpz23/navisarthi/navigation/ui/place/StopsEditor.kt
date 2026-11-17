@@ -95,7 +95,7 @@ fun StopsEditorSheet(
     ) {
         // Keep the taskbar clearance outside the scroll area, so even the final Done
         // action can scroll fully above the dock on short screens and in landscape.
-        Column(Modifier.navigationBarsPadding().padding(bottom = 96.dp)
+        Column(Modifier.navigationBarsPadding().padding(bottom = 104.dp)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -227,7 +227,7 @@ fun StopsEditorSheet(
                     .clip(RoundedCornerShape(8.dp))
                     .dpadHighlight(RoundedCornerShape(8.dp))
                     .clickable { onApply(order); onAddStop() } // keeps a reorder or removal made first
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Sym.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -284,7 +284,7 @@ fun TripEditorSheet(
     ) {
         // Keep the taskbar clearance outside the scroll area, so even the final Done
         // action can scroll fully above the dock on short screens and in landscape.
-        Column(Modifier.navigationBarsPadding().padding(bottom = 96.dp)
+        Column(Modifier.navigationBarsPadding().padding(bottom = 104.dp)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -398,7 +398,7 @@ fun TripEditorSheet(
                     .clip(RoundedCornerShape(8.dp))
                     .dpadHighlight(RoundedCornerShape(8.dp))
                     .clickable { onApply(order.map { it.point }); onAddStop() }
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Sym.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))

@@ -36,7 +36,7 @@ object LocalBasemapTiles : Interceptor {
         installed = true
         runCatching {
             org.maplibre.android.module.http.HttpRequestUtil.setOkHttpClient(
-                okhttp3.OkHttpClient.Builder()
+                InternetMapCalls(org.maplibre.android.MapLibre.getApplicationContext(), okhttp3.OkHttpClient.Builder()
                     .dispatcher(okhttp3.Dispatcher().apply { maxRequestsPerHost = 20 })
                     .addInterceptor(this)
                     .addInterceptor(SnapshotBasemapTiles)
@@ -45,7 +45,7 @@ object LocalBasemapTiles : Interceptor {
                     .addInterceptor(com.sxdpz23.navisarthi.navigation.core.net.NetHealth.interceptor)
                     .addInterceptor(com.sxdpz23.navisarthi.navigation.diag.NetCount) // after the local hook too: only what reaches the network
                     .addInterceptor(ReleaseRedirects) // a release file's signed address, kept between range reads
-                    .build(),
+                    .build()),
             )
         }.onFailure { installed = false; android.util.Log.w("NavigationLocalTiles", "could not install the tile hook: ${it.message}") }
     }

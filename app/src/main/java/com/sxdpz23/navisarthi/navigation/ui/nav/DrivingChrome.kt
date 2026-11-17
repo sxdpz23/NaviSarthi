@@ -89,7 +89,7 @@ internal fun BoxScope.DrivingChrome(state: MapUiState, vm: MapViewModel) {
     // is read on every pass, since Settings draws over the map and this never leaves
     // composition; the clock below recomposes it once a minute. Keyed on the drive too: a drive
     // adds the same flag and clears it when it ends, and this puts it back.
-    val keepAwake = context.getSharedPreferences("navigation_settings", android.content.Context.MODE_PRIVATE).getBoolean("keep_screen_on_nav", true)
+    val keepAwake = false
     val window = remember(context) {
         var c: android.content.Context? = context
         while (c is ContextWrapper && c !is Activity) c = c.baseContext
@@ -155,7 +155,7 @@ internal fun BoxScope.DrivingChrome(state: MapUiState, vm: MapViewModel) {
             },
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -181,7 +181,7 @@ internal fun BoxScope.DrivingChrome(state: MapUiState, vm: MapViewModel) {
     // The right-edge column, where the drive keeps its buttons: locate, then the voice.
     val barClearance = with(density) { DrivingBar.heightPx.intValue.toDp() } + 16.dp
     Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.End,
         modifier = Modifier
             .align(Alignment.BottomEnd)

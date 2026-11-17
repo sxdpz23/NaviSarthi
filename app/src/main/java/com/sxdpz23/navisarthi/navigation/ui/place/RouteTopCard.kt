@@ -102,7 +102,7 @@ fun RouteTopCard(
         shape = RoundedCornerShape(28.dp),
         // Same tone as the search bar it replaces, so the top chrome reads as one family.
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, end = 2.dp, top = 8.dp, bottom = 8.dp)) {
             IconButton(onClick = onClose, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
                 Icon(
                     Sym.ArrowBack,
@@ -238,7 +238,7 @@ fun RouteTopCard(
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                                 ) {
                                     Text(stringResource(R.string.route_save_keep_stops), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                    androidx.compose.material3.Switch(checked = keepStops, onCheckedChange = { keepStops = it }, modifier = Modifier.dpadHighlight(CircleShape))
+                                    com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = keepStops, onCheckedChange = { keepStops = it }, modifier = Modifier.dpadHighlight(CircleShape))
                                 }
                                 if (!keepStops) Text(stringResource(R.string.route_save_keep_stops_hint), style = MaterialTheme.typography.bodySmall, color = dim)
                             }
@@ -398,7 +398,7 @@ private fun LinkTripRows(link: LinkTrip.View, meName: String, ink: Color, dim: C
 /** Where one place's lookup stands: a spinner, a check, or a warning when it found nothing. */
 @Composable
 private fun LookupMark(lookup: LinkTrip.Lookup) {
-    val m = Modifier.padding(end = 6.dp).size(18.dp)
+    val m = Modifier.padding(end = 8.dp).size(18.dp)
     when (lookup) {
         LinkTrip.Lookup.LOOKING -> {
             val cd = stringResource(R.string.link_trip_looking_cd)
@@ -513,7 +513,7 @@ private fun TripShortcutDialog(destinationName: String, travelModeKey: String, o
             modifier = Modifier.fillMaxWidth().dpadHighlight().dpadFieldEscape(),
         )
         androidx.compose.foundation.layout.FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(top = 12.dp),
         ) {
             com.sxdpz23.navisarthi.navigation.ui.map.PoiIcons.SHORTCUT_ICON_KEYS.forEach { key ->
@@ -535,7 +535,7 @@ private fun TripShortcutDialog(destinationName: String, travelModeKey: String, o
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text(stringResource(R.string.trip_shortcut_themed), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            androidx.compose.material3.Switch(checked = themed, onCheckedChange = { themed = it }, modifier = Modifier.dpadHighlight(CircleShape))
+            com.sxdpz23.navisarthi.ui.components.VehicleGlassSwitch(checked = themed, onCheckedChange = { themed = it }, modifier = Modifier.dpadHighlight(CircleShape))
         }
     }
 }

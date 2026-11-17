@@ -292,7 +292,7 @@ fun GoogleStyleDirectionsPanel(
             ) {
                 Column(Modifier.padding(start = 20.dp, end = 16.dp, top = if (compact) 6.dp else 12.dp)) {
                     if (route == null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                             Text(stringResource(R.string.place_finding_route), style = MaterialTheme.typography.bodyMedium, color = dim)
                         }
@@ -300,7 +300,7 @@ fun GoogleStyleDirectionsPanel(
                         val eta = route.durationInTrafficSeconds ?: route.durationSeconds
                         val fastest = routes.minOfOrNull { it.durationInTrafficSeconds ?: it.durationSeconds } ?: eta
                         val deltaMin = ((eta - fastest) / 60.0).roundToInt()
-                        route.savedName?.let { SavedRouteChip(it, Modifier.padding(bottom = 6.dp)) }
+                        route.savedName?.let { SavedRouteChip(it, Modifier.padding(bottom = 8.dp)) }
                         Text(
                             buildAnnotatedString {
                                 withStyle(SpanStyle(color = trafficEtaColor(route) ?: ink, fontWeight = FontWeight.Medium, fontSize = 22.sp)) {
@@ -345,7 +345,7 @@ fun GoogleStyleDirectionsPanel(
                                     .clip(CircleShape)
                                     .dpadHighlight(CircleShape)
                                     .clickable { onAltsOpenChange(!altsOpen) }
-                                    .padding(vertical = 6.dp, horizontal = 8.dp),
+                                    .padding(vertical = 8.dp, horizontal = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(Sym.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -369,7 +369,7 @@ fun GoogleStyleDirectionsPanel(
                 // its distance, the roads it uses and its camera count. Back returns to the Google view.
                 if (altsOpen && routes.size > 1) {
                     val fastestEta = routes.minOf { it.durationInTrafficSeconds ?: it.durationSeconds }
-                    Column(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
+                    Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
                         Row(
                             Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -403,7 +403,7 @@ fun GoogleStyleDirectionsPanel(
                                     .background(if (chosen) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
                                     .dpadHighlight(RoundedCornerShape(14.dp))
                                     .clickable { onSelectRoute(i); onAltsOpenChange(false) }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
@@ -671,7 +671,7 @@ internal fun SavedRouteChip(name: String, modifier: Modifier = Modifier) {
         modifier
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.tertiaryContainer)
-            .padding(horizontal = 10.dp, vertical = 3.dp),
+            .padding(horizontal = 12.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(

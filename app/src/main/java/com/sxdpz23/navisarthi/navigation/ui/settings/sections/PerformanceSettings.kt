@@ -71,5 +71,39 @@ internal fun PerformanceSettingsScreen(onBack: () -> Unit) {
             } else stringResource(R.string.settings_texture_render_hint),
         )
         }
+        BackgroundAccessSettings()
+    }
+}
+
+@Composable
+private fun BackgroundAccessSettings() {
+    val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var restricted by remember { mutableStateOf(com.sxdpz23.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(context)) }
+    var unavailable by remember { mutableStateOf(false) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+        restricted = com.sxdpz23.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(context)
+    }
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME)
+                restricted = com.sxdpz23.navisarthi.util.DeviceReadiness.shouldShowNavigationBatteryGuidance(context)
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    SettingsGroup("Battery and background usage") {
+        com.sxdpz23.navisarthi.navigation.ui.settings.Hint(if (restricted)
+            "Review Android battery restrictions so guidance can continue with the phone locked."
+            else "No Android battery restrictions detected.")
+        androidx.compose.material3.TextButton(onClick = {
+            val readiness = com.sxdpz23.navisarthi.util.DeviceReadiness
+            val intent = if (!readiness.isIgnoringBatteryOptimizations(context)) readiness.batteryExemptionIntent(context)
+                else readiness.appSettingsIntent(context)
+            unavailable = runCatching { launcher.launch(intent) }.isFailure &&
+                runCatching { launcher.launch(readiness.appSettingsIntent(context)) }.isFailure
+        }) { androidx.compose.material3.Text("Review background access") }
+        if (unavailable) com.sxdpz23.navisarthi.navigation.ui.settings.Hint("Open Android Settings → Apps → NaviSarthi → Battery.")
     }
 }
