@@ -106,13 +106,21 @@ internal fun SettingsScaffold(
             }
         }
     }
-    // Stock-Settings top bar: a LARGE collapsing title (the big left-aligned heading that shrinks
-    // into the bar as you scroll), in the Settings font. Transparent over the page background like
-    // the Pixel Settings app - the old always-elevated pinned bar read dated (user 2026-07-23).
+    // The hub shares the taskbar pages' header. Child pages retain their back/focus plumbing.
     val scrollBehavior = androidx.compose.material3.TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = if (showBack) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
         topBar = {
+            if (!showBack) {
+                com.sxdpz23.navisarthi.ui.components.ScreenHeader(
+                    title = title,
+                    modifier = Modifier.padding(
+                        start = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageHorizontal,
+                        end = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageHorizontal,
+                        top = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageTop,
+                    ),
+                )
+            } else {
             androidx.compose.material3.TopAppBar(
                 title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
                 scrollBehavior = scrollBehavior,
@@ -139,6 +147,7 @@ internal fun SettingsScaffold(
                     }
                 },
             )
+            }
         },
     ) { padding ->
         Column(

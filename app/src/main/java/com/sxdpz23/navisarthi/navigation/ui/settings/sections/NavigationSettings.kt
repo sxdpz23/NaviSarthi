@@ -58,7 +58,6 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         SettingsGroup {
         // Which route chooser Directions opens. The Google-style picker graduated from an
         // experiment to the default on 2026-09-18; the classic panel stays one toggle away.
-        GroupDivider()
         ToggleRow(
             label = stringResource(R.string.settings_route_picker),
             checked = com.sxdpz23.navisarthi.navigation.ui.RoutePicker.googleStyle.value,

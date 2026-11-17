@@ -7,6 +7,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -26,11 +29,20 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.sxdpz23.navisarthi.navigation.ui.theme.isAppInDarkTheme
+import com.sxdpz23.navisarthi.ui.components.GlassEdge
+import com.sxdpz23.navisarthi.ui.components.GlassWash
+import com.sxdpz23.navisarthi.ui.components.GlassUnderlay
+
+/** Root coordinates let the shell sample the map without sampling Nav's floating glass. */
+internal data class NavGlassSource(val layer: GraphicsLayer, val rootOrigin: Offset)
+internal val LocalNavGlassObserver = staticCompositionLocalOf<(NavGlassSource, Boolean) -> Unit> { { _, _ -> } }
 
 private class MapGlassBackdrop(val layer: GraphicsLayer) {
     var origin by mutableStateOf(Offset.Zero)
@@ -42,13 +54,22 @@ private val LocalMapGlass = staticCompositionLocalOf<MapGlassBackdrop?> { null }
 internal fun NavGlassHost(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     val layer = rememberGraphicsLayer()
     val backdrop = remember(layer) { MapGlassBackdrop(layer) }
+    val observer by rememberUpdatedState(LocalNavGlassObserver.current)
+    DisposableEffect(layer) {
+        onDispose { observer(NavGlassSource(layer, Offset.Zero), false) }
+    }
     CompositionLocalProvider(LocalMapGlass provides backdrop) { Box(modifier, content = content) }
 }
 
 internal fun Modifier.navGlassBackdrop(): Modifier = composed {
     val backdrop = LocalMapGlass.current
     val rootView = LocalView.current
-    if (backdrop == null) this else onGloballyPositioned { backdrop.origin = it.positionInRoot() + screenOffset(rootView) }
+    val observer = LocalNavGlassObserver.current
+    if (backdrop == null) this else onGloballyPositioned {
+        val rootOrigin = it.positionInRoot()
+        backdrop.origin = rootOrigin + screenOffset(rootView)
+        observer(NavGlassSource(backdrop.layer, rootOrigin), true)
+    }
         .drawWithContent {
             backdrop.layer.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop.layer)
@@ -62,31 +83,42 @@ internal fun NavGlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
     darkTint: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val backdrop = LocalMapGlass.current
     val rootView = LocalView.current
     val dark = darkTint || isAppInDarkTheme()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val pressed = interactionSource?.collectIsPressedAsState()?.value ?: false
+    val pressure by animateFloatAsState(if (pressed) 1f else 0f, label = "glassPressure")
     val shader = remember { RuntimeShader(com.sxdpz23.navisarthi.ui.components.LIQUID_GLASS_SHADER) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier.shadow(6.dp, shape).clip(shape)
         .onGloballyPositioned { origin = it.positionInRoot() + screenOffset(rootView) }
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(.55f), Color.White.copy(.12f))), shape)
+        .border(1.dp, GlassEdge, shape)
     ) {
         if (backdrop != null) Canvas(Modifier.matchParentSize().graphicsLayer {
             shader.setFloatUniform("resolution", size.width, size.height)
             shader.setFloatUniform("dark", if (dark) 1f else 0f)
-            shader.setFloatUniform("radius", minOf(28.dp.toPx(), size.width / 2f, size.height / 2f))
+            val outline = shape.createOutline(size, layoutDirection, density)
+            val radius = (outline as? Outline.Rounded)?.roundRect?.topLeftCornerRadius?.x ?: 0f
+            val thickness = ((size.height / density.density - 96f) / 224f).coerceIn(0f, 1f)
+            shader.setFloatUniform("radius", radius)
+            shader.setFloatUniform("thickness", thickness)
+            shader.setFloatUniform("pressure", pressure)
+            val blur = 8f + thickness * 4f
             renderEffect = RenderEffect.createChainEffect(
                 RenderEffect.createRuntimeShaderEffect(shader, "content"),
-                RenderEffect.createBlurEffect(8f, 8f, Shader.TileMode.CLAMP),
+                RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP),
             ).asComposeRenderEffect()
         }) {
             translate(backdrop.origin.x - origin.x, backdrop.origin.y - origin.y) { drawLayer(backdrop.layer) }
         }
         Box(Modifier.matchParentSize().background(if (backdrop == null) MaterialTheme.colorScheme.surfaceContainerHigh
-            else if (dark) Color(0x223F4855) else Color(0x26FFFFFF)))
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color(0x32F3F1EC), Color(0x193F4855), Color(0x30323A46)))))
+            else if (dark) GlassUnderlay else Color(0x26FFFFFF)))
+        Box(Modifier.matchParentSize().background(GlassWash))
         if (darkTint) MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme(
             primary = MaterialTheme.colorScheme.primary,
             secondary = MaterialTheme.colorScheme.secondary,
@@ -96,7 +128,10 @@ internal fun NavGlassSurface(
 
 @Composable
 internal fun NavGlassChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, gap: androidx.compose.ui.unit.Dp = 8.dp, icon: @Composable () -> Unit) {
-    NavGlassSurface(modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick)) {
+    val interaction = remember { MutableInteractionSource() }
+    NavGlassSurface(modifier.heightIn(min = 48.dp).clickable(interactionSource = interaction,
+        indication = androidx.compose.foundation.LocalIndication.current,
+        role = Role.Button, onClick = onClick), interactionSource = interaction) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(gap)) {
             icon()

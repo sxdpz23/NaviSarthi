@@ -11,6 +11,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.sxdpz23.navisarthi.dash.nav.GeoPoint
 import com.sxdpz23.navisarthi.navigation.car.CarFraming
+import com.sxdpz23.navisarthi.navigation.car.FrontClip
 import com.sxdpz23.navisarthi.navigation.car.CarStyle
 import com.sxdpz23.navisarthi.navigation.core.model.LatLng
 import com.sxdpz23.navisarthi.navigation.core.model.destinationPoint
@@ -48,7 +49,7 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val renderQueue = DeferredMapRender({ work -> main.post { work() } }, ::renderLatest)
     private data class Request(val frame: MapRenderer.Frame, val width: Int, val height: Int)
-    private data class Ready(val snapshot: MapSnapshot, val camera: CameraPosition, val key: String, val at: Long)
+    private data class Ready(val snapshot: MapSnapshot, val camera: CameraPosition, val key: String, val at: Long, val clip: FrontClip)
     @Volatile private var wanted: Request? = null
     @Volatile private var ready: Ready? = null
     @Volatile private var mapError: String? = null
@@ -79,7 +80,14 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
             text.color = if (dark) Color.LTGRAY else Color.DKGRAY
             val wallpaper = IdleWallpaperStore.get(context).bitmap.value
             if (wallpaper != null) {
-                rect.set(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat())
+                // Encoder surfaces need not be square. Fill by cropping, never by
+                // independently stretching the saved square crop along each axis.
+                val scale = maxOf(canvas.width.toFloat() / wallpaper.width, canvas.height.toFloat() / wallpaper.height)
+                val width = wallpaper.width * scale
+                val height = wallpaper.height * scale
+                val left = (canvas.width - width) / 2f
+                val top = (canvas.height - height) / 2f
+                rect.set(left, top, left + width, top + height)
                 canvas.drawBitmap(wallpaper, null, rect, bitmapPaint)
                 return
             }
@@ -167,15 +175,16 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
 
         text.textSize = w * .052f
         text.textAlign = Paint.Align.LEFT
+        // Use one face, weight, size and baseline for the whole headline;
+        // only Adventure's colour changes, avoiding italic font metric differences.
+        text.typeface = android.graphics.Typeface.DEFAULT_BOLD
         val lead = "Ready for "
         val leadWidth = text.measureText(lead)
-        text.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD_ITALIC)
         val tailWidth = text.measureText("Adventure")
         val left = cx - (leadWidth + tailWidth) / 2f
         text.typeface = android.graphics.Typeface.DEFAULT_BOLD
         text.color = Color.WHITE
         canvas.drawText(lead, left, h * .48f, text)
-        text.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD_ITALIC)
         text.color = Color.rgb(48, 218, 40)
         canvas.drawText("Adventure", left + leadWidth, h * .48f, text)
 
@@ -204,7 +213,10 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         text.textSize = 11f
     }
 
-    private fun point(ready: Ready, lat: Double, lng: Double): android.graphics.PointF? = runCatching {
+    private fun point(ready: Ready, lat: Double, lng: Double): android.graphics.PointF? =
+        if (ready.clip.inFront(lat, lng)) projectRaw(ready, lat, lng) else null
+
+    private fun projectRaw(ready: Ready, lat: Double, lng: Double): android.graphics.PointF? = runCatching {
         ready.snapshot.pixelForLatLng(MLLatLng(lat, lng)).takeIf { it.x.isFinite() && it.y.isFinite() }
     }.getOrNull()
 
@@ -212,8 +224,24 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         if (route.size < 2) return
         path.reset()
         var started = false
+        var previous: GeoPoint? = null
+        var previousIn = false
         for (coordinate in route) {
-            val p = point(ready, coordinate.lat, coordinate.lng)
+            val inside = ready.clip.inFront(coordinate.lat, coordinate.lng)
+            val before = previous
+            if (before != null && previousIn != inside) {
+                val t = ready.clip.crossing(before.lat, before.lng, coordinate.lat, coordinate.lng)
+                val edge = projectRaw(ready, before.lat + (coordinate.lat - before.lat) * t,
+                    before.lng + (coordinate.lng - before.lng) * t)
+                if (edge != null) {
+                    if (previousIn && started) path.lineTo(edge.x, edge.y)
+                    else if (inside) path.moveTo(edge.x, edge.y)
+                }
+                started = inside && edge != null
+            }
+            previous = coordinate
+            previousIn = inside
+            val p = if (inside) projectRaw(ready, coordinate.lat, coordinate.lng) else null
             if (p == null || kotlin.math.abs(p.x) > 100_000 || kotlin.math.abs(p.y) > 100_000) { started = false; continue }
             if (started) path.lineTo(p.x, p.y) else { path.moveTo(p.x, p.y); started = true }
         }
@@ -308,6 +336,9 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
         val metersPerPixel = 78271.517 * cos(Math.toRadians(base.lat)) / Math.pow(2.0, zoom)
         val target = base.destinationPoint(ahead * metersPerPixel, bearing)
         val camera = CameraPosition.Builder().target(MLLatLng(target.lat, target.lng)).zoom(zoom).bearing(bearing).tilt(tilt).build()
+        val clip = FrontClip(target.lat, target.lng, bearing,
+            CarFraming.behindLimitPx(tilt, request.height.toDouble()) *
+                (78271.517 * cos(Math.toRadians(target.lat)) / Math.pow(2.0, zoom)))
         val last = ready
         if (last?.key == key && last.camera == camera && SystemClock.elapsedRealtime() - last.at < 30_000L) return
         rendering = true
@@ -332,7 +363,7 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
                     enqueue()
                     return@start
                 }
-                ready = Ready(result, camera, key, SystemClock.elapsedRealtime())
+                ready = Ready(result, camera, key, SystemClock.elapsedRealtime(), clip)
                 mapError = null
                 onFrameReady()
                 if (wanted !== request) enqueue()

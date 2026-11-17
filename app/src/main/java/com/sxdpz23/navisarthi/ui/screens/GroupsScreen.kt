@@ -14,7 +14,10 @@ import com.sxdpz23.navisarthi.ui.theme.*
 
 @Composable
 fun GroupsScreen() {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 20.dp).padding(bottom = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageBottom)) {
+    Column(Modifier.fillMaxSize().padding(
+        horizontal = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageHorizontal,
+        vertical = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageTop,
+    ).padding(bottom = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageBottom)) {
         ScreenHeader(title = "Groups")
         Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {

@@ -31,15 +31,16 @@ import androidx.compose.ui.unit.sp
 import com.sxdpz23.navisarthi.ui.theme.*
 
 // ---- Shape constants ----
-val CardShape    = RoundedCornerShape(16.dp)
-val BtnShape     = RoundedCornerShape(10.dp)
-val InputShape   = RoundedCornerShape(12.dp)
+val CardShape    = RoundedCornerShape(24.dp)
+val BtnShape     = RoundedCornerShape(16.dp)
+val InputShape   = RoundedCornerShape(16.dp)
 val ChipShape    = CircleShape
-val IconBtnShape = RoundedCornerShape(10.dp)
+val IconBtnShape = RoundedCornerShape(16.dp)
 
 object ControlSpacing {
     val Item = 8.dp
     val PageHorizontal = 20.dp
+    val PageTop = 20.dp
     val PageBottom = 120.dp
 }
 
@@ -359,7 +360,7 @@ fun ScreenHeader(
     trailing: @Composable (() -> Unit)? = null,
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         modifier = modifier
             .fillMaxWidth()
             .padding(bottom = 20.dp)
@@ -392,19 +393,19 @@ fun ScreenHeader(
                 }
             } else {
                 Column {
-                    if (eyebrow != null) Eyebrow(eyebrow, Modifier.padding(bottom = 3.dp))
                     if (title != null) {
                         Text(
                             title, color = TextHi, fontSize = 24.sp,
                             fontWeight = FontWeight.Medium, fontFamily = GeistFamily,
-                            letterSpacing = 0.sp,
+                            letterSpacing = 0.sp, lineHeight = 32.sp,
                         )
                     }
+                    if (eyebrow != null) Eyebrow(eyebrow, Modifier.padding(top = 4.dp))
                     // One-line "what this screen is for" guidance, shown right under the title.
                     if (hint != null) {
                         Text(
                             hint, color = TextLo, fontSize = 14.sp, fontFamily = GeistFamily,
-                            lineHeight = 20.sp, modifier = Modifier.padding(top = 3.dp, end = 8.dp),
+                            lineHeight = 20.sp, modifier = Modifier.padding(top = 4.dp, end = 8.dp),
                         )
                     }
                 }

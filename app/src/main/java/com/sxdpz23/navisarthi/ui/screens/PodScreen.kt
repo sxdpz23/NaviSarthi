@@ -30,9 +30,10 @@ fun PodScreen(vm: PodViewModel) {
     val connection by vm.ble.state.collectAsState()
     val ctx = LocalContext.current
     val miles = com.sxdpz23.navisarthi.navigation.ui.Units.imperial.value
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = com.sxdpz23.navisarthi.ui.components.ControlSpacing.PageBottom),
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        .padding(horizontal = ControlSpacing.PageHorizontal, vertical = ControlSpacing.PageTop).padding(bottom = ControlSpacing.PageBottom),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ScreenHeader(title = "Meteor 350 · Tripper Pod", hint = "Turn-by-turn guidance over Bluetooth")
+        ScreenHeader(title = "Pod", eyebrow = "Meteor 350 · Tripper Pod", hint = "Turn-by-turn guidance over Bluetooth")
         if (!nav.navProjection) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             PodPreview(nav.cue, nav.turnMeters?.let {
                 if (miles) "${(it * 3.28084).toInt()} ft" else "${it.toInt()} m"

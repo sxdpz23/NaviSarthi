@@ -16,7 +16,9 @@
     "skipped": 0
   },
   "lint": {
-    "status": "Running after APK delivery, as requested"
+    "status": "Complete after APK delivery",
+    "errors": 0,
+    "warnings": 2610
   },
   "signatureVerified": true,
   "sameSigningCertificateAs061": true,

@@ -12,6 +12,8 @@ Use this directory for finished APKs and their accompanying checksums and releas
 
 This is the standing project preference unless the user explicitly requests another destination.
 
+Prioritise APK delivery for future builds. Defer lint checks unless the user explicitly requests them; retain package/signature/checksum verification before delivery.
+
 ## Navigation ownership
 
 Nav is the sole route planner, navigation/guidance session and map-style owner. Dash/Pod display that session using the existing headless/power-saving connection; do not introduce a separate console route planner, router or voice owner. There is no separate Console route screen. Saved Destinations is the Nav list feature formerly titled Your lists; do not add a duplicate console saved-destination entry. Phone map viewing/editing during console navigation is temporary and explicit. Keep Dash zoom, TDV/POV shortcut, power controls and blue/vehicle-accent/golden-line route colors.

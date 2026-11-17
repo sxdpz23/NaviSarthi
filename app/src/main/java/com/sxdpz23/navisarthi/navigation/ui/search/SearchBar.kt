@@ -6,6 +6,7 @@ import com.sxdpz23.navisarthi.navigation.ui.icons.SymOutlined
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -106,7 +107,14 @@ fun SearchBar(
     }
     // Only the text region arms input in D-pad mode; saved places and voice remain separate targets.
     com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
-        modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+        modifier.fillMaxWidth().focusProperties { canFocus = false }.clickable {
+            // Cover the complete glass shell, including its padded edges and search icon.
+            // Child actions (voice, lists, clear and back) keep their own click handling.
+            if (!fieldArmed) fieldArmed = true else {
+                runCatching { fieldFocus.requestFocus() }
+                if (inputMode.inputMode == InputMode.Touch) keyboard?.show()
+            }
+        }, shape = RoundedCornerShape(28.dp),
     ) {
         Row(
             Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp),
@@ -136,6 +144,7 @@ fun SearchBar(
             Box(
                 Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .padding(horizontal = 4.dp)
                     .then(
                         if (dpadMode) {

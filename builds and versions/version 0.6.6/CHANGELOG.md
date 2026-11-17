@@ -10,4 +10,4 @@
 
 Includes all previously delivered 0.6.5 features. Source audits are in docs/unified-settings.md and docs/unslop-spacing-2026-11-18.md. Unslop by Damir Sokolovsky, CC BY 4.0; attribution remains in app notices.
 
-Verification results are in VERIFICATION.json. Full lint is deferred to prioritise APK delivery. Device visual, accessibility and physical Dash/Pod verification remain pending.
+Verification results are in VERIFICATION.json. Full release lint completed after APK delivery: 0 errors, 2610 warnings. Device visual, accessibility and physical Dash/Pod verification remain pending.

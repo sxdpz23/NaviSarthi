@@ -185,7 +185,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 20.dp)
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = ControlSpacing.PageTop)
             .padding(bottom = ControlSpacing.PageBottom),
         verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
     ) {

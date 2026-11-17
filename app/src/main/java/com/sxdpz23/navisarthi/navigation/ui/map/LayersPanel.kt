@@ -80,6 +80,7 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
     // The button takes the accent while something beyond the default map is on. 3D buildings are
     // on by default, so they do not count.
     val anyLayerOn = SatelliteLayer.on.value || Traffic.on.value || Topography.on.value
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Box(
         modifier = Modifier
             .align(Alignment.TopEnd)
@@ -91,8 +92,9 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
     ) {
         NavGlassSurface(
             modifier = Modifier.size(48.dp).dpadHighlight(CircleShape),
+            interactionSource = interaction,
         ) {
-            IconButton(onClick = { open = true }, modifier = Modifier.fillMaxSize()) {
+            IconButton(onClick = { open = true }, modifier = Modifier.fillMaxSize(), interactionSource = interaction) {
                 Icon(
                     SymOutlined.Layers,
                     contentDescription = stringResource(R.string.map_layers),

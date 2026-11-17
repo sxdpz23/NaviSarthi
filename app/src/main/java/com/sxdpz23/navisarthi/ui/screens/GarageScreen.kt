@@ -109,7 +109,7 @@ fun GarageScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = ControlSpacing.PageTop)
             .padding(bottom = ControlSpacing.PageBottom),
     ) {
         ScreenHeader(
