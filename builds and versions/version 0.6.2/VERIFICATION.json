@@ -1,0 +1,38 @@
+{
+  "versionName": "0.6.2",
+  "versionCode": 33,
+  "applicationId": "com.navisarthi.app",
+  "minSdk": 34,
+  "targetSdk": 36,
+  "apk": "NaviSarthi-0.6.2.apk",
+  "bytes": 165866890,
+  "sha256": "c55ceeee28c2a0f886c9848a1f1c22c5ae9bbd41809ee6fd2d57a8c79398ce45",
+  "releaseDebuggable": false,
+  "unitTests": {
+    "suites": 30,
+    "tests": 137,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 2576,
+    "missingTranslationWarnings": 1431,
+    "hints": 55,
+    "report": "lint-release.txt",
+    "translationPolicy": "Partial locales retain default English fallback; missing translations remain visible as warnings."
+  },
+  "signatureVerified": true,
+  "sameSigningCertificateAs061": true,
+  "signerSha256": "46271167e0a7da2e66ef669e6ff2025588b54dceea349a67c2bd36a03afc95b6",
+  "zipIntegrityVerified": true,
+  "zipAlignment16KiBVerified": true,
+  "abis": [
+    "arm64-v8a"
+  ],
+  "sourceResourceContractChecks": 59,
+  "validatedStringXmlFiles": 24,
+  "verifiedAt": "2026-11-17T07:54:07.559120+00:00",
+  "deviceVisualAndPhysicalConsoleValidation": "Pending; no device installation or bike ride performed"
+}

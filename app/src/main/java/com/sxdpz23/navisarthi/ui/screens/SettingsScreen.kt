@@ -59,12 +59,12 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 18.dp)
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 20.dp)
             .padding(bottom = ControlSpacing.PageBottom),
         verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
     ) {
         ScreenHeader(title = "Settings", onBack = onBack,
-            hint = "Connection, music, phone and calls, battery usage, and voice guidance.")
+            hint = "Connection, music, phone and calls, and background battery usage.")
 
         val vehicle = LocalVehicle.current
         var showVehiclePicker by remember { mutableStateOf(false) }
@@ -375,7 +375,7 @@ fun SettingsScreen(
         if (batteryRestricted) ControlHint("Set NaviSarthi to Unrestricted or No restrictions and allow background activity so navigation can continue with the screen off.")
         if (batterySettingsUnavailable) ControlHint("Open Android Settings → Apps → NaviSarthi → Battery to review background usage.")
 
-        SharedVoiceAndUnitsSettings()
+        SharedUnitsSettings()
 
         DriveBackupSettings()
 
@@ -384,7 +384,7 @@ fun SettingsScreen(
         val appVersion = remember { com.sxdpz23.navisarthi.data.UpdateChecker.currentVersionName(ctx) }
         Text(
             "NAVISARTHI v$appVersion",
-            color = TextDis, fontSize = 11.sp, fontFamily = GeistMonoFamily,
+            color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp),
         )
         Text(
@@ -392,7 +392,7 @@ fun SettingsScreen(
                 "Royal Enfield. \"Royal Enfield\", \"Himalayan\" and \"Tripper\" are trademarks of " +
                 "their respective owners, used here only to describe compatible hardware. The dash " +
                 "link is unofficial and exists solely for interoperability with hardware you own — use at your own risk.",
-            color = TextDis, fontSize = 10.sp, fontFamily = GeistFamily,
+            color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp, start = 8.dp, end = 8.dp),
         )
     }
@@ -457,9 +457,9 @@ internal fun TestBuildCard() {
                     color = TextMid, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp),
                 )
                 if (b.notes.isNotBlank())
-                    Text(b.notes, color = TextLo, fontSize = 11.5.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(b.notes, color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                 if (status.isNotBlank())
-                    Text(status, color = TextLo, fontSize = 11.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(top = 4.dp))
+                    Text(status, color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(top = 4.dp))
             }
             NaviSarthiBtn(
                 if (busy) "…" else "Install",
@@ -487,7 +487,7 @@ private fun SettingRow(
         modifier = Modifier
             .fillMaxWidth()
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 6.dp, vertical = 13.dp),
+            .padding(horizontal = 6.dp, vertical = 12.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -497,7 +497,7 @@ private fun SettingRow(
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
+            Text(title, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
             if (sub != null) Text(sub, color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         }
         control()

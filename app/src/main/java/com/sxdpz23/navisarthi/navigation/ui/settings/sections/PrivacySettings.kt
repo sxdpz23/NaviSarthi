@@ -27,6 +27,7 @@ import com.sxdpz23.navisarthi.navigation.ui.dpadHighlight // D-pad-only operatio
 @Composable
 internal fun PrivacySettingsScreen(vm: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     SettingsScaffold(stringResource(R.string.settings_privacy), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
         PageIntro(stringResource(R.string.settings_data_privacy_hint))
@@ -91,7 +92,7 @@ internal fun PrivacySettingsScreen(vm: com.sxdpz23.navisarthi.navigation.ui.map.
                         modifier = Modifier.dpadHighlight(androidx.compose.material3.ButtonDefaults.filledTonalShape),
                         onClick = {
                             rot.startNewNow(context)
-                            android.widget.Toast.makeText(context, context.getString(R.string.settings_google_session_done), android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, contextResources.getString(R.string.settings_google_session_done), android.widget.Toast.LENGTH_SHORT).show()
                         },
                     ) { Text(stringResource(R.string.settings_google_session_now)) }
                 }
@@ -152,7 +153,7 @@ internal fun PrivacySettingsScreen(vm: com.sxdpz23.navisarthi.navigation.ui.map.
                 onConfirm = {
                     vm.clearAllHistory()
                     confirmClear = false
-                    android.widget.Toast.makeText(context, context.getString(R.string.settings_clear_history_done), android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, contextResources.getString(R.string.settings_clear_history_done), android.widget.Toast.LENGTH_SHORT).show()
                 },
                 dismissText = stringResource(android.R.string.cancel),
                 onDismiss = { confirmClear = false },
@@ -221,6 +222,7 @@ private fun googleUsageLabel(kind: String): String = when {
 private fun MapsLinksGroup() {
     if (android.os.Build.VERSION.SDK_INT < 31) return
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     var state by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(mapsLinkState(context)) }
     val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(owner) {

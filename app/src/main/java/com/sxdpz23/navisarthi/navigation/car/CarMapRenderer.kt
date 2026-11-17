@@ -1,5 +1,6 @@
 package com.sxdpz23.navisarthi.navigation.car
 
+
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
@@ -38,6 +39,9 @@ import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.roundToInt
+
+private const val VERBOSE_LOG_TAG = "NavigationCar"
+
 
 /**
  * Renders the REAL styled Navigation map (OpenFreeMap Liberty vector — streets, labels, POIs) onto an
@@ -791,9 +795,9 @@ class CarMapRenderer(
                 rendering = false
                 // Frame cost per snapshot, for a tile or raster that slows the map: `setprop
                 // log.tag.NavigationCar DEBUG` on the phone turns it on.
-                if (android.util.Log.isLoggable("NavigationCar", android.util.Log.DEBUG)) {
+                if (android.util.Log.isLoggable(VERBOSE_LOG_TAG, android.util.Log.DEBUG)) {
                     android.util.Log.d(
-                        "NavigationCar",
+                        VERBOSE_LOG_TAG,
                         "snapshot ${android.os.SystemClock.elapsedRealtime() - startedMs} ms zoom=${"%.1f".format(java.util.Locale.US, zoom)} tilt=${tilt.toInt()} yaw=${turnYaw.toInt()} traffic=${trafficShown == true} speed=${(speedMps * 3.6).toInt()}",
                     )
                 }

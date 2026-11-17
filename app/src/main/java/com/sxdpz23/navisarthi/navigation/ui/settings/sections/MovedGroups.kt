@@ -115,7 +115,7 @@ internal fun CameraSettingsGroup() {
 @Composable
 internal fun PlacesOnMapGroup() {
     val context = LocalContext.current
-        SettingsGroup(title = stringResource(R.string.settings_map_places)) {
+    SettingsGroup(title = stringResource(R.string.settings_map_places)) {
         ToggleRow(
             label = stringResource(R.string.settings_show_pois),
             checked = com.sxdpz23.navisarthi.navigation.ui.MapPoiPrefs.showPois.value,
@@ -195,7 +195,7 @@ internal fun PlacesOnMapGroup() {
 @Composable
 internal fun PlacesSourceGroup(topRow: Modifier = Modifier, compact: Boolean = false) {
     val context = LocalContext.current
-        SettingsGroup {
+    SettingsGroup {
             // Where the map's businesses come from (Map, then Privacy on 2026-09-16, then Places on
             // 2026-09-17 so everything about places sits together; the hints still spell out what
             // leaves the phone as you pan). Each option states its own cost so the choice
@@ -341,7 +341,7 @@ internal fun ParkingHistoryGroup(vm: com.sxdpz23.navisarthi.navigation.ui.map.Ma
                     Text(
                         com.sxdpz23.navisarthi.navigation.ui.formatDateTime(androidx.compose.ui.platform.LocalContext.current, entry.savedAtMillis),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isCurrent) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+                        fontWeight = if (isCurrent) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
                         modifier = Modifier.weight(1f),
                     )
                     if (isCurrent) {

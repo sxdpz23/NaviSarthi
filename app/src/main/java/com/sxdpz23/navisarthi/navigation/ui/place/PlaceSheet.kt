@@ -320,7 +320,8 @@ fun PlaceSheet(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val dark = isAppInDarkTheme()
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
+    val dark = true // The place card is the dark-tinted glass extension of the Nav tab.
     val ink = if (dark) InkDark else InkLight
     val dim = if (dark) DimDark else DimLight
     // The saved parking spot's own sheet: car glyph beside the name, a Clear action pill.
@@ -642,7 +643,7 @@ fun PlaceSheet(
             bodyScroll.animateScrollTo(bodyScroll.maxValue)
         }
     }
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
         modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
@@ -663,12 +664,11 @@ fun PlaceSheet(
                 val p = measurable.measure(constraints.copy(minHeight = floorPx, maxHeight = cap))
                 layout(p.width, p.height) { p.place(0, 0) }
             },
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = if (dark) SheetDark else SheetLight),
+        shape = RoundedCornerShape(28.dp),
+        darkTint = true,
     ) {
         // Card background fills to the screen bottom; pad the content up off the nav bar.
-        Column(Modifier.navigationBarsPadding()) {
+        Column(Modifier.padding(bottom = 96.dp)) {
             // D-pad-first (docs/dpad.md): when the sheet opens, land focus ON the handle so the
             // sheet is the active surface — otherwise Compose leaves focus on the search bar
             // behind the sheet (measured: sometimes the search field, sometimes a photo — the
@@ -699,7 +699,7 @@ fun PlaceSheet(
                         sheetDragGestures(dragBy = { dragSheetBy(it) }, settle = { settleFromVelocity(it) })
                     }
                     .heightIn(min = 36.dp)
-                    .padding(vertical = 14.dp),
+                    .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -836,7 +836,7 @@ fun PlaceSheet(
                     runCatching {
                         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, place.name))
-                        Toast.makeText(context, context.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, contextResources.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
                     }
                 }
                 Text(
@@ -913,7 +913,7 @@ fun PlaceSheet(
                     Text(
                         String.format(Locale.US, "%.1f", place.rating),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = ink,
                     )
                     RatingStars(place.rating!!, modifier = Modifier.padding(horizontal = 5.dp))
@@ -971,7 +971,7 @@ fun PlaceSheet(
                     IconButton(onClick = {
                         val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cb.setPrimaryClip(ClipData.newPlainText("coordinates", coords))
-                        Toast.makeText(context, context.getString(R.string.place_coordinates_copied), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, contextResources.getString(R.string.place_coordinates_copied), Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(Sym.ContentCopy, contentDescription = stringResource(R.string.place_copy_coordinates), tint = dim, modifier = Modifier.size(18.dp))
                     }
@@ -984,7 +984,7 @@ fun PlaceSheet(
                 Text(
                     stringResource(R.string.place_permanently_closed),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color(0xFFD93838),
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -996,7 +996,7 @@ fun PlaceSheet(
                 Text(
                     stringResource(R.string.place_temporarily_closed),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color(0xFFD93838),
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -1026,7 +1026,7 @@ fun PlaceSheet(
                 val parts = status.split(Regex("\\s*[·⋅]\\s*"), limit = 2)
                 val statusInk = com.sxdpz23.navisarthi.navigation.ui.themedStatusColor(status, demoStatus?.second ?: place.openNow)
                 val annotated = buildAnnotatedString {
-                    withStyle(SpanStyle(color = statusInk, fontWeight = FontWeight.Bold)) {
+                    withStyle(SpanStyle(color = statusInk, fontWeight = FontWeight.SemiBold)) {
                         append(parts[0])
                     }
                     if (parts.size > 1) {
@@ -1060,7 +1060,7 @@ fun PlaceSheet(
             // (Google's order). The actual phone number / website domain are tappable detail rows
             // lower down (below the hours), out of the way of the primary action.
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp),
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1156,7 +1156,7 @@ fun PlaceSheet(
             // this location". Tap to open one.
             if (placesHere.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.place_also_at_location), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink)
+                Text(stringResource(R.string.place_also_at_location), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
                 placesHere.forEach { other ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onOpenPlace(other) }.padding(vertical = 10.dp),
@@ -1179,7 +1179,7 @@ fun PlaceSheet(
             // detail re-fetch (root [2][11][0]); a horizontal row of tappable cards.
             if (place.similarPlaces.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.place_people_also_search), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink)
+                Text(stringResource(R.string.place_people_also_search), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1217,12 +1217,12 @@ fun PlaceSheet(
                         else -> pluralStringResource(R.plurals.place_fuel_updated_days, days, days)
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Sym.LocalGasStation, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = ink)) { append(fp) }
+                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = ink)) { append(fp) }
                             if (age != null) withStyle(SpanStyle(color = dim)) { append("  ·  $age") }
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -1232,7 +1232,7 @@ fun PlaceSheet(
             }
             place.fullAddress()?.let { addr ->
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 14.dp),
+                    Modifier.fillMaxWidth().padding(top = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Sym.Place, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
@@ -1241,7 +1241,7 @@ fun PlaceSheet(
                     IconButton(onClick = {
                         val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cb.setPrimaryClip(ClipData.newPlainText("address", addr))
-                        Toast.makeText(context, context.getString(R.string.place_address_copied), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, contextResources.getString(R.string.place_address_copied), Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(Sym.ContentCopy, contentDescription = stringResource(R.string.place_copy_address), tint = dim, modifier = Modifier.size(18.dp))
                     }
@@ -1399,7 +1399,7 @@ fun PlaceSheet(
                         val delta = tabRowY - bodyY
                         tabScope.launch { bodyScroll.scrollBy(delta) }
                     },
-                    modifier = Modifier.background(if (dark) SheetDark else SheetLight).padding(horizontal = 20.dp),
+                    modifier = Modifier.background(Color(0xCC17191C)).padding(horizontal = 20.dp),
                 )
             }
             }
@@ -1407,7 +1407,7 @@ fun PlaceSheet(
     }
 
     galleryStart?.let { start ->
-        PhotoGallery(place.photoUrls, place.photoDates.map { d -> d?.let { context.getString(R.string.place_photo_caption, it) } }, start) { galleryStart = null }
+        PhotoGallery(place.photoUrls, place.photoDates.map { d -> d?.let { contextResources.getString(R.string.place_photo_caption, it) } }, start) { galleryStart = null }
     }
 
     if (showListChooser) {
@@ -1506,7 +1506,7 @@ internal fun SaveToListSheet(
                 Text(
                     stringResource(R.string.place_save_to_list),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 )
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
@@ -1566,7 +1566,7 @@ private fun NoteEditorDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.padding(20.dp).widthIn(max = 420.dp)) {
-                Text(stringResource(R.string.place_edit_note), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.place_edit_note), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
@@ -1635,7 +1635,7 @@ fun DirectionsPanel(
     onShare: () -> Unit = {},
     onClose: () -> Unit = {},
 ) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = if (dark) InkDark else InkLight
     val dim = if (dark) DimDark else DimLight
     // Keyed to the destination so opening directions for a different place starts
@@ -1726,11 +1726,10 @@ fun DirectionsPanel(
         if (dirH.value > 0.5f) dirH.animateTo(0f, glideSpec)
         collapsed.value = true
     }
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = if (dark) SheetDark else SheetLight),
+        shape = RoundedCornerShape(28.dp),
+        docked = true,
     ) {
         Column(
             Modifier
@@ -1821,9 +1820,7 @@ fun DirectionsPanel(
             ) {
                 listOf(
                     Triple(TravelMode.DRIVE, stringResource(R.string.place_mode_drive), Sym.DirectionsCar),
-                    Triple(TravelMode.TRANSIT, stringResource(R.string.place_mode_transit), Sym.DirectionsBus),
-                    Triple(TravelMode.WALK, stringResource(R.string.place_mode_walk), Sym.DirectionsWalk),
-                    Triple(TravelMode.BICYCLE, stringResource(R.string.place_mode_bike), Sym.DirectionsBike),
+                    Triple(TravelMode.MOTORBIKE, stringResource(R.string.place_mode_motorbike), com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Motor),
                 ).forEach { (mode, label, icon) ->
                     // Google-style mode pills: stadium shape + a mode glyph, not bare squarish chips.
                     // Once a mode's time is known the chip shows THAT ("25 min") and the glyph says
@@ -2117,6 +2114,7 @@ internal fun DepartTimeChooser(
     onTimeSelected: (Int, Long?) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val ink = if (isAppInDarkTheme()) InkDark else InkLight
     // Keyed to the destination so switching places resets the picked time. mode: 0 now, 1 depart at,
     // 2 arrive by, 3 last available (transit only). date + time compose the chosen wall-clock.
@@ -2153,7 +2151,7 @@ internal fun DepartTimeChooser(
                 time = n.plusMinutes(((5 - n.minute % 5) % 5).toLong())
                 // Say so: the pill now shows a different time than the one just picked, and an
                 // unexplained rewrite of explicit input reads as a bug (user 2026-07-11).
-                Toast.makeText(context, context.getString(R.string.place_time_past_toast), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, contextResources.getString(R.string.place_time_past_toast), Toast.LENGTH_SHORT).show()
             }
         }
         DepartPick.keep(pickKey, mode, date, time)
@@ -2252,7 +2250,7 @@ internal fun DepartTimeChooser(
  *  (filled confirm pill that auto-focuses, plain dismiss). */
 @Composable
 private fun PickerDialog(onConfirm: () -> Unit, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     // Own the width (issue #432): the platform dialog keeps side margins that on a 360 dp phone
     // leave less than the Material date picker's fixed 360 dp, and the last weekday column was
     // clipped off, so Sundays could not be picked. Edge to edge on narrow phones, capped wider.
@@ -2322,7 +2320,7 @@ private fun RouteOption(r: Route, selected: Boolean, fastestEtaSeconds: Double, 
     ) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(eta, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = etaColor)
+                Text(eta, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = etaColor)
                 Spacer(Modifier.width(8.dp))
                 if (isFastest) {
                     Text(
@@ -2446,7 +2444,7 @@ fun TransitNavSheet(
     onWalkDirections: suspend (LatLng, LatLng) -> List<String>,
     modifier: Modifier = Modifier,
 ) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = if (dark) InkDark else InkLight
     val dim = if (dark) DimDark else DimLight
     val itin = nav.itinerary
@@ -2458,7 +2456,7 @@ fun TransitNavSheet(
     // instructions"). Same top-aligned-pane grammar as Street View's half-screen viewer.
     Surface(
         modifier.fillMaxWidth().fillMaxHeight(0.48f),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shape = RoundedCornerShape(28.dp),
         shadowElevation = 4.dp,
         color = if (dark) SheetDark else SheetLight,
     ) {
@@ -2475,7 +2473,7 @@ fun TransitNavSheet(
             // Current leg, large.
             if (step != null && !nav.arrived) {
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SheetPalette.row(dark)).padding(14.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SheetPalette.row(dark)).padding(16.dp),
                 ) { TransitStepRow(step, ink, dim, onWalkDirections) }
             } else {
                 Text(itin.arrivalText?.let { stringResource(R.string.place_arrive_approx, it) } ?: "", style = MaterialTheme.typography.bodyLarge, color = ink)
@@ -2656,6 +2654,7 @@ private fun TransitRow(t: TransitItinerary, nowSec: Long, ink: Color, dim: Color
             // (Google's "Tickets and information" footer).
             if (t.fare != null || t.agencyPhone != null) {
                 val context = LocalContext.current
+                val contextResources = androidx.compose.ui.platform.LocalResources.current
                 HorizontalDivider(color = dim.copy(alpha = 0.25f))
                 Text(stringResource(R.string.place_transit_tickets), style = MaterialTheme.typography.labelMedium, color = ink)
                 t.fare?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = ink) }
@@ -2988,7 +2987,7 @@ fun RouteDetailSheet(
     // D-pad: place focus on the back arrow when the sheet opens (same convention as the reviews page),
     // so a D-pad-only user can immediately scroll the timeline / step onto a stop with no wake-up press.
     val backFocus = rememberDpadAutoFocus()
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = if (dark) InkDark else InkLight
     val dim = if (dark) DimDark else DimLight
     val lineColor = parseHexColor(step?.line?.colorHex) ?: MaterialTheme.colorScheme.primary
@@ -3080,7 +3079,7 @@ private fun RouteStopRow(
             .clickable(onClick = onClick),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 6.dp, end = 14.dp),
+            Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 6.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Vertical rail + node, drawn so the line is continuous between rows. Board/alight get a
@@ -3104,7 +3103,7 @@ private fun RouteStopRow(
                 fontWeight = if (isFirst || isLast) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (past) dim else ink,
                 maxLines = 2,
-                modifier = Modifier.weight(1f).padding(vertical = 14.dp),
+                modifier = Modifier.weight(1f).padding(vertical = 16.dp),
             )
             stop.timeText?.let { time ->
                 // Realtime = the feed gave this stop an adjusted time distinct from the timetable.
@@ -3315,7 +3314,7 @@ object FullReviewsOverlay {
 @Composable
 fun PlaceOverlays() {
     FullReviewsOverlay.req?.let { r ->
-        val dark = isAppInDarkTheme()
+        val dark = true
         FullScreenReviewsContent(r.featureId, r.place, if (dark) InkDark else InkLight, if (dark) DimDark else DimLight) { FullReviewsOverlay.dismiss() }
     }
     GalleryOverlay.req?.let { r ->
@@ -3496,7 +3495,7 @@ private fun PhotoGalleryContent(urls: List<String>, dates: List<String?>, start:
                             .navigationBarsPadding()
                             .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
                             .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
             }
@@ -3559,7 +3558,7 @@ private fun MenuTab(place: Place, menuIndices: List<Int>, dim: Color, onOpen: (I
                                     .padding(6.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color.Black.copy(alpha = 0.55f))
-                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
                             )
                         }
                     }
@@ -3811,7 +3810,7 @@ private fun PlaceTabs(
                     if (hasAbout) {
                         Text(
                             stringResource(R.string.place_tab_about),
-                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink,
+                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink,
                             modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
                         )
                         AboutTab(place.about, place.editorialSummary, place.ownerDescription, ink, dim)
@@ -3903,7 +3902,7 @@ private fun FullScreenReviews(featureId: String, place: Place, ink: Color, dim: 
 
 @Composable
 private fun FullScreenReviewsContent(featureId: String, place: Place, ink: Color, dim: Color, onClose: () -> Unit) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     var reviewPhotos by remember(featureId) { mutableStateOf<Triple<List<String>, List<String?>, Int>?>(null) }
     BackHandler(onBack = { if (reviewPhotos != null) reviewPhotos = null else onClose() })
     val reviewsBackFocus = rememberDpadAutoFocus()
@@ -3927,7 +3926,7 @@ private fun FullScreenReviewsContent(featureId: String, place: Place, ink: Color
                         Icon(Sym.Close, contentDescription = stringResource(R.string.place_close), tint = ink)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(place.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
+                        Text(place.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = ink, maxLines = 1)
                         Text(stringResource(R.string.place_reviews_title), style = MaterialTheme.typography.bodySmall, color = dim)
                     }
                 }
@@ -3942,6 +3941,7 @@ private fun FullScreenReviewsContent(featureId: String, place: Place, ink: Color
                     )
                 }
                 val ctxForToast = androidx.compose.ui.platform.LocalContext.current
+                val ctxForToastResources = androidx.compose.ui.platform.LocalResources.current
                 com.sxdpz23.navisarthi.navigation.web.GoogleReviewsPanel(
                     featureId = featureId,
                     dark = dark,
@@ -3951,7 +3951,7 @@ private fun FullScreenReviewsContent(featureId: String, place: Place, ink: Color
                     // so the page never left the Overview: bounce back AND say why, or the close
                     // reads as a crash (issue #359). The inline native list is still there.
                     onFailed = {
-                        android.widget.Toast.makeText(ctxForToast, ctxForToast.getString(R.string.place_reviews_throttled), android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(ctxForToast, ctxForToastResources.getString(R.string.place_reviews_throttled), android.widget.Toast.LENGTH_LONG).show()
                         onClose()
                     },
                     // Tapping a review photo opens Navigation's own gallery (Google's photo viewer is a
@@ -4013,7 +4013,7 @@ private fun ReviewsTab(
                 Text(
                     String.format(Locale.US, "%.1f", r),
                     style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = ink,
                 )
                 Spacer(Modifier.width(14.dp))
@@ -4217,7 +4217,7 @@ private fun emphasize(text: String, query: String): androidx.compose.ui.text.Ann
         val idx = lc.indexOf(q, i)
         if (idx < 0) { append(text.substring(i)); break }
         append(text.substring(i, idx))
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(idx, idx + query.length)) }
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(text.substring(idx, idx + query.length)) }
         i = idx + query.length
     }
 }
@@ -4370,7 +4370,7 @@ private fun ActionPill(icon: ImageVector, label: String, emphasized: Boolean = f
             .background(bg)
             .dpadHighlight(androidx.compose.foundation.shape.CircleShape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
@@ -4384,6 +4384,7 @@ private fun ActionPill(icon: ImageVector, label: String, emphasized: Boolean = f
 @Composable
 private fun SharePill(place: Place) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     var open by remember { mutableStateOf(false) }
     val lat = place.location.lat
     val lng = place.location.lng
@@ -4396,7 +4397,7 @@ private fun SharePill(place: Place) {
                         type = "text/plain"
                         putExtra(Intent.EXTRA_TEXT, text)
                     },
-                    context.getString(R.string.place_share_place),
+                    contextResources.getString(R.string.place_share_place),
                 ),
             )
         }
@@ -4427,7 +4428,7 @@ private fun SharePill(place: Place) {
         runCatching {
             val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, url))
-            Toast.makeText(context, context.getString(R.string.place_link_copied), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, contextResources.getString(R.string.place_link_copied), Toast.LENGTH_SHORT).show()
         }
         open = false
     }
@@ -4437,7 +4438,7 @@ private fun SharePill(place: Place) {
         runCatching {
             val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, place.name))
-            Toast.makeText(context, context.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, contextResources.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
         }
         open = false
     }
@@ -4450,7 +4451,7 @@ private fun SharePill(place: Place) {
     fun openInOtherApp() {
         runCatching {
             val view = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(place.name)})"))
-            val chooser = Intent.createChooser(view, context.getString(R.string.place_open_other_app)).apply {
+            val chooser = Intent.createChooser(view, contextResources.getString(R.string.place_open_other_app)).apply {
                 putExtra(
                     Intent.EXTRA_EXCLUDE_COMPONENTS,
                     arrayOf(android.content.ComponentName(context, com.sxdpz23.navisarthi.MainActivity::class.java)),
@@ -4512,7 +4513,7 @@ private fun PopularTimesSection(pt: com.sxdpz23.navisarthi.navigation.core.model
                         .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (sel) accent else dim,
-                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.clip(CircleShape).dpadHighlight(CircleShape).clickable { selectedDow = d.dayOfWeek }
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
@@ -4628,7 +4629,7 @@ private fun DepartmentsSection(departments: List<com.sxdpz23.navisarthi.navigati
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
             color = dim,
-            modifier = Modifier.padding(start = 26.dp, top = 4.dp),
+            modifier = Modifier.padding(start = 24.dp, top = 4.dp),
         )
         departments.forEach { dep ->
             var expanded by remember(dep.name) { mutableStateOf(false) }
@@ -4701,13 +4702,13 @@ private fun DepartmentsSection(departments: List<com.sxdpz23.navisarthi.navigati
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (i == 0) ink else dim,
-                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
                             )
                             Text(
                                 dt[1],
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (i == 0) ink else dim,
-                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         }
                     }
@@ -4779,7 +4780,7 @@ private fun HoursSection(
         }
         AnimatedVisibility(expanded) {
             Column {
-                Column(Modifier.padding(start = 26.dp, top = 2.dp, bottom = 2.dp)) {
+                Column(Modifier.padding(start = 24.dp, top = 2.dp, bottom = 2.dp)) {
                     days.forEachIndexed { i, dt ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                             Text(
@@ -4787,13 +4788,13 @@ private fun HoursSection(
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (i == 0) ink else dim,
-                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
                             )
                             Text(
                                 dt[1],
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (i == 0) ink else dim,
-                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         }
                     }
@@ -4860,8 +4861,8 @@ private fun PlaceTabRow(
 @Composable
 private fun ReviewSummaryCard(place: Place, ink: Color, dim: Color, onOpen: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(12.dp))
-            .background(dim.copy(alpha = 0.08f)).padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+        Modifier.fillMaxWidth().padding(top = 20.dp).clip(RoundedCornerShape(12.dp))
+            .background(dim.copy(alpha = 0.08f)).padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
     ) {
         // A flow, not a row with a weighted middle: in German the button reads "Bewertungen
         // anzeigen", and on a large font it took the row and squeezed the stars and the count
@@ -4902,7 +4903,7 @@ private fun ReviewSummaryCard(place: Place, ink: Color, dim: Color, onOpen: () -
 /** Hairline between the place's info rows, inset past the row icons. */
 @Composable
 private fun InfoDivider(dim: Color) {
-    HorizontalDivider(Modifier.padding(start = 26.dp, top = 4.dp, bottom = 4.dp), thickness = 0.5.dp, color = dim.copy(alpha = 0.25f))
+    HorizontalDivider(Modifier.padding(start = 24.dp, top = 4.dp, bottom = 4.dp), thickness = 0.5.dp, color = dim.copy(alpha = 0.25f))
 }
 
 /** The gallery as a grid, filtered by Google's photo categories. With no categories yet, a food
@@ -4974,10 +4975,11 @@ private fun PhotosTab(
 @Composable
 private fun UpdatesSection(updates: List<com.sxdpz23.navisarthi.navigation.core.model.PlaceUpdate>, ink: Color, dim: Color, title: Boolean) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     if (title) {
         Text(
             stringResource(R.string.place_updates),
-            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink,
+            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink,
             modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
         )
     }

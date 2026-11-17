@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +32,7 @@ import com.sxdpz23.navisarthi.ui.NaviSarthiIcons
 import com.sxdpz23.navisarthi.ui.components.*
 import com.sxdpz23.navisarthi.ui.components.SpacedControlHint as ControlHint
 import com.sxdpz23.navisarthi.ui.theme.*
+import com.sxdpz23.navisarthi.dash.nav.DashRouteColor
 import com.sxdpz23.navisarthi.dash.protocol.EtaDisplayMode
 import com.sxdpz23.navisarthi.viewmodel.ConnStage
 import com.sxdpz23.navisarthi.viewmodel.DashViewModel
@@ -41,7 +41,11 @@ import kotlinx.coroutines.delay
 @Composable
 fun DashScreen(vm: DashViewModel = viewModel()) {
     val ui by vm.ui.collectAsState()
-    val previewFrame by vm.previewFrame.collectAsState()
+    // Projection keeps the handset map/bitmap consumer stopped until Nav is opened temporarily.
+    val previewFrame = if (!ui.navProjection) {
+        val frame by vm.previewFrame.collectAsState()
+        frame
+    } else null
     val context = LocalContext.current
 
     // WiFi network request (13+: NEARBY_WIFI_DEVICES) + GPS for the map
@@ -132,12 +136,6 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
     }
 
     val streaming = ui.stage == ConnStage.STREAMING
-    // Tear the MapLibre map down the INSTANT a connection starts (Wi-Fi/auth), not at the streaming
-    // transition. Disposing MapLibre's native MapView (TextureView GL surface) at the same moment the
-    // MediaCodec encoder input Surface is created races the GL renderer thread's eglSwap on some OEMs
-    // (MIUI especially) → SIGABRT in libgui/libhwui (mbgl AndroidGLRenderableResource::swap). Disposing
-    // it seconds earlier, while connecting, lets the GL thread fully tear down before the encoder spins up.
-    val connectingOrLive = ui.stage == ConnStage.WIFI || ui.stage == ConnStage.AUTH || streaming
 
     // Auto-connect on opening the Dash screen, so the rider doesn't tap "Connect" every
     // ride — just open the app. Fires once; if the dash is off it errors out quietly and
@@ -156,10 +154,10 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
     // (e.g. from the Wi‑Fi panel), retry the connection automatically — no second tap needed.
     val uiState = rememberUpdatedState(ui)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        vm.setPreviewVisible(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+    DisposableEffect(lifecycleOwner, ui.navProjection) {
+        vm.setPreviewVisible(!ui.navProjection && lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
         val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) vm.setPreviewVisible(true)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) vm.setPreviewVisible(!uiState.value.navProjection)
             if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) vm.setPreviewVisible(false)
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 batteryOk = com.sxdpz23.navisarthi.util.DeviceReadiness.isIgnoringBatteryOptimizations(context)
@@ -187,14 +185,13 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 18.dp)
+            .padding(horizontal = ControlSpacing.PageHorizontal, vertical = 20.dp)
             .padding(bottom = ControlSpacing.PageBottom),
         verticalArrangement = Arrangement.spacedBy(ControlSpacing.Item),
     ) {
         ScreenHeader(
-            eyebrow = "What the rider sees",
-            title = "Dash view",
-            hint = "A live preview of the map sent to the dash. Tap Connect to join the bike's WiFi and stream — your phone screen can stay off.",
+            title = "Dash",
+            hint = "Nav owns your route, voice guidance and map. Dash keeps the connection and power-saving display controls.",
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (streaming && ui.gpsStatus != com.sxdpz23.navisarthi.viewmodel.GpsStatus.GOOD) {
@@ -222,7 +219,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
         // Single connection card (hidden once streaming)
         if (!streaming) {
-            NaviSarthiCard(modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+            NaviSarthiCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -302,13 +299,13 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Frames encoded: ${ui.frameCount}",
-                        color = TextLo, fontSize = 11.sp, fontFamily = GeistMonoFamily,
+                        color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,
                     )
                 }
                 ui.lastButton?.let { btn ->
                     Text(
                         "Joystick: $btn",
-                        color = Gold, fontSize = 11.sp, fontFamily = GeistMonoFamily,
+                        color = Gold, fontSize = 12.sp, fontFamily = GeistMonoFamily,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
@@ -316,118 +313,88 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
         }
 
 
-        // Circular viewport with streaming aura
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        ) {
-            if (streaming) {
-                Box(
-                    Modifier
-                        .size(300.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(Brush.radialGradient(listOf(GoldGlow, Color.Transparent), radius = 200f))
-                )
+        if (ui.navProjection) {
+            NaviSarthiCard(modifier = Modifier.fillMaxWidth()) {
+                Text("Navigation is on Dash", color = TextHi, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                ControlHint("The phone map is hidden to save power. Open Nav to temporarily view progress or change the route, then return it to Dash.")
             }
-            // Round Tripper viewport. While streaming we show the EXACT frame being encoded to
-            // the dash (same renderer → pixel-identical to the bike). Before connecting there's no
-            // dash frame yet, so we fall back to the live MapLibre map for route preview.
-            Box(
-                modifier = Modifier
-                    .size(272.dp)
-                    .clip(CircleShape)
+        } else {
+            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(272.dp).clip(CircleShape)
                     .border(6.dp, Color(0xFF0D0F10), CircleShape)
-                    .border(2.dp, Line2, CircleShape),
-            ) {
-                val dashFrame = previewFrame
-                when {
-                    streaming && dashFrame != null -> androidx.compose.foundation.Image(
-                        bitmap = dashFrame.asImageBitmap(),
-                        contentDescription = "Live dash frame",
-                        // The dash is round and shows the centred circle of the 526×300 frame;
-                        // Crop into the circular viewport reproduces exactly that.
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    // Connecting OR streaming-before-first-frame: show a lightweight placeholder, NOT the
-                    // MapLibre map. MapLibre's native MapView is disposed as soon as connecting starts
-                    // (see [connectingOrLive]) so its GL/TextureView teardown finishes well before the
-                    // encoder's MediaCodec Surface is created — disposing it concurrently raced the GL
-                    // renderer thread and crashed the process (SIGSEGV/SIGABRT in libmaplibre/libgui).
-                    connectingOrLive -> Box(
-                        Modifier.fillMaxSize().background(Color(0xFF0B0D0E)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "Preparing dash view…",
-                            color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,
+                    .border(2.dp, Line2, CircleShape).background(Bg0), contentAlignment = Alignment.Center) {
+                    val frame = previewFrame
+                    if (streaming && frame != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = frame.asImageBitmap(), contentDescription = "Dash display preview",
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
                         )
+                    } else {
+                        Text(if (streaming) "Preparing Dash…" else "Choose a route in Nav",
+                            color = TextMid, modifier = Modifier.padding(24.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
-                    else -> NaviSarthiMap(
-                        riderLat = ui.riderLat,
-                        riderLng = ui.riderLng,
-                        dest = ui.destLatLng,
-                        routePoints = ui.routePoints,
-                        hasLocationPermission = hasEssentialPermissions(),
-                        modifier = Modifier.fillMaxSize(),
+                }
+            }
+        }
+
+        if (!ui.navProjection) {
+            // Next-turn banner (real turn-by-turn from the routing engine)
+            ui.maneuver?.let { mv ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(if (ui.offRoute) Color(0x33D8853E) else GoldTint)
+                        .border(1.dp, if (ui.offRoute) Warn else GoldTint2, RoundedCornerShape(13.dp))
+                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                ) {
+                    Icon(NaviSarthiIcons.Navi, null, tint = if (ui.offRoute) Warn else Gold, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(11.dp))
+                    Text(
+                        if (ui.offRoute) "Off route — rerouting…" else mv,
+                        color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                     )
                 }
+                Spacer(Modifier.height(10.dp))
             }
-        }
 
-        Spacer(Modifier.height(14.dp))
-
-        // Next-turn banner (real turn-by-turn from the routing engine)
-        ui.maneuver?.let { mv ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(if (ui.offRoute) Color(0x33D8853E) else GoldTint)
-                    .border(1.dp, if (ui.offRoute) Warn else GoldTint2, RoundedCornerShape(13.dp))
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
-            ) {
-                Icon(NaviSarthiIcons.Navi, null, tint = if (ui.offRoute) Warn else Gold, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(11.dp))
-                Text(
-                    if (ui.offRoute) "Off route — rerouting…" else mv,
-                    color = TextHi, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        // Live info strip — real remaining distance, ETA, zoom
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf(
-                Triple(
-                    ui.remainingKm?.let { if (it >= 10) "%.0f".format(it) else "%.1f".format(it) } ?: "—",
-                    if (ui.remainingKm != null) "km" else "", "Remaining",
-                ),
-                Triple(ui.etaMinutes?.toString() ?: "—", if (ui.etaMinutes != null) "min" else "", "ETA"),
-                Triple("z${ui.mapZoom}", "", "Zoom"),
-            ).forEach { (v, u, k) ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(Surf1)
-                        .border(1.dp, Line, RoundedCornerShape(13.dp))
-                        .padding(11.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
-                        Text(v, color = TextHi, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
-                        if (u.isNotEmpty()) {
-                            Spacer(Modifier.width(3.dp))
-                            Text(u, color = TextLo, fontSize = 10.5.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(bottom = 2.dp))
+            // Live info strip — real remaining distance, ETA, zoom
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(
+                    Triple(
+                        ui.remainingKm?.let { if (it >= 10) "%.0f".format(it) else "%.1f".format(it) } ?: "—",
+                        if (ui.remainingKm != null) "km" else "", "Remaining",
+                    ),
+                    Triple(ui.etaMinutes?.toString() ?: "—", if (ui.etaMinutes != null) "min" else "", "ETA"),
+                    Triple("z${ui.mapZoom}", "", "Zoom"),
+                ).forEach { (v, u, k) ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(Surf1)
+                            .border(1.dp, Line, RoundedCornerShape(13.dp))
+                            .padding(11.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
+                            Text(v, color = TextHi, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
+                            if (u.isNotEmpty()) {
+                                Spacer(Modifier.width(3.dp))
+                                Text(u, color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(bottom = 2.dp))
+                            }
                         }
+                        Eyebrow(k, Modifier.padding(top = 3.dp))
                     }
-                    Eyebrow(k, Modifier.padding(top = 3.dp))
                 }
             }
+
         }
+
 
         if (streaming) ControlHint("Automatic power profile: ${ui.powerProfile}. Precision and console connection remain active.")
         ControlSection("ETA display")
@@ -455,7 +422,7 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
                 Spacer(Modifier.width(11.dp))
                 Column {
                     Text("Map adjust mode", color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-                    Text("Mirrors the bike joystick", color = TextLo, fontSize = 11.5.sp, modifier = Modifier.padding(top = 1.dp))
+                    Text("Mirrors the bike joystick", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 1.dp))
                 }
             }
             NaviSarthiToggle(on = adjustMode, onChange = { adjustMode = it })
@@ -463,28 +430,6 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
 
         Spacer(Modifier.height(10.dp))
 
-        // Heading-up toggle (rotate map to travel direction)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Surf1)
-                .border(1.dp, Line, RoundedCornerShape(14.dp))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(NaviSarthiIcons.Navi, null, tint = if (ui.headingUp) Gold else TextMid, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(11.dp))
-                Column {
-                    Text("Heading-up map", color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-                    Text(if (ui.headingUp) "Rotates to travel direction" else "North-up", color = TextLo, fontSize = 11.5.sp, modifier = Modifier.padding(top = 1.dp))
-                }
-            }
-            NaviSarthiToggle(on = ui.headingUp, onChange = { vm.toggleHeadingUp() })
-        }
-        ControlHint("Heading-up follows your direction of travel. Switch it off for north-up in TDV.")
         if (ui.stopCount > 1) {
             Text("Stop ${ui.stopNumber} of ${ui.stopCount}: ${ui.destinationName.orEmpty()}",
                 color = TextHi, modifier = Modifier.padding(top = 10.dp))
@@ -494,102 +439,27 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
                 ControlHint("Continue to the next stop in your itinerary.")
             }
         }
-        ControlSection("Map angle")
+        ControlSection("Dash view")
         NaviSarthiSegmented(
             options = listOf("TDV", "POV"),
             selected = if (ui.perspective) "POV" else "TDV",
             onSelect = { vm.setPerspective(it == "POV") },
             modifier = Modifier.fillMaxWidth(),
         )
-        ControlHint("TDV shows the map from above. POV tilts it to show more of the road ahead.")
-        var showTrafficSetup by remember { mutableStateOf(false) }
-        var trafficKey by remember { mutableStateOf("") }
-        ControlSection("Live traffic")
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Show traffic along the active route", Modifier.weight(1f), color = TextMid)
-            NaviSarthiToggle(on = ui.trafficEnabled && ui.trafficAvailable, enabled = ui.trafficAvailable, onChange = { enabled ->
-                if (enabled && !ui.trafficConfigured) showTrafficSetup = true
-                else vm.setTrafficEnabled(enabled)
-            })
-        }
-        Text(
-            if (ui.trafficAvailable) "Refreshes every 3 minutes while online."
-            else "Live traffic is unavailable in Black with Golden Line.",
-            color = TextLo, fontSize = 12.sp,
+        ControlHint("TDV looks down from above; POV looks along the road. This shortcut changes the same view selected in Nav.")
+        ControlSection("Route colour on Dash")
+        val routeColours = listOf(
+            DashRouteColor.BLUE to "Blue",
+            DashRouteColor.VEHICLE_ACCENT to "Vehicle accent",
+            DashRouteColor.GOLDEN_LINE to "Golden line",
         )
-        Text("Green: near free flow · Yellow: slower · Orange: heavy · Red: severe",
-            color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-        Text("Red and light grey: road closed.", color = TextLo, fontSize = 12.sp)
-        Text("Create a TomTom account, copy a key with Traffic API access, then paste it here and tap Enable.",
-            color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-        androidx.compose.material3.TextButton(onClick = {
-            val guide = android.content.Intent(android.content.Intent.ACTION_VIEW,
-                android.net.Uri.parse("https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key"))
-            try {
-                context.startActivity(guide)
-            } catch (_: android.content.ActivityNotFoundException) {
-                android.widget.Toast.makeText(context, "No browser available", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }) { Text("Get a TomTom Traffic API key") }
-        if (ui.trafficConfigured && ui.trafficAvailable) {
-            androidx.compose.material3.TextButton(onClick = { showTrafficSetup = true }) {
-                Text("Traffic provider settings")
-            }
-        }
-        if (showTrafficSetup && ui.trafficAvailable) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showTrafficSetup = false; trafficKey = "" },
-                title = { Text("Connect TomTom traffic") },
-                text = {
-                    Column {
-                        Text("Enter a TomTom API key with Traffic API access. Live traffic needs internet.")
-                        androidx.compose.material3.OutlinedTextField(
-                            value = trafficKey,
-                            onValueChange = { trafficKey = it.take(200) },
-                            label = { Text("TomTom API key") },
-                            singleLine = true,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        )
-                        if (ui.trafficConfigured) {
-                            androidx.compose.material3.TextButton(onClick = {
-                                vm.configureTraffic("")
-                                trafficKey = ""
-                                showTrafficSetup = false
-                            }) { Text("Remove key") }
-                        }
-                    }
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(enabled = trafficKey.isNotBlank(), onClick = {
-                        vm.configureTraffic(trafficKey)
-                        vm.setTrafficEnabled(true)
-                        trafficKey = ""
-                        showTrafficSetup = false
-                    }) { Text("Enable") }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        trafficKey = ""
-                        showTrafficSetup = false
-                    }) { Text("Cancel") }
-                },
-            )
-        }
-        ControlSection("Map colour theme")
         NaviSarthiSegmented(
-            options = listOf("Light", "Dark", "Black"),
-            selected = ui.mapStyle.name,
-            onSelect = { vm.setMapStyle(com.sxdpz23.navisarthi.dash.map.MapRenderer.Style.valueOf(it)) },
+            options = routeColours.map { it.second },
+            selected = routeColours.first { it.first == ui.routeColor }.second,
+            onSelect = { label -> vm.setRouteColor(routeColours.first { it.second == label }.first) },
             modifier = Modifier.fillMaxWidth(),
         )
-        ControlHint("Light is for daylight, Dark reduces glare, and Black shows a label-free road map.")
-        if (ui.mapStyle == com.sxdpz23.navisarthi.dash.map.MapRenderer.Style.Black) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Adapt to Dash Golden Line colour", Modifier.weight(1f), color = TextMid)
-                NaviSarthiToggle(on = ui.goldenRoute, onChange = vm::setGoldenRoute)
-            }
-            ControlHint("Use gold for the route, rider marker, and arrival message. Live traffic is paused while gold is on.")
-        }
+        ControlHint("Blue is the default. Change the route colour here; select the map scheme, traffic and route alternatives in Nav.")
 
         Spacer(Modifier.height(16.dp))
 
@@ -623,18 +493,18 @@ fun DashScreen(vm: DashViewModel = viewModel()) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                NaviSarthiIconBtn(NaviSarthiIcons.Plus,  onClick = { vm.zoomIn() },  size = 52.dp)
+                NaviSarthiIconBtn(NaviSarthiIcons.Plus,  onClick = { vm.zoomIn() }, contentDescription = "Zoom in", size = 52.dp)
                 Text("z${ui.mapZoom}", color = Gold, fontSize = 12.sp, fontFamily = GeistMonoFamily, fontWeight = FontWeight.SemiBold)
-                NaviSarthiIconBtn(NaviSarthiIcons.Minus, onClick = { vm.zoomOut() }, size = 52.dp)
-                NaviSarthiIconBtn(NaviSarthiIcons.Recenter, onClick = { vm.recenter(); pan = Offset.Zero }, size = 52.dp, active = true)
+                NaviSarthiIconBtn(NaviSarthiIcons.Minus, onClick = { vm.zoomOut() }, contentDescription = "Zoom out", size = 52.dp)
+                NaviSarthiIconBtn(NaviSarthiIcons.Recenter, onClick = { vm.recenter(); pan = Offset.Zero }, size = 52.dp, active = true, contentDescription = "Recenter map")
             }
         }
 
-        // Exit navigation → free roam (keeps streaming, just drops the route)
+        // Nav owns stop/completion; the view-model forwards this action to that same session.
         if (streaming && ui.destinationName != null) {
             Spacer(Modifier.height(16.dp))
             NaviSarthiBtn(
-                "Exit navigation",
+                "Stop navigation",
                 onClick = { vm.exitNavigation() },
                 icon = NaviSarthiIcons.Navi,
                 variant = BtnVariant.Ghost,

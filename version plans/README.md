@@ -20,8 +20,9 @@ Maintain one plan per version. Before each feature addition, update its plan wit
 4. 0.4.0 � setup, joystick zoom, console music controls via the app and headset guidance qualification; first navigation/music pilot.
 5. 0.5.0 � offline maps, saved custom routes, ride history.
 6. 0.6.0 � live traffic and traffic-aware routing.
-7. 0.7.0 � wallpaper, garage and fuel diary integration; music moved to 0.4.0.
+7. [0.6.2 — shared navigation and glass consistency](0.6.2.md): verified signed Android build; device and console acceptance pending.
+8. 0.7.0 � wallpaper, garage and fuel diary integration; music moved to 0.4.0.
 
-8. [0.8.0 — Console OTA updates](0.8.0.md): official TFT firmware discovery, download, validation, installation and post-reboot verification; planned and gated on package access and hardware qualification.
+9. [0.8.0 — Console OTA updates](0.8.0.md): official TFT firmware discovery, download, validation, installation and post-reboot verification; planned and gated on package access and hardware qualification.
 
 Existing inherited features may remain but must not be presented as newly qualified. Hardware validation gates all supported-model claims. Do not assume high frame rates are supported by the console.

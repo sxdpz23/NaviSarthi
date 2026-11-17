@@ -338,7 +338,7 @@ fun StreetViewScreen(
                                     monthYear(t.year, t.month) ?: "",
                                     color = if (isShown) Color(0xFF1A1A1A) else Color.White,
                                     fontWeight = if (isShown) FontWeight.SemiBold else FontWeight.Normal,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                 )
                             }
                         }
@@ -357,7 +357,7 @@ fun StreetViewScreen(
                             }
                             .dpadHighlight(RoundedCornerShape(20.dp)),
                     ) {
-                        Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Icon(
                                 Sym.History,
                                 contentDescription = stringResource(R.string.street_view_dates),

@@ -1,6 +1,17 @@
 package com.sxdpz23.navisarthi.navigation.core.model
 
-enum class TravelMode { DRIVE, WALK, BICYCLE, TRANSIT }
+enum class TravelMode {
+    DRIVE, WALK, BICYCLE, TRANSIT, MOTORBIKE;
+
+    val isRoad: Boolean get() = this == DRIVE || this == MOTORBIKE
+
+    /** Old links, shortcuts and saved preferences remain readable without reopening removed modes. */
+    fun roadMode(): TravelMode = if (isRoad) this else DRIVE
+
+    companion object {
+        val roadModes = listOf(DRIVE, MOTORBIKE)
+    }
+}
 
 enum class ManeuverType {
     DEPART, ARRIVE, CONTINUE, STRAIGHT,

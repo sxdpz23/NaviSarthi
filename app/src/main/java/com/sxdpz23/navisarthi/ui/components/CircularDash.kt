@@ -30,7 +30,7 @@ import kotlin.math.*
  * @param zoom      Map zoom scale (0.7–2.4)
  * @param distance  Next turn distance string
  * @param street    Current street name
- * @param live      Show live ring pulse (connected state)
+ * @param live      Show the steady connected-state ring
  * @param compact   Hide distance/street labels (for small embeds)
  */
 @Composable
@@ -44,19 +44,6 @@ fun CircularDash(
     compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    // Live ring pulse animation
-    val infiniteTransition = rememberInfiniteTransition(label = "live-ring")
-    val ringScale by infiniteTransition.animateFloat(
-        initialValue = 0.7f, targetValue = 2.0f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
-        label = "ring-scale",
-    )
-    val ringAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
-        label = "ring-alpha",
-    )
-
     val accent = Gold
     Box(
         contentAlignment = Alignment.Center,
@@ -68,15 +55,7 @@ fun CircularDash(
             .border(6.dp, Color(0xFF0D0F10), CircleShape)
             .padding(6.dp)
             .clip(CircleShape)
-            .background(
-                Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0f to Color(0xFF14201F),
-                        0.7f to Color(0xFF0C1413),
-                        1f to Color(0xFF070B0B),
-                    )
-                )
-            ),
+            .background(Bg0),
     ) {
         // Map layer with pan/zoom
         Canvas(
@@ -98,13 +77,13 @@ fun CircularDash(
             drawTickRing(accent)
         }
 
-        // Live ring pulse (behind the rider marker)
+        // Steady connected-state ring (behind the rider marker)
         if (live) {
             Canvas(Modifier.fillMaxSize()) {
                 // this.size is DrawScope.size (px)
                 drawCircle(
-                    color = accent.copy(alpha = ringAlpha * 0.5f),
-                    radius = this.size.minDimension * 0.12f * ringScale,
+                    color = accent.copy(alpha = .22f),
+                    radius = this.size.minDimension * 0.12f,
                     center = center,
                     style = Stroke(width = 2.dp.toPx()),
                 )

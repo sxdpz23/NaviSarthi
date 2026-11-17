@@ -187,17 +187,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             onCheckedChange = { com.sxdpz23.navisarthi.navigation.ui.FasterRouteAuto.set(context, it) },
             hint = stringResource(R.string.settings_faster_auto_hint),
         )
-        GroupDivider()
-        ToggleRow(
-            label = stringResource(R.string.settings_pause_in_bar),
-            checked = com.sxdpz23.navisarthi.navigation.ui.PauseInBar.on.value,
-            onCheckedChange = { com.sxdpz23.navisarthi.navigation.ui.PauseInBar.set(context, it) },
-            // With Prefer buttons on the bar carries the step-list button as well, so say so.
-            hint = stringResource(
-                if (com.sxdpz23.navisarthi.navigation.ui.PreferButtons.on.value) R.string.settings_pause_in_bar_hint_buttons
-                else R.string.settings_pause_in_bar_hint
-            ),
-        )
+
         }
         Spacer(Modifier.height(12.dp))
         SettingsGroup {
@@ -380,12 +370,10 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             // The ROOT swallows bare LEFT/RIGHT (SettingsScaffold), so this horizontal row drives
             // its OWN LEFT/RIGHT via FocusRequesters - requestFocus (not moveFocus) never clears at
             // the ends, and consuming the key stops it reaching the root swallow.
-            val chipFocus = remember { List(4) { FocusRequester() } }
+            val chipFocus = remember { List(2) { FocusRequester() } }
             listOf(
                 TravelMode.DRIVE to stringResource(R.string.settings_mode_driving),
-                TravelMode.WALK to stringResource(R.string.settings_mode_walking),
-                TravelMode.BICYCLE to stringResource(R.string.settings_mode_cycling),
-                TravelMode.TRANSIT to stringResource(R.string.settings_mode_transit),
+                TravelMode.MOTORBIKE to stringResource(R.string.place_mode_motorbike),
             ).forEachIndexed { i, (mode, label) ->
                 var on by remember(mode) {
                     val default = if (!prefs.getBoolean(Haptics.KEY, true)) false else Haptics.defaultFor(mode)

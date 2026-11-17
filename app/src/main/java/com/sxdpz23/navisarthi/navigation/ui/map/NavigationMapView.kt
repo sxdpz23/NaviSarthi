@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
@@ -1258,6 +1259,16 @@ fun NavigationMapView(
     }
 
     var mapRef by remember { mutableStateOf<MapLibreMap?>(null) }
+    val sharedView by com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.collectAsState()
+    LaunchedEffect(sharedView.perspective, mapRef) {
+        val map = mapRef ?: return@LaunchedEffect
+        if (!navModeHolder.value) {
+            val camera = map.cameraPosition
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(
+                CameraPosition.Builder(camera).tilt(if (sharedView.perspective) 55.0 else 0.0).build()
+            ), 300)
+        }
+    }
     var mapInitRequested by remember { mutableStateOf(false) }
     // Settings > Map "Tilt with two fingers" applies at once, not at the next map start.
     val tiltGestures = com.sxdpz23.navisarthi.navigation.ui.MapTilt.on.value
@@ -1332,7 +1343,7 @@ fun NavigationMapView(
         if (kotlin.math.abs(cam.bearing) > 0.5 || cam.tilt > 0.5) {
             m.animateCamera(
                 org.maplibre.android.camera.CameraUpdateFactory.newCameraPosition(
-                    org.maplibre.android.camera.CameraPosition.Builder(cam).bearing(0.0).tilt(0.0).build(),
+                    org.maplibre.android.camera.CameraPosition.Builder(cam).bearing(0.0).tilt(if (sharedView.perspective) 55.0 else 0.0).build(),
                 ),
                 600,
             )
@@ -3414,10 +3425,10 @@ fun NavigationMapView(
                     // measured chrome moved a dp or more and held still.
                     navPuck.framer.track(android.os.SystemClock.uptimeMillis(), context, cam.width.toInt(), cam.height.toInt(), navBarTopHolder.value, navNorthUpHolder.value)
                     val navPad = navPuck.framer.pad
-                    // Tilt: north-up = flat; else a shove-set override wins over the 55 default.
+                    // Nav owns the view choice, including the Dash shortcut.
                     val tiltWanted = when {
+                        !com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.value.perspective -> 0.0
                         navNorthUpHolder.value -> 0.0
-                        !navUserTilt[0].isNaN() -> navUserTilt[0]
                         else -> 55.0
                     }
                     val speedZoom = NavFraming.zoom(18.5 - (navZoomSpeed[0] / 30f) * (18.5 - 15.8), navPuck.framer.zoomOffset) // even closer default (user 2026-07-15, was 18.0-15.5); speed still zooms out
@@ -3595,13 +3606,14 @@ fun NavigationMapView(
                     // once when the camera leaves the car, shown again when it returns; the turn
                     // and exit callouts stay. Dial `navBubblesDetached` 1 keeps them.
                     if (detachedBubblesHidden.isEmpty() && !overviewLive[0]) {
-                        if (!com.sxdpz23.navisarthi.navigation.ui.AppTune.on("navBubblesDetached", false))
-                        runCatching {
-                            for (id in arrayOf(NAV_ROADLABEL_LAYER, NAV_ROADLABEL_MINOR_LAYER, NAV_ROADLABEL_FADE_LAYER)) {
-                                val l = style.getLayer(id) ?: continue
-                                if (l.visibility.value == Property.NONE) continue
-                                l.setProperties(PropertyFactory.visibility(Property.NONE))
-                                detachedBubblesHidden += id
+                        if (!com.sxdpz23.navisarthi.navigation.ui.AppTune.on("navBubblesDetached", false)) {
+                            runCatching {
+                                for (id in arrayOf(NAV_ROADLABEL_LAYER, NAV_ROADLABEL_MINOR_LAYER, NAV_ROADLABEL_FADE_LAYER)) {
+                                    val l = style.getLayer(id) ?: continue
+                                    if (l.visibility.value == Property.NONE) continue
+                                    l.setProperties(PropertyFactory.visibility(Property.NONE))
+                                    detachedBubblesHidden += id
+                                }
                             }
                         }
                         // Asked once per detach, whatever it found (the dial and three lookups are not per-frame work).
@@ -4023,7 +4035,7 @@ fun NavigationMapView(
                     map.gesturesManager.shoveGestureDetector.maxShoveAngle = 55f
                     map.gesturesManager.shoveGestureDetector.pixelDeltaThreshold = 20f * context.resources.displayMetrics.density
                 }
-                map.setMaxPitchPreference(70.0)
+                map.setMaxPitchPreference(60.0)
                 // TILE LEVEL OF DETAIL on a tilted view (MapLibre 11.10+). Past the pitch threshold
                 // the engine loads the far part of the view at lower zoom instead of every tile to
                 // the horizon at full zoom. Its own threshold is 60 degrees and a drive runs at 55,
@@ -4954,7 +4966,7 @@ fun NavigationMapView(
         // reached the map as a gesture, which dropped the follow camera, so the restored app
         // came back detached and needed a Re-center every time (user report).
         val pipNow = com.sxdpz23.navisarthi.navigation.ui.PipMode.active.value
-        map.uiSettings.isCompassEnabled = !pipNow
+        map.uiSettings.isCompassEnabled = !pipNow && !navMode
         map.uiSettings.setAllGesturesEnabled(!pipNow)
         // ("All" turns tilt and rotation back on, and this block runs on every update: the
         // settings come last.)
@@ -5946,10 +5958,8 @@ private fun ensureLayers(style: Style, painted: Boolean) {
         // `road_one_way_arrow` (idx ~61), which sits BELOW the `bridge_*` layers (~63-82) — anchoring there
         // hid the route on bridges. Anchor instead to the first symbol AFTER the last bridge (a real label),
         // falling back to the first symbol / top if a style has no bridge layers.
-        val lastBridge = style.layers.indexOfLast { it.id.startsWith("bridge_") }
-        val firstLabel = (if (lastBridge >= 0) style.layers.drop(lastBridge + 1) else style.layers)
-            .firstOrNull { it is SymbolLayer }?.id
-        if (firstLabel != null) style.addLayerBelow(routeLine, firstLabel) else style.addLayer(routeLine)
+        val labelAnchor = MapOverlayOrder.routeLabelAnchor(style.layers.map { OverlayLayer(it.id, it is SymbolLayer) })
+        if (labelAnchor != null) style.addLayerBelow(routeLine, labelAnchor) else style.addLayer(routeLine)
         // The route preview's traffic stretches, each its own exact line over the route (see
         // ROUTE_TRAFFIC_SRC). Hidden outside the preview.
         style.addSource(GeoJsonSource(ROUTE_TRAFFIC_SRC))
@@ -5984,7 +5994,7 @@ private fun ensureLayers(style: Style, painted: Boolean) {
             PropertyFactory.iconPadding(0f),
             PropertyFactory.visibility(Property.NONE),
         )
-        if (firstLabel != null) style.addLayerBelow(routeDash, firstLabel) else style.addLayer(routeDash)
+        if (labelAnchor != null) style.addLayerBelow(routeDash, labelAnchor) else style.addLayer(routeDash)
         // The nav ahead-suffix line (see ROUTE_AHEAD_SRC) — added after ROUTE_LAYER under the same
         // label anchor, so it draws ON TOP of the full (traversed-gray) line during nav.
         style.addSource(GeoJsonSource(ROUTE_AHEAD_SRC, GeoJsonOptions().withLineMetrics(true)))
@@ -5995,7 +6005,7 @@ private fun ensureLayers(style: Style, painted: Boolean) {
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
             PropertyFactory.visibility(Property.NONE),
         )
-        if (firstLabel != null) style.addLayerBelow(routeAhead, firstLabel) else style.addLayer(routeAhead)
+        if (labelAnchor != null) style.addLayerBelow(routeAhead, labelAnchor) else style.addLayer(routeAhead)
         // The far-tail twin (AUDIT FIX 9): identical paint, uploaded once per window advance.
         style.addSource(GeoJsonSource(ROUTE_TAIL_SRC, GeoJsonOptions().withLineMetrics(true)))
         val routeTail = LineLayer(ROUTE_TAIL_LAYER, ROUTE_TAIL_SRC).withProperties(
@@ -6041,7 +6051,7 @@ private fun ensureLayers(style: Style, painted: Boolean) {
         // The outlines, one per piece on the piece's own source, all BELOW the lowest piece so an
         // outline's round cap never draws across another piece's fill. Each starts like its piece.
         // Dial `routeOutline` 0 leaves them out (read at style load).
-        val outlines = (com.sxdpz23.navisarthi.navigation.ui.AppTune.local("routeOutline") ?: com.sxdpz23.navisarthi.navigation.core.config.CalibrationStore.latest.tune("routeOutline", 1.0)) > 0.0
+        val outlines = true // Navigation contrast is required across every map style.
         for (id in arrayOf(ROUTE_LAYER, ROUTE_TAIL_LAYER, ROUTE_TAIL_LAYER_B, ROUTE_AHEAD_LAYER, ROUTE_AHEAD_LAYER_B, ROUTE_CUT_LAYER, ROUTE_CUT_LAYER_B)) {
             if (!outlines) break
             val fill = style.getLayer(id) as? LineLayer ?: continue
@@ -6054,6 +6064,14 @@ private fun ensureLayers(style: Style, painted: Boolean) {
             )
             ol.lineOpacityTransition = org.maplibre.android.style.layers.TransitionOptions(0, 0)
             style.addLayerBelow(ol, ROUTE_LAYER)
+            val halo = LineLayer(id + "-halo", fill.sourceId).withProperties(
+                PropertyFactory.lineWidth(realWidthCurve(ROUTE_BASE_STOPS, ROUTE_REAL_M, ROUTE_CAP_DP) { -7.0 }),
+                PropertyFactory.lineColor("#FFFFFF"), PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.visibility(fill.visibility.value ?: Property.VISIBLE),
+            )
+            halo.lineOpacityTransition = org.maplibre.android.style.layers.TransitionOptions(0, 0)
+            style.addLayerBelow(halo, id + ROUTE_OUTLINE_SUFFIX)
         }
     }
     // Grayed, tappable alternate routes — drawn BELOW the active line (Google-style).
@@ -7803,7 +7821,7 @@ private fun ensureTraffic(style: Style, on: Boolean) {
             // line), and Google's baked tiles paint free-flow green everywhere — at
             // full opacity that buries the basemap and reads as noise. ~0.6 keeps the
             // red/amber congestion legible while the green recedes.
-            PropertyFactory.rasterOpacity(0.6f),
+            PropertyFactory.rasterOpacity(0.85f),
             // Google's tiles expire while you drive, and a replaced tile used to pop: the old one
             // vanished and the new one appeared on the next frame, which reads as the whole
             // congestion layer flickering (user 2026-09-18). MapLibre cross-fades a tile over its
@@ -7818,15 +7836,10 @@ private fun ensureTraffic(style: Style, on: Boolean) {
         // the topmost building layer keeps POI icons and labels on top and the buildings under.
         // With satellite on, anchor above the imagery instead - the raster otherwise buries the
         // traffic tiles entirely.
-        val satTop = style.getLayer(SAT_ROADS_LAYER) ?: style.getLayer(SAT_LAYER)
-        val buildingTop = style.getLayer("building-3d") ?: style.getLayer("building")
-        val firstSymbol = style.layers.firstOrNull { it is SymbolLayer }?.id
-        when {
-            satTop != null -> style.addLayerAbove(layer, satTop.id)
-            buildingTop != null -> style.addLayerAbove(layer, buildingTop.id)
-            firstSymbol != null -> style.addLayerBelow(layer, firstSymbol)
-            else -> style.addLayer(layer)
-        }
+        val geometry = MapOverlayOrder.geometryTop(style.layers.map { OverlayLayer(it.id, it is SymbolLayer) },
+            setOf(SAT_LAYER, SAT_ROADS_LAYER))
+        if (geometry != null) style.addLayerAbove(layer, geometry) else style.addLayer(layer)
+
     } else if (!on && present) {
         style.removeLayer(TRAFFIC_LAYER)
         style.getSource(TRAFFIC_SRC)?.let { runCatching { style.removeSource(it) } }
@@ -8317,12 +8330,8 @@ private fun ensureSatellite(style: Style, on: Boolean) {
         // labels begin. "Below the first symbol layer" was wrong - Liberty interleaves a low
         // symbol layer beneath the road/building fills, so the raster sank under half the
         // geometry and blue footprints + roads drew on top of the photo (user 2026-07-13).
-        val geomTop = style.getLayer("building-3d") ?: style.getLayer("building")
-        when {
-            geomTop != null -> style.addLayerAbove(layer, geomTop.id)
-            else -> style.layers.lastOrNull { it !is SymbolLayer }?.let { style.addLayerAbove(layer, it.id) }
-                ?: style.addLayer(layer)
-        }
+        val geometry = MapOverlayOrder.geometryTop(style.layers.map { OverlayLayer(it.id, it is SymbolLayer) })
+        if (geometry != null) style.addLayerAbove(layer, geometry) else style.addLayer(layer)
         // Ghost roads over the photo (Google hybrid does this): a single translucent white line
         // layer from the basemap's transportation source, above the raster, below the labels -
         // without it the road network disappears into tree cover and the map stops being
@@ -11073,7 +11082,7 @@ private const val ROUTE_OUTLINE_SUFFIX = "-ol"
 private const val ROUTE_OUTLINE_LIGHT = "#0e326a"
 private const val ROUTE_OUTLINE_DARK = "#061a45"
 /** Each side of the outline, dp. */
-private const val ROUTE_OUTLINE_DP = 1.25
+private const val ROUTE_OUTLINE_DP = 2.0
 private fun routeOutlineWidth(): Expression = realWidthCurve(ROUTE_BASE_STOPS, ROUTE_REAL_M, ROUTE_CAP_DP) { z ->
     -2.0 * ROUTE_OUTLINE_DP * ((z - 9.0) / 5.0).coerceIn(0.4, 1.0)
 }
@@ -11092,6 +11101,8 @@ private fun Style.routeSet(id: String, vararg props: org.maplibre.android.style.
     val copy = props.filter { it.name == "visibility" || it.name == "line-opacity" }.toMutableList()
     if (outline != null) copy += PropertyFactory.lineGradient(outline)
     if (copy.isNotEmpty()) ol.setProperties(*copy.toTypedArray())
+    val haloProps = props.filter { it.name == "visibility" || it.name == "line-opacity" }
+    if (haloProps.isNotEmpty()) getLayer(id + "-halo")?.setProperties(*haloProps.toTypedArray())
 }
 
 /** Empties and hides the second copies of the route pieces (see ROUTE_CUT_SRC_B). */

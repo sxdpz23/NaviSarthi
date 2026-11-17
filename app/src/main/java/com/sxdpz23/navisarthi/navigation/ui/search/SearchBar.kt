@@ -66,7 +66,6 @@ fun SearchBar(
     /** Bumped whenever [query] was set from outside the keyboard (fill-in arrow, voice): the cursor moves to the end. */
     fillTick: Int = 0,
     onSearch: () -> Unit,
-    onOpenSettings: () -> Unit,
     onClear: () -> Unit = {},
     onFocusChange: (Boolean) -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -77,7 +76,7 @@ fun SearchBar(
     // Voice search: shown only when there's a way to service it (a voice-input app, and later an
     // on-device model). Null = no mic. Sits at the right when the field is empty, Google-style.
     onMic: (() -> Unit)? = null,
-    /** Opens Your lists. Null hides the button (issue #290 moved it here from the chip row). */
+    /** Opens Saved Destinations using the existing Nav lists. */
     onOpenLists: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -105,23 +104,9 @@ fun SearchBar(
             if (inputMode.inputMode == InputMode.Keyboard) keyboard?.hide() else keyboard?.show()
         }
     }
-    // Match the darker tone of the category chips (elevated chips sit on
-    // surfaceContainerLow; the default Card uses the lightest surface) so the
-    // search box and the chips read as one set.
-    // D-pad: the "arm the field" clickable goes on the TEXT REGION only (below), NOT the
-    // whole Card — a card-level clickable made the entire bar ONE focus stop and swallowed
-    // the Settings gear inside it (the gear became unreachable by D-pad; measured on-device).
-    // Light theme: a WHITE bar with a real shadow and a hairline border, the way Google's sits
-    // on its near-white map. surfaceContainerLow on the light land color was almost the same
-    // tone as the map, so the bar dissolved into it (issue #351). Dark keeps the flat tone: a
-    // shadow reads as a smear on a dark map.
-    val dark = com.sxdpz23.navisarthi.navigation.ui.theme.isAppInDarkTheme()
-    Card(
-        modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = if (dark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (dark) 0.dp else 6.dp),
-        border = if (dark) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+    // Only the text region arms input in D-pad mode; saved places and voice remain separate targets.
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
+        modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
     ) {
         Row(
             Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 6.dp),
@@ -299,7 +284,7 @@ fun SearchBar(
             }
             // Voice search mic: only with the field empty (the clear "X" owns the typing state,
             // Google-style) and only when something can service it (onMic != null). Sits just
-            // before the settings gear.
+            // at the trailing edge of the bar.
             if (onMic != null && query.isEmpty()) {
                 IconButton(onClick = onMic, modifier = Modifier.size(40.dp)) {
                     Icon(
@@ -314,17 +299,6 @@ fun SearchBar(
                 // The old `.size(22.dp).padding(end=10.dp)` squeezed the arc into a 12x22 box, so it
                 // drew as an ellipse and looked like it was spinning off-axis (user report).
                 CircularProgressIndicator(Modifier.padding(end = 10.dp).size(22.dp), strokeWidth = 2.dp)
-            } else {
-                IconButton(onClick = onOpenSettings) {
-                    // Explicit soft ink: this row is not a Surface, so an untinted Icon fell
-                    // back to LocalContentColor's BLACK and the gear read darker than the mic
-                    // beside it (user 2026-07-11). Glyphs wear onSurfaceVariant, text keeps ink.
-                    Icon(
-                        SymOutlined.Settings,
-                        contentDescription = stringResource(R.string.search_settings_cd),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }

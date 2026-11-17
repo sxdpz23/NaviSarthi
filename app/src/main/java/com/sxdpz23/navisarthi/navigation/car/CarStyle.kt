@@ -15,7 +15,7 @@ import org.json.JSONObject
 internal object CarStyle {
     const val TRAFFIC_SRC = "navisarthi-traffic-src"
     const val TRAFFIC_LAYER = "navisarthi-traffic"
-    const val TRAFFIC_OPACITY = 0.6
+    const val TRAFFIC_OPACITY = 0.85
     const val LIGHT_INTENSITY = 0.25
 
     private val POLYGON = JSONArray(listOf("match", JSONArray(listOf("geometry-type")), JSONArray(listOf("Polygon", "MultiPolygon")), true, false))
@@ -88,11 +88,9 @@ internal object CarStyle {
             put("layout", JSONObject().put("visibility", "none"))
             put("paint", JSONObject().put("raster-opacity", TRAFFIC_OPACITY).put("raster-fade-duration", 0))
         }
-        when {
-            "building-3d" in ids -> above("building-3d", traffic)
-            "building" in ids -> above("building", traffic)
-            else -> out.add(out.indexOfFirst { it.optString("type") == "symbol" }.takeIf { it >= 0 } ?: out.size, traffic)
-        }
+        // Inject above all geometry; symbols above that geometry continue to label traffic.
+        val lastGeometry = out.indexOfLast { it.optString("type") !in listOf("symbol", "background") }
+        out.add((lastGeometry + 1).coerceIn(0, out.size), traffic)
         // The phone's style light, so the car's building tops keep the palette color.
         style.put("light", (style.optJSONObject("light") ?: JSONObject()).put("intensity", LIGHT_INTENSITY))
         style.put("layers", JSONArray(out))

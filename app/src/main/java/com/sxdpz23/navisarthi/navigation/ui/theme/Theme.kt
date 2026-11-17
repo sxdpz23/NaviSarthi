@@ -20,7 +20,7 @@ private val LightColors = lightColorScheme(
     surface = androidx.compose.ui.graphics.Color(0xFFF8F9FA),
     surfaceContainerLowest = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
     surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF1F3F4),
-    surfaceContainer = androidx.compose.ui.graphics.Color(0xFFE8EAED),
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFFF3F1EC),
     surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFDADCE0),
     surfaceContainerHighest = androidx.compose.ui.graphics.Color(0xFFDADCE0),
     primary = NavigationTeal,
@@ -40,15 +40,15 @@ private val LightColors = lightColorScheme(
 
 private val DarkColors = darkColorScheme(
     // Neutral near-black surfaces under the teal accent.
-    background = androidx.compose.ui.graphics.Color(0xFF131314),
-    surface = androidx.compose.ui.graphics.Color(0xFF131314),
-    surfaceContainerLowest = androidx.compose.ui.graphics.Color(0xFF131314),
-    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF131314),
-    surfaceContainer = androidx.compose.ui.graphics.Color(0xFF1E1F20),
-    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFF282A2C),
-    surfaceContainerHighest = androidx.compose.ui.graphics.Color(0xFF333537),
-    onSurface = androidx.compose.ui.graphics.Color(0xFFE8EAED),
-    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFE3E3E3),
+    background = androidx.compose.ui.graphics.Color(0xFF111315),
+    surface = androidx.compose.ui.graphics.Color(0xFF111315),
+    surfaceContainerLowest = androidx.compose.ui.graphics.Color(0xFF111315),
+    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF111315),
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFF181A1D),
+    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFF202326),
+    surfaceContainerHighest = androidx.compose.ui.graphics.Color(0xFF2A2E32),
+    onSurface = androidx.compose.ui.graphics.Color(0xFFF3F1EC),
+    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF9EA0A3),
     outline = androidx.compose.ui.graphics.Color(0xFF5F6368),
     outlineVariant = androidx.compose.ui.graphics.Color(0xFF5F6368),
     primary = NavigationTealLight,
@@ -117,9 +117,24 @@ fun NavigationTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    val family = com.sxdpz23.navisarthi.navigation.ui.AppFont.family.value
+    val family = if (com.sxdpz23.navisarthi.navigation.ui.AppFont.appDefault.value) com.sxdpz23.navisarthi.ui.theme.GeistFamily else com.sxdpz23.navisarthi.navigation.ui.AppFont.family.value
     val typography = androidx.compose.runtime.remember(family) { navigationTypography(family) }
-    MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
+    val vehicle = com.sxdpz23.navisarthi.ui.theme.LocalVehicle.current
+    // Explicit wallpaper colors remain authoritative. Defaults use the selected motorcycle.
+    val themed = if (dynamicColor) colorScheme else {
+        val accent = if (darkTheme) vehicle.accent else androidx.compose.ui.graphics.lerp(vehicle.accent, androidx.compose.ui.graphics.Color.Black, .42f)
+        colorScheme.copy(
+            primary = accent,
+            onPrimary = if (darkTheme) vehicle.onAccent else androidx.compose.ui.graphics.Color.White,
+            primaryContainer = androidx.compose.ui.graphics.lerp(colorScheme.surface, accent, .14f),
+            onPrimaryContainer = if (darkTheme) vehicle.accent else accent,
+            secondary = colorScheme.onSurfaceVariant,
+            secondaryContainer = colorScheme.surfaceContainerHigh,
+            onSecondaryContainer = colorScheme.onSurface,
+            outlineVariant = colorScheme.onSurface.copy(alpha = .10f),
+        )
+    }
+    MaterialTheme(colorScheme = themed, typography = typography, shapes = com.sxdpz23.navisarthi.ui.theme.CraftShapes, content = content)
 }
 
 /** True only while the wallpaper's colors are really in use: the setting is on AND the phone's

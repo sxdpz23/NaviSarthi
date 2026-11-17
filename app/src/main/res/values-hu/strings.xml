@@ -639,6 +639,7 @@
     <string name="place_edit_note">Jegyzet szerkesztése</string>
     <string name="place_note_label">Jegyzet</string>
     <plurals name="map_save_list">
+        <item quantity="one">Lista mentése · %1$d hely</item>
         <item quantity="other">Lista mentése · %1$d hely</item>
     </plurals>
     <string name="map_list_saved">„%1$s” elmentve a listáidba</string>
@@ -664,6 +665,7 @@
     <string name="mapvm_export_lists_chooser">Listák exportálása</string>
     <string name="lists_empty_hint">Még nincs lista. Koppints az Újra egy létrehozásához, vagy ments el egy helyet az oldaláról.</string>
     <plurals name="lists_place_count">
+        <item quantity="one">%1$d hely</item>
         <item quantity="other">%1$d hely</item>
     </plurals>
     <string name="settings_advanced">Speciális</string>

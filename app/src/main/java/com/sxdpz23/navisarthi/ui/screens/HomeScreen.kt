@@ -45,24 +45,16 @@ fun HomeScreen(
     }
     val (statusLabel, statusSub, statusDot) = status
 
-    // Pulse animation for connected dot
-    val infiniteTransition = rememberInfiniteTransition(label = "dot-pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        1f, 0.35f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "pulse",
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(18.dp)
+            .padding(20.dp)
             .padding(bottom = 24.dp),
     ) {
         ScreenHeader(
             wordmark = true,
-            trailing = { NaviSarthiIconBtn(NaviSarthiIcons.Gear, onClick = { onNavigate("settings") }) },
+            trailing = { NaviSarthiIconBtn(NaviSarthiIcons.Gear, contentDescription = "Settings", onClick = { onNavigate("settings") }) },
         )
 
         // Prominent build identity (debug/test only) — the same sha12 checksum that pull-diag and
@@ -74,7 +66,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 14.dp)
+                    .padding(bottom = 16.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Gold.copy(alpha = 0.10f))
                     .border(1.dp, Gold.copy(alpha = 0.40f), RoundedCornerShape(8.dp))
@@ -82,19 +74,19 @@ fun HomeScreen(
             ) {
                 Text(
                     "TEST BUILD",
-                    color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    color = Gold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                     fontFamily = GeistMonoFamily, letterSpacing = 0.1.sp,
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     buildSha,
-                    color = TextHi, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    color = TextHi, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     fontFamily = GeistMonoFamily,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
                     "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    color = TextLo, fontSize = 11.sp, fontFamily = GeistMonoFamily,
+                    color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,
                 )
             }
         }
@@ -126,14 +118,14 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier.size(9.dp).clip(CircleShape).background(
-                                statusDot.copy(alpha = if (conn == ConnectionState.Connected) pulseAlpha else 1f)
+                                statusDot
                             )
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             statusLabel, color = TextHi, fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold, fontFamily = GeistFamily,
-                            letterSpacing = (-0.38).sp,
+                            fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily,
+                            letterSpacing = 0.sp,
                         )
                     }
 

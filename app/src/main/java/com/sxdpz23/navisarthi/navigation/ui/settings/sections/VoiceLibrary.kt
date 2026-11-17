@@ -133,7 +133,7 @@ internal fun VoiceLibrary(vm: MapViewModel, state: MapUiState) {
                 Text(
                     PiperCatalog.languageLabel(lang),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
@@ -230,7 +230,7 @@ private fun VoiceRow(
                 Text(
                     (if (v.recommended) "★ " else "") + v.displayName,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                 )
             }
             val sub = when {

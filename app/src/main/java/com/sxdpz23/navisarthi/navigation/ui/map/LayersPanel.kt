@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,7 +79,7 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
     var open by remember { mutableStateOf(false) }
     // The button takes the accent while something beyond the default map is on. 3D buildings are
     // on by default, so they do not count.
-    val anyLayerOn = SatelliteLayer.on.value || Traffic.on.value || TransitLayer.on.value || Topography.on.value
+    val anyLayerOn = SatelliteLayer.on.value || Traffic.on.value || Topography.on.value
     Box(
         modifier = Modifier
             .align(Alignment.TopEnd)
@@ -86,16 +87,12 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
             // One-line landscape chrome: the chips sit beside the bar, so the button rises a
             // whole row (matches the compass margin in NavigationMapView). 23 dp from the end puts
             // this 42 dp button's center on the line the other map buttons share (#778).
-            .padding(top = if (landscapeChrome) 74.dp else 128.dp, end = 23.dp),
+            .padding(top = if (landscapeChrome) 74.dp else 128.dp, end = 16.dp),
     ) {
-        Surface(
-            color = mapButtonColor(darkTheme),
-            shape = CircleShape,
-            border = mapButtonRing(darkTheme),
-            shadowElevation = 3.dp,
-            modifier = Modifier.size(42.dp).dpadHighlight(CircleShape),
+        NavGlassSurface(
+            modifier = Modifier.size(48.dp).dpadHighlight(CircleShape),
         ) {
-            IconButton(onClick = { open = true }) {
+            IconButton(onClick = { open = true }, modifier = Modifier.fillMaxSize()) {
                 Icon(
                     SymOutlined.Layers,
                     contentDescription = stringResource(R.string.map_layers),
@@ -106,7 +103,7 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
         }
         // NavigationMenu, not a bare DropdownMenu (docs/dpad.md): a Popup cannot be pre-focused, so a
         // key-first device gets the chooser dialog, and the first tile takes focus on open.
-        NavigationMenu(expanded = open, onDismissRequest = { open = false }) {
+        NavigationMenu(expanded = open, onDismissRequest = { open = false }, glass = true) {
             LayersPanel(vm, onClose = { open = false })
         }
     }
@@ -131,11 +128,25 @@ private class Tile(
 @Composable
 private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
+    val display by com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.collectAsState()
     val firstTile = rememberDpadAutoFocus()
     val satellite = SatelliteLayer.on.value
     val look = MapLook.style.value
     val placesSource = MapPoiPrefs.placesSource.value
     Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        GroupTitle("View")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.FilterChip(selected = !display.perspective,
+                onClick = { com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setPerspective(false) }, label = { Text("TDV") })
+            androidx.compose.material3.FilterChip(selected = display.perspective,
+                onClick = { com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setPerspective(true) }, label = { Text("POV") })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.FilterChip(selected = !display.showAlternatives,
+                onClick = { com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setAlternatives(false) }, label = { Text("Selected route") })
+            androidx.compose.material3.FilterChip(selected = display.showAlternatives,
+                onClick = { com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setAlternatives(true) }, label = { Text("Alternatives") })
+        }
         // Map type is one choice: a look, or satellite over it. Picking a look while satellite is
         // on turns satellite off, which is what choosing a map type means; the satellite tile
         // itself toggles, so a second press returns to the look.
@@ -168,9 +179,6 @@ private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit) {
             listOf(
                 Tile(stringResource(R.string.map_layers_traffic), Traffic.on.value, { Traffic.set(ctx, !Traffic.on.value) }) {
                     GlyphDisc(Sym.Traffic, it)
-                },
-                Tile(stringResource(R.string.map_layers_transit), TransitLayer.on.value, { TransitLayer.set(ctx, !TransitLayer.on.value) }) {
-                    GlyphDisc(Sym.Train, it)
                 },
                 Tile(stringResource(R.string.map_layers_terrain), Topography.on.value, { Topography.set(ctx, !Topography.on.value) }) {
                     GlyphDisc(Sym.Terrain, it)

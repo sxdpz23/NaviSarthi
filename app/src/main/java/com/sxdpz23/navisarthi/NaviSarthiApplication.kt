@@ -96,6 +96,7 @@ class NaviSarthiApplication : Application(), coil.ImageLoaderFactory {
         // on every launch so an over-the-top install self-heals without the user re-toggling access.
         rebindNotificationListener()
         com.sxdpz23.navisarthi.dash.nav.NavigationRouting.install(this)
+        com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.init(this)
         // A build's own data links (a local test server, -PobfManifestUrl= and the like), before
         // anything fetches. Blank means the compiled default in NavigationLinks.
         com.sxdpz23.navisarthi.navigation.core.config.NavigationLinks.compiled = mapOf(
@@ -239,7 +240,6 @@ class NaviSarthiApplication : Application(), coil.ImageLoaderFactory {
         com.sxdpz23.navisarthi.navigation.ui.PreferButtons.init(this)
         com.sxdpz23.navisarthi.navigation.ui.ZoomKeys.init(this)
         com.sxdpz23.navisarthi.navigation.ui.PipTurnCard.init(this)
-        com.sxdpz23.navisarthi.navigation.ui.PauseInBar.init(this)
         com.sxdpz23.navisarthi.navigation.ui.FasterRouteAuto.init(this)
         com.sxdpz23.navisarthi.navigation.ui.RegionUpdates.init(this)
         com.sxdpz23.navisarthi.navigation.ui.BuildingOverlay.init(this)

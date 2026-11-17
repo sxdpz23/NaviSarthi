@@ -23,8 +23,8 @@ private fun TextStyle.scaled(): TextStyle = copy(
  * decides it, rather than every composable that sets a style having to remember.
  */
 fun navigationTypography(family: androidx.compose.ui.text.font.FontFamily? = null): Typography {
-    fun TextStyle.f(): TextStyle = if (family == null) this else copy(fontFamily = family)
-    return NavigationTypography.run {
+    fun TextStyle.f(): TextStyle = copy(fontFamily = family ?: androidx.compose.ui.text.font.FontFamily.Default)
+    return com.sxdpz23.navisarthi.ui.theme.CraftTypography.run {
         copy(
             displayLarge = displayLarge.f(), displayMedium = displayMedium.f(), displaySmall = displaySmall.f(),
             headlineLarge = headlineLarge.f(), headlineMedium = headlineMedium.f(), headlineSmall = headlineSmall.f(),

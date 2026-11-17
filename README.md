@@ -8,6 +8,10 @@ Kotlin namespace/source packages: `com.sxdpz23.navisarthi`. Installed Android ap
 
 ## Current status
 
+Version 0.6.2 (33) unifies Nav-owned console guidance and the darker glass map interface, with automatic Dash/Pod handoff, temporary handset viewing, Car/Motorbike routing and corrected traffic/route layering. 137 unit tests, full release lint (0 errors), assembly and APK signature/package/alignment/checksum checks passed. Non-blocking translation/style warnings and device/physical-console validation are recorded in [the conversation verification report](docs/conversation-verification.md). The signed APK is under `builds and versions/version 0.6.2`.
+
+Version 0.6.1 applies an app-wide craft pass to typography, contrast, spacing, controls and motion while retaining the approved glass navigation and existing features. Release assembly, lint, signature/package checks and 127 JVM tests passed. Native visual and physical console acceptance remain pending. See [the nine-pass report](docs/unslop-app-report.md).
+
 Version 0.6.0 introduces the liquid-glass Dash/Pod, Nav, optional Garage, Groups and Settings shell. Navigation source, services, resources and assets compile directly into NaviSarthi's application; there is one Application, Activity and Settings entry. Navigation includes offline maps/routing, search/places, traffic/transit, voices, saved places and Android Auto, adapted from Vela. See [integration and verification](docs/0.6.0-ui-integration-review.md). Physical Pod/Dash qualification is still required; see [Pod evidence and acceptance](docs/tripper-pod.md). Upstream APK update checks are disabled. NaviSarthi installs as `com.navisarthi.app`; existing Northstar data is not automatically migrated. Optional Firebase configuration must belong to this application ID.
 
 ## Build

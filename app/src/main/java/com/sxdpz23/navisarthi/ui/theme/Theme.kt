@@ -30,6 +30,6 @@ fun NaviSarthiTheme(vehicle: VehicleModel = VehicleModel.Himalayan450, content: 
     val scheme = remember(vehicle) { colorScheme(vehicle) }
     val typography = remember(vehicle) { vehicleTypography(vehicle.accent) }
     CompositionLocalProvider(LocalVehicle provides vehicle) {
-        MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+        MaterialTheme(colorScheme = scheme, typography = typography, shapes = CraftShapes, content = content)
     }
 }

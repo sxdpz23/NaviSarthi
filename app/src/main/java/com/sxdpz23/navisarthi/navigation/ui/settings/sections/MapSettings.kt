@@ -27,6 +27,7 @@ import com.sxdpz23.navisarthi.navigation.ui.settings.ToggleRow
 @Composable
 internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     SettingsScaffold(stringResource(R.string.settings_map), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
         SettingsGroup {
@@ -175,6 +176,7 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
 @Composable
 private fun StartViewRows(homeSet: Boolean) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val title = stringResource(R.string.settings_start_view)
     Text(
         title,
@@ -185,7 +187,7 @@ private fun StartViewRows(homeSet: Boolean) {
     // Takes the view the map is on now, picks the option and says so.
     val useCurrent = {
         if (StartView.useLiveView(context)) {
-            android.widget.Toast.makeText(context, context.getString(R.string.settings_start_view_saved), android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, contextResources.getString(R.string.settings_start_view_saved), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     SelectableRow(

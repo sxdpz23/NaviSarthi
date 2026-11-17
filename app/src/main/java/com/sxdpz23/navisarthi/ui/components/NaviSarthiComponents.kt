@@ -5,11 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,11 +31,11 @@ import androidx.compose.ui.unit.sp
 import com.sxdpz23.navisarthi.ui.theme.*
 
 // ---- Shape constants ----
-val CardShape    = RoundedCornerShape(18.dp)
-val BtnShape     = RoundedCornerShape(14.dp)
+val CardShape    = RoundedCornerShape(16.dp)
+val BtnShape     = RoundedCornerShape(10.dp)
 val InputShape   = RoundedCornerShape(12.dp)
 val ChipShape    = CircleShape
-val IconBtnShape = RoundedCornerShape(14.dp)
+val IconBtnShape = RoundedCornerShape(10.dp)
 
 object ControlSpacing {
     val Item = 8.dp
@@ -46,7 +48,7 @@ object ControlSpacing {
 fun NaviSarthiCard(
     modifier: Modifier = Modifier,
     glow: Boolean = false,
-    padding: Dp = 18.dp,
+    padding: Dp = 20.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -80,45 +82,31 @@ fun NaviSarthiBtn(
     size: BtnSize = BtnSize.Md,
     enabled: Boolean = true,
 ) {
-    val (bgColor, fgColor, borderColor, hasShadow) = when (variant) {
-        BtnVariant.Primary   -> listOf(Gold, OnGold, Color.Transparent, true)
-        BtnVariant.Secondary -> listOf(Surf2, TextHi, Line2, false)
-        BtnVariant.Ghost     -> listOf(Color.Transparent, TextMid, Line2, false)
-        BtnVariant.Danger    -> listOf(Color.Transparent, Alert, Alert.copy(alpha = 0.4f), false)
+    val (background, foreground, border) = when (variant) {
+        BtnVariant.Primary -> Triple(Gold, OnGold, Color.Transparent)
+        BtnVariant.Secondary -> Triple(Surf2, TextHi, Line2)
+        BtnVariant.Ghost -> Triple(Color.Transparent, TextMid, Line)
+        BtnVariant.Danger -> Triple(Color.Transparent, Alert, Alert.copy(alpha = .24f))
     }
-    val height = when (size) { BtnSize.Lg -> 58.dp; BtnSize.Md -> 50.dp; BtnSize.Sm -> 40.dp }
-    val fontSize = when (size) { BtnSize.Lg -> 16.sp; BtnSize.Md -> 15.sp; BtnSize.Sm -> 13.5.sp }
-    val iconSize = when (size) { BtnSize.Sm -> 17.dp; else -> 20.dp }
-
+    val height = if (size == BtnSize.Lg) 56.dp else 48.dp
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .height(height)
-            .clip(BtnShape)
-            .background(bgColor as Color)
-            .border(1.dp, borderColor as Color, BtnShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp),
+        modifier = modifier.heightIn(min = height)
+            .craftFocus(BtnShape).clip(BtnShape)
+            .background(if (enabled) background else Surf2)
+            .border(1.dp, if (enabled) border else Line, BtnShape)
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = fgColor as Color,
-                modifier = Modifier.size(iconSize),
-            )
-            Spacer(Modifier.width(9.dp))
+            Icon(icon, null, tint = if (enabled) foreground else TextDis, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
         }
-        Text(
-            text = label,
-            color = fgColor as Color,
-            fontSize = fontSize,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = GeistFamily,
-            letterSpacing = (-0.15).sp,
-            maxLines = 1,
-        )
+        Text(label, color = if (enabled) foreground else TextDis,
+            fontSize = if (size == BtnSize.Sm) 14.sp else 16.sp,
+            fontWeight = FontWeight.Medium, fontFamily = GeistFamily,
+            letterSpacing = 0.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -128,9 +116,10 @@ fun NaviSarthiIconBtn(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 44.dp,
+    size: Dp = 48.dp,
     active: Boolean = false,
     tint: Color? = null,
+    contentDescription: String? = null,
 ) {
     val bg = if (active) GoldTint else Surf2
     val bd = if (active) GoldTint2 else Line2
@@ -139,13 +128,13 @@ fun NaviSarthiIconBtn(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(size)
-            .clip(IconBtnShape)
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp).size(size)
+            .craftFocus(IconBtnShape).clip(IconBtnShape)
             .background(bg)
             .border(1.dp, bd, IconBtnShape)
-            .clickable(onClick = onClick),
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
     ) {
-        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = contentDescription, tint = iconTint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -170,7 +159,7 @@ fun NaviSarthiChip(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .height(30.dp)
             .clip(ChipShape)
@@ -185,7 +174,7 @@ fun NaviSarthiChip(
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
         }
         Text(
-            label, color = fg, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold,
+            label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
             fontFamily = GeistFamily, maxLines = 1,
         )
     }
@@ -194,31 +183,15 @@ fun NaviSarthiChip(
 // ---- Toggle ----
 @Composable
 fun NaviSarthiToggle(on: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    val track = if (on) Gold else Surf3
-    val bd    = if (on) Gold else Line3
-    val knob  = if (on) OnGold else TextMid
-    val knobOffset = if (on) 22.dp else 2.5.dp
-
-    Box(
-        modifier = Modifier
-            .width(50.dp).height(30.dp)
-            .clip(CircleShape)
-            .background(track)
-            .border(1.dp, bd, CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = enabled,
-            ) { onChange(!on) },
-    ) {
-        Box(
-            Modifier
-                .padding(start = knobOffset, top = 2.5.dp)
-                .size(23.dp)
-                .clip(CircleShape)
-                .background(knob)
-        )
-    }
+    androidx.compose.material3.Switch(
+        checked = on, enabled = enabled, onCheckedChange = onChange,
+        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = OnGold, checkedTrackColor = Gold,
+            uncheckedThumbColor = TextMid, uncheckedTrackColor = Surf3,
+            uncheckedBorderColor = Line3,
+        ),
+    )
 }
 
 // ---- Segmented control ----
@@ -231,10 +204,10 @@ fun NaviSarthiSegmented(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .selectableGroup().clip(RoundedCornerShape(12.dp))
             .background(Surf1)
             .border(1.dp, Line, RoundedCornerShape(12.dp))
-            .padding(3.dp),
+            .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEach { opt ->
@@ -243,14 +216,14 @@ fun NaviSarthiSegmented(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .heightIn(min = 48.dp)
+                    .craftFocus(RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
                     .background(if (active) Surf3 else Color.Transparent)
-                    .clickable { onSelect(opt) },
+                    .selectable(selected = active, role = androidx.compose.ui.semantics.Role.Tab, onClick = { onSelect(opt) }),
             ) {
                 Text(
                     opt, color = if (active) TextHi else TextLo,
-                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp, fontWeight = FontWeight.Medium,
                     fontFamily = GeistFamily,
                 )
             }
@@ -268,17 +241,17 @@ fun NaviSarthiDivider(modifier: Modifier = Modifier) {
 /** Consistent hierarchy for groups of controls on a scrolling screen. */
 @Composable
 fun ControlSection(title: String, modifier: Modifier = Modifier) {
-    Eyebrow(title, modifier.padding(top = 22.dp, bottom = 8.dp))
+    Eyebrow(title, modifier.padding(top = 24.dp, bottom = 8.dp))
 }
 
 @Composable
-fun ControlHint(text: String, modifier: Modifier = Modifier, topPadding: Dp = 6.dp) {
+fun ControlHint(text: String, modifier: Modifier = Modifier, topPadding: Dp = 8.dp) {
     Text(
         text = text,
         modifier = modifier.padding(top = topPadding),
         color = TextLo,
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
     )
 }
 
@@ -291,12 +264,12 @@ fun SpacedControlHint(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier) {
     Text(
-        text = text.uppercase(),
+        text = text,
         color = TextLo,
-        fontSize = 11.sp,
-        letterSpacing = 0.16.sp,
-        fontFamily = GeistMonoFamily,
-        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        letterSpacing = 0.sp,
+        fontFamily = GeistFamily,
+        fontWeight = FontWeight.Medium,
         modifier = modifier,
     )
 }
@@ -328,14 +301,16 @@ fun NaviSarthiRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 13.dp, horizontal = 4.dp)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .heightIn(min = 48.dp)
+            .craftFocus(CardShape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 12.dp, horizontal = 4.dp),
     ) {
         if (icon != null) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(iconBg)
                     .border(1.dp, Line, RoundedCornerShape(12.dp)),
@@ -346,9 +321,9 @@ fun NaviSarthiRow(
         }
         Column(Modifier.weight(1f)) {
             Text(
-                title, color = TextHi, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold,
-                fontFamily = GeistFamily, letterSpacing = (-0.15).sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                title, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                fontFamily = GeistFamily, letterSpacing = 0.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             if (sub != null) {
                 Text(sub, color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
@@ -360,19 +335,19 @@ fun NaviSarthiRow(
                     Text(
                         right,
                         color = if (accentRight) Gold else TextHi,
-                        fontSize = 14.5.sp, fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp, fontWeight = FontWeight.Medium,
                         fontFamily = GeistMonoFamily,
                     )
                 }
                 if (rightSub != null) {
-                    Text(rightSub, color = TextLo, fontSize = 11.5.sp)
+                    Text(rightSub, color = TextLo, fontSize = 12.sp)
                 }
             }
         }
         if (trailingIcon || (onClick != null && right == null)) {
             Spacer(Modifier.width(8.dp))
             Icon(
-                Icons.Outlined.ChevronRight,
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null, tint = TextLo, modifier = Modifier.size(18.dp),
             )
         }
@@ -394,13 +369,14 @@ fun ScreenHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 18.dp)
-            .defaultMinSize(minHeight = 44.dp),
+            .padding(bottom = 20.dp)
+            .defaultMinSize(minHeight = 48.dp),
     ) {
         if (onBack != null) {
             NaviSarthiIconBtn(
-                icon = Icons.Outlined.ChevronLeft,
+                icon = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
                 onClick = onBack,
+                contentDescription = androidx.compose.ui.res.stringResource(com.sxdpz23.navisarthi.R.string.craft_back),
                 modifier = Modifier.padding(end = 12.dp),
             )
         }
@@ -416,27 +392,26 @@ fun ScreenHeader(
                     Text(
                         "NaviSarthi",
                         color = TextHi, fontFamily = GeistMonoFamily,
-                        fontWeight = FontWeight.Bold, fontSize = 21.sp,
+                        fontWeight = FontWeight.Medium, fontSize = 20.sp,
                         letterSpacing = 0.14.sp,
                     )
                     Spacer(Modifier.width(8.dp))
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Gold))
                 }
             } else {
                 Column {
                     if (eyebrow != null) Eyebrow(eyebrow, Modifier.padding(bottom = 3.dp))
                     if (title != null) {
                         Text(
-                            title, color = TextHi, fontSize = 23.sp,
-                            fontWeight = FontWeight.Bold, fontFamily = GeistFamily,
-                            letterSpacing = (-0.46).sp,
+                            title, color = TextHi, fontSize = 24.sp,
+                            fontWeight = FontWeight.Medium, fontFamily = GeistFamily,
+                            letterSpacing = 0.sp,
                         )
                     }
                     // One-line "what this screen is for" guidance, shown right under the title.
                     if (hint != null) {
                         Text(
-                            hint, color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily,
-                            lineHeight = 15.sp, modifier = Modifier.padding(top = 3.dp, end = 8.dp),
+                            hint, color = TextLo, fontSize = 14.sp, fontFamily = GeistFamily,
+                            lineHeight = 20.sp, modifier = Modifier.padding(top = 3.dp, end = 8.dp),
                         )
                     }
                 }

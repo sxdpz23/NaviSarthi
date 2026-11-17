@@ -85,7 +85,7 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp),
+                .padding(horizontal = 24.dp),
         ) {
             // Brand
             Column(
@@ -106,7 +106,7 @@ fun LoginScreen(
                         "NaviSarthi",
                         color = TextHi,
                         fontFamily = GeistMonoFamily,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 32.sp,
                         letterSpacing = 0.16.sp,
                     )
@@ -152,7 +152,7 @@ fun LoginScreen(
                             .clickable(enabled = !loading) { launchGoogleSignIn() }
                             .padding(horizontal = 20.dp),
                     ) {
-                        Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                         Spacer(Modifier.width(12.dp))
                         Text(
                             if (loading) "Signing in…" else "Continue with Google",
@@ -188,7 +188,7 @@ fun LoginScreen(
                     Text(
                         if (authState.syncAvailable) "Sign in to sync across devices · data stays local otherwise"
                         else "Local only · add a Firebase project to sync across devices",
-                        color = TextLo, fontSize = 12.5.sp, textAlign = TextAlign.Center,
+                        color = TextLo, fontSize = 14.sp, textAlign = TextAlign.Center,
                     )
                 }
             }

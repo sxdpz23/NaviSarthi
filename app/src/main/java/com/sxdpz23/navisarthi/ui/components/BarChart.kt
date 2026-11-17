@@ -21,23 +21,23 @@ data class BarEntry(val label: String, val value: Float)
 fun NaviSarthiBarChart(
     data: List<BarEntry>,
     modifier: Modifier = Modifier,
-    height: Dp = 108.dp,
+    height: Dp = 128.dp,
 ) {
     if (data.isEmpty()) return
-    val maxVal = data.maxOf { it.value } * 1.12f
+    val maxVal = (data.maxOf { it.value }.coerceAtLeast(0f) * 1.12f).coerceAtLeast(1f)
+    val accent = Gold
 
-    val accentGradient = listOf(Gold, GoldDeep)
     Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom,
         modifier = modifier
             .height(height)
             .padding(top = 8.dp),
     ) {
         data.forEach { entry ->
-            val pct = entry.value / maxVal
-            val best = entry.value == data.maxOf { it.value }
-            val barH = (height.value - 26f) * pct
+            val pct = (entry.value / maxVal).coerceIn(0f, 1f)
+            val best = entry.value > 0f && entry.value == data.maxOf { it.value }
+            val barH = (height.value - 56f) * pct
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -47,10 +47,10 @@ fun NaviSarthiBarChart(
                 Text(
                     text = entry.value.toString(),
                     color = if (best) Gold else TextLo,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = GeistMonoFamily,
-                    modifier = Modifier.padding(bottom = 7.dp),
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
 
                 Box(
@@ -61,7 +61,7 @@ fun NaviSarthiBarChart(
                         .drawBehind {
                             if (best) {
                                 drawRect(
-                                    brush = Brush.verticalGradient(accentGradient),
+                                    color = accent,
                                 )
                             } else {
                                 drawRect(color = Surf3)
@@ -72,9 +72,9 @@ fun NaviSarthiBarChart(
                 Text(
                     text = entry.label,
                     color = TextLo,
-                    fontSize = 10.5.sp,
+                    fontSize = 12.sp,
                     fontFamily = GeistMonoFamily,
-                    modifier = Modifier.padding(top = 7.dp),
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }

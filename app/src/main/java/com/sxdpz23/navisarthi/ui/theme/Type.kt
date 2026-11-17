@@ -19,68 +19,35 @@ val GeistFamily = FontFamily(
     Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.Normal),
     Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.Medium),
     Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.Bold),
+    Font(googleFont = GoogleFont("Geist"), fontProvider = provider, weight = FontWeight.SemiBold),
 )
 
 val GeistMonoFamily = FontFamily(
     Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Normal),
     Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Medium),
     Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.Bold),
+    Font(googleFont = GoogleFont("Geist Mono"), fontProvider = provider, weight = FontWeight.SemiBold),
 )
 
-internal fun vehicleTypography(accent: androidx.compose.ui.graphics.Color) = Typography(
-    displayLarge = TextStyle(
-        fontFamily = GeistMonoFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 38.sp,
-        color = accent,
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 24.sp,
-        letterSpacing = (-0.48).sp,
-        color = TextHi,
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 19.sp,
-        letterSpacing = (-0.38).sp,
-        color = TextHi,
-    ),
-    titleLarge = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 23.sp,
-        letterSpacing = (-0.46).sp,
-        color = TextHi,
-    ),
-    titleMedium = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        letterSpacing = (-0.16).sp,
-        color = TextHi,
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
-        color = TextMid,
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = GeistFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        color = TextMid,
-    ),
-    labelSmall = TextStyle(
-        fontFamily = GeistMonoFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
-        letterSpacing = 0.16.sp,
-        color = TextLo,
-    ),
+/** Shared phone typography. Map labels, road shields and console pixels have their own scales. */
+val CraftTypography = Typography(
+    displayLarge = TextStyle(fontFamily = GeistMonoFamily, fontWeight = FontWeight.Medium, fontSize = 40.sp, lineHeight = 44.sp, fontFeatureSettings = "tnum"),
+    displayMedium = TextStyle(fontFamily = GeistMonoFamily, fontWeight = FontWeight.Medium, fontSize = 32.sp, lineHeight = 36.sp, fontFeatureSettings = "tnum"),
+    displaySmall = TextStyle(fontFamily = GeistMonoFamily, fontWeight = FontWeight.Medium, fontSize = 28.sp, lineHeight = 32.sp, fontFeatureSettings = "tnum"),
+    headlineLarge = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 28.sp, lineHeight = 36.sp),
+    headlineMedium = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 24.sp, lineHeight = 32.sp),
+    headlineSmall = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp),
+    titleLarge = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 24.sp, lineHeight = 32.sp),
+    titleMedium = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
+    titleSmall = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    bodyLarge = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    labelMedium = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
+    labelSmall = TextStyle(fontFamily = GeistFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
+)
+
+internal fun vehicleTypography(accent: androidx.compose.ui.graphics.Color) = CraftTypography.copy(
+    displayLarge = CraftTypography.displayLarge.copy(color = accent),
 )

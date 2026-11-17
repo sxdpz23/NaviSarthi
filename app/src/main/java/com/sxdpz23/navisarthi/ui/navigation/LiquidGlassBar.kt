@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -29,31 +30,20 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sxdpz23.navisarthi.ui.theme.*
+import kotlin.math.roundToInt
 
 internal data class GlassTab(val route: String, val icon: ImageVector, val label: String)
 
 // Only the background goes through this shader. Labels and hit targets remain sharp.
-private const val GLASS_SHADER = """
-uniform shader content;
-uniform float2 resolution;
-half4 main(float2 p) {
-    float r = resolution.y * .5;
-    float2 c = float2(clamp(p.x, r, resolution.x-r), r);
-    float2 delta = p-c;
-    float d = length(delta);
-    float edge = pow(clamp(1.0-(r-d)/18.0, 0.0, 1.0), 1.65);
-    float2 normal = delta / max(d, .001);
-    half4 color = content.eval(clamp(p + normal*edge*11.0, float2(0), resolution));
-    float luminance = dot(float3(color.rgb), float3(.2126,.7152,.0722));
-    float tint = mix(.42, .88, smoothstep(.30,.85,luminance));
-    return half4(mix(color.rgb, half3(.08,.09,.11), tint), color.a);
-}
-"""
 
 @Composable
 internal fun LiquidGlassBar(
@@ -62,9 +52,11 @@ internal fun LiquidGlassBar(
     modifier: Modifier = Modifier, onSelect: (String) -> Unit,
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val shader = remember { RuntimeShader(GLASS_SHADER) }
-    val height by animateDpAsState(if (compact) 60.dp else 72.dp, label = "glassHeight")
-    val labelAlpha by animateFloatAsState(if (compact) 0f else 1f, label = "glassLabels")
+    val shader = remember { RuntimeShader(com.sxdpz23.navisarthi.ui.components.LIQUID_GLASS_SHADER) }
+    // One progress value keeps the shell, selection and label space in proportion throughout collapse.
+    val animatedExpansion by animateFloatAsState(if (compact) 0f else 1f, label = "glassExpansion")
+    val expansion = animatedExpansion.coerceIn(0f, 1f)
+    val height = 60.dp + 12.dp * expansion
     val selected = tabs.indexOfFirst { it.route == selectedRoute }.coerceAtLeast(0)
     BoxWithConstraints(modifier.widthIn(max = 480.dp).fillMaxWidth().height(height)
         .shadow(16.dp, CircleShape).clip(CircleShape)
@@ -73,6 +65,8 @@ internal fun LiquidGlassBar(
     ) {
         Canvas(Modifier.matchParentSize().graphicsLayer {
             shader.setFloatUniform("resolution", size.width, size.height)
+            shader.setFloatUniform("dark", 1f)
+            shader.setFloatUniform("radius", size.height / 2f)
             renderEffect = RenderEffect.createChainEffect(
                 RenderEffect.createRuntimeShaderEffect(shader, "content"),
                 RenderEffect.createBlurEffect(8f, 8f, Shader.TileMode.CLAMP),
@@ -80,27 +74,38 @@ internal fun LiquidGlassBar(
         }) {
             translate(backdropOrigin.x - origin.x, backdropOrigin.y - origin.y) { drawLayer(backdrop) }
         }
+        Box(Modifier.matchParentSize().background(Color(0x223F4855)))
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
             Color(0x32F3F1EC), Color(0x193F4855), Color(0x30323A46),
         ))))
         val slot = (maxWidth - 12.dp) / tabs.size
         // Compose's animation clock honours the system animator duration scale.
         val left by animateDpAsState(slot * selected, spring(dampingRatio = .88f, stiffness = 480f), label = "glassSelection")
-        Box(Modifier.padding(6.dp).offset(x = left).width(slot).fillMaxHeight()
-            .clip(CircleShape).background(Brush.verticalGradient(listOf(Color(0x32FFFFFF), Color(0x10FFFFFF))))
-            .border(1.dp, Color(0x38FFFFFF), CircleShape))
-        Row(Modifier.fillMaxSize().padding(6.dp).selectableGroup()) {
-            tabs.forEach { tab ->
-                val active = tab.route == selectedRoute
-                val tint by animateColorAsState(if (active) Gold else TextHi.copy(alpha = .84f), label = "tabTint")
-                Column(Modifier.weight(1f).fillMaxHeight().clip(CircleShape)
-                    .selectable(active, role = Role.Tab, onClick = { onSelect(tab.route) }),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-                ) {
-                    Icon(tab.icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-                    Text(tab.label, color = tint.copy(alpha = labelAlpha), fontFamily = GeistFamily, fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium, maxLines = 1)
+        val selectionWidth = slot
+        Box(Modifier.fillMaxSize().padding(6.dp)) {
+            // Keep the same full tab boundary when labels collapse.
+            Box(Modifier.offset(x = left + (slot - selectionWidth) / 2).width(selectionWidth).fillMaxHeight()
+                .clip(CircleShape).background(Brush.verticalGradient(listOf(Color(0x32FFFFFF), Color(0x10FFFFFF))))
+                .border(1.dp, Color(0x38FFFFFF), CircleShape))
+            Row(Modifier.fillMaxSize().selectableGroup()) {
+                tabs.forEach { tab ->
+                    val active = tab.route == selectedRoute
+                    val tint by animateColorAsState(if (active) Gold else TextHi.copy(alpha = .84f), label = "tabTint")
+                    Column(Modifier.weight(1f).fillMaxHeight().clip(CircleShape)
+                        .semantics { contentDescription = tab.label }
+                        .selectable(active, role = Role.Tab, onClick = { onSelect(tab.route) }),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(tab.icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(4.dp * expansion))
+                        Text(tab.label, color = tint.copy(alpha = expansion), fontFamily = GeistFamily, fontSize = 11.sp,
+                            modifier = Modifier.clearAndSetSemantics {}.clipToBounds().layout { measurable, constraints ->
+                                val label = measurable.measure(constraints)
+                                layout(label.width, (label.height * expansion).roundToInt()) { label.placeRelative(0, 0) }
+                            },
+                            fontWeight = FontWeight.Medium, maxLines = 1)
+                    }
                 }
             }
         }

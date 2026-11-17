@@ -50,6 +50,7 @@ import com.sxdpz23.navisarthi.navigation.ui.item
 @Composable
 internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onCloseSettings: () -> Unit = onBack) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val scope = rememberCoroutineScope()
     SettingsScaffold(stringResource(R.string.settings_saved_places), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
@@ -74,7 +75,7 @@ internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 onClick = {
                     val intent = vm.exportSavedIntent()
                     if (intent != null) runCatching { context.startActivity(intent) }
-                    else android.widget.Toast.makeText(context, context.getString(R.string.settings_no_saved_places), android.widget.Toast.LENGTH_SHORT).show()
+                    else android.widget.Toast.makeText(context, contextResources.getString(R.string.settings_no_saved_places), android.widget.Toast.LENGTH_SHORT).show()
                 },
             ) { Text(stringResource(R.string.settings_export)) }
             Spacer(Modifier.width(8.dp))
@@ -105,7 +106,7 @@ internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 onClick = {
                     val intent = vm.exportListsIntent()
                     if (intent != null) runCatching { context.startActivity(intent) }
-                    else android.widget.Toast.makeText(context, context.getString(R.string.settings_no_lists), android.widget.Toast.LENGTH_SHORT).show()
+                    else android.widget.Toast.makeText(context, contextResources.getString(R.string.settings_no_lists), android.widget.Toast.LENGTH_SHORT).show()
                 },
             ) { Text(stringResource(R.string.settings_export)) }
             Spacer(Modifier.width(8.dp))
@@ -202,6 +203,7 @@ private fun toastImport(
 @Composable
 private fun SavedRoutesGroup(vm: MapViewModel, onOpen: (com.sxdpz23.navisarthi.navigation.core.model.SavedRoute) -> Unit) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val state by vm.state.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<com.sxdpz23.navisarthi.navigation.core.model.SavedRoute?>(null) }
     SettingsGroup(title = stringResource(R.string.settings_saved_routes)) {
@@ -230,7 +232,7 @@ private fun SavedRoutesGroup(vm: MapViewModel, onOpen: (com.sxdpz23.navisarthi.n
                         Icon(Sym.MoreVert, contentDescription = stringResource(R.string.exp_chooser_more))
                     }
                     com.sxdpz23.navisarthi.navigation.ui.NavigationMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        item(stringResource(R.string.settings_saved_route_edit)) { menu = false; vm.flashStatus(context.getString(R.string.settings_saved_route_edit_hint)); onOpen(r) }
+                        item(stringResource(R.string.settings_saved_route_edit)) { menu = false; vm.flashStatus(contextResources.getString(R.string.settings_saved_route_edit_hint)); onOpen(r) }
                         item(stringResource(if (r.pinned) R.string.saved_unpin else R.string.saved_pin)) { menu = false; vm.setSavedRoutePinned(r.id, !r.pinned) }
                         item(stringResource(R.string.settings_saved_route_rename)) { menu = false; renaming = r }
                         item(stringResource(R.string.settings_saved_route_delete)) { menu = false; vm.deleteSavedRoute(r.id) }

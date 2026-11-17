@@ -44,7 +44,7 @@ fun RidesScreen(ridesViewModel: RidesViewModel = viewModel()) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(18.dp)
+            .padding(20.dp)
             .padding(bottom = ControlSpacing.PageBottom),
     ) {
         ScreenHeader(eyebrow = "Telemetry", title = "Ride history",
@@ -81,7 +81,7 @@ private fun RideTotals(rides: List<Ride>) {
 @Composable
 private fun Stat(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = GeistFamily)
+        Text(value, color = Gold, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
         Text(label, color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily)
     }
 }
@@ -111,7 +111,7 @@ private fun RideCard(ride: Ride, onDelete: () -> Unit) {
                         color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily,
                     )
                 }
-                Text("%.1f km".format(ride.distanceKm), color = Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = GeistFamily)
+                Text("%.1f km".format(ride.distanceKm), color = Gold, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
             }
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -129,7 +129,7 @@ private fun RideCard(ride: Ride, onDelete: () -> Unit) {
             Text(
                 if (ride.hasConsistentSpeedStats) "Average includes time stopped. GPS gaps may reduce recorded distance."
                 else "Speed statistics unavailable: this older recording contains inconsistent GPS data.",
-                color = TextLo, fontSize = 11.sp, fontFamily = GeistFamily,
+                color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
@@ -140,7 +140,7 @@ private fun RideCard(ride: Ride, onDelete: () -> Unit) {
 private fun MiniStat(value: String, label: String) {
     Column(horizontalAlignment = Alignment.Start) {
         Text(value, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-        Text(label, color = TextLo, fontSize = 11.sp, fontFamily = GeistFamily)
+        Text(label, color = TextLo, fontSize = 12.sp, fontFamily = GeistFamily)
     }
 }
 

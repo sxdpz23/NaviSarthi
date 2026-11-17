@@ -769,6 +769,34 @@ class GoogleMapsDataSource @Inject constructor(
         departBearingDeg: Double?,
         budgetMs: Long?,
     ): List<Route> {
+        if (mode == TravelMode.MOTORBIKE) return io {
+            val timeout = budgetMs ?: if (urgent) 6_000L else 20_000L
+            if (timeout <= 0L) return@io emptyList()
+            val started = System.nanoTime()
+            fun left() = (timeout - (System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0L)
+            val points = listOf(origin) + waypoints + destination
+            val phoneReady = routeEngine.isReady(mode) && routeEngine.covers(origin, destination, mode)
+            val onlineWait = if (phoneReady) minOf(timeout / 2, 4_000L).coerceAtLeast(1L) else timeout
+            val routes = com.sxdpz23.navisarthi.navigation.core.data.ValhallaRouter.motorcycleRoutes(
+                http, points, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, onlineWait, alternates = !urgent,
+            )
+            if (routes.isNotEmpty()) {
+                val traffic = if (com.sxdpz23.navisarthi.navigation.ui.Traffic.on.value &&
+                    com.sxdpz23.navisarthi.navigation.core.data.RoutingPrefs.googleTraffic &&
+                    !com.sxdpz23.navisarthi.navigation.core.data.NoGoogle.enabled && left() > 0L) {
+                    kotlinx.coroutines.withTimeoutOrNull(minOf(left(), 4_000L)) {
+                        googleDirectionsRetried(origin, destination, TravelMode.DRIVE, tries = 1,
+                            avoidTolls = avoidTolls, avoidHighways = avoidHighways,
+                            avoidFerries = avoidFerries, waypoints = waypoints)
+                    }.orEmpty()
+                } else emptyList()
+                routes.map { com.sxdpz23.navisarthi.navigation.core.data.MotorcycleTraffic.overlay(it, traffic) }
+            } else if (phoneReady && left() > 0L) {
+                if (waypoints.isEmpty()) routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = left())
+                    .map { it.copy(offline = true) }
+                else listOfNotNull(chainOnDevice(points, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = left()))
+            } else emptyList()
+        }
         if (mode != TravelMode.DRIVE) return directionsPlain(origin, destination, mode, waypoints, avoidTolls, avoidHighways, avoidFerries, urgent, departBearingDeg, budgetMs)
         // The map's roads round the destination are asked for while the routes are fetched, so
         // the word on the last turn (withLotTurn) is a read from memory by the time they are built.

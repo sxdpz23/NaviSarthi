@@ -156,7 +156,7 @@ private fun WelcomeIntro(onNext: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             NavigationMark(84.dp)
             Spacer(Modifier.height(16.dp))
-            Text("Navigation Maps", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
             Text(
                 stringResource(R.string.welcome_tagline),
@@ -223,7 +223,7 @@ private fun GoogleChoice(
             Text(
                 stringResource(R.string.welcome_google_title),
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -281,7 +281,7 @@ private fun CameraChoices(avoid: Boolean, warn: Boolean, onAvoid: (Boolean) -> U
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 6.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 10.dp, top = 16.dp, bottom = 6.dp)) {
             // The badge itself, so a new user knows the purple square when it appears on the map.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PlateCameraBadge()
@@ -315,7 +315,7 @@ private fun TripChoices(save: Boolean, clear: Boolean, onSave: (Boolean) -> Unit
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 6.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 10.dp, top = 16.dp, bottom = 6.dp)) {
             Text(stringResource(R.string.welcome_trips_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(2.dp))
             Text(
@@ -367,7 +367,7 @@ private fun ChoiceCard(selected: Boolean, title: String, gives: String, sends: S
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
         Row(
-            Modifier.padding(start = 8.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+            Modifier.padding(start = 8.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(horizontal = 10.dp))

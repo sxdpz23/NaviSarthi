@@ -33,15 +33,11 @@ import com.sxdpz23.navisarthi.navigation.ui.item
 internal fun MoreCategoriesChip(onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        ElevatedAssistChip(
-            onClick = { open = true },
-            modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
-            label = { Text(stringResource(R.string.cat_more)) },
-            leadingIcon = { Icon(Sym.MoreHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
-            shape = CircleShape,
-            colors = AssistChipDefaults.elevatedAssistChipColors(leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        )
-        NavigationMenu(expanded = open, onDismissRequest = { open = false }) {
+        NavGlassChip(stringResource(R.string.cat_more), { open = true }, Modifier.dpadHighlight(CircleShape)) {
+            Icon(Sym.MoreHoriz, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        NavigationMenu(expanded = open, onDismissRequest = { open = false }, glass = true) {
             QuickCategories.arranged().forEach { chip ->
                 item(stringResource(chip.label), chip.icon) { open = false; onPick(chip.query) }
             }

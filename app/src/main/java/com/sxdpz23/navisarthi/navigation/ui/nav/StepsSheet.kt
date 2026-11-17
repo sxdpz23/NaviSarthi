@@ -264,7 +264,7 @@ fun StepsSheet(
             }
         }
     }
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier
             .fillMaxWidth()
             .onSizeChanged { sheetHeightPx = it.height }
@@ -279,10 +279,8 @@ fun StepsSheet(
                     settle = settleDrag,
                 )
             },
-        shape = if (header != null) navBarShape() else RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        border = if (amoled) BorderStroke(1.dp, SheetPalette.BorderAmoled) else null,
-        elevation = if (header != null) CardDefaults.cardElevation(defaultElevation = 6.dp) else CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = if (header != null) navBarLook().bg else SheetPalette.bg(dark, amoled), contentColor = ink),
+        shape = RoundedCornerShape(28.dp),
+        docked = true,
     ) {
         // The nav form sits on the bar's near-black in every theme, so its rows take the dark inks.
         val headerOnDark = header != null && navBarLook().onDark
@@ -291,7 +289,7 @@ fun StepsSheet(
             // gets its margins from the host, so only the list padding applies there).
             Column(
                 if (header != null) (if (navBarFlush()) Modifier.navigationBarsPadding() else Modifier)
-                else Modifier.navigationBarsPadding().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 8.dp),
+                else Modifier.navigationBarsPadding().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
             ) {
                 if (header != null) {
                     header(dismiss)
@@ -306,7 +304,7 @@ fun StepsSheet(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.steps_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ink)
+                            Text(stringResource(R.string.steps_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = ink)
                             Text(
                                 formatDuration(etaSeconds) + "  ·  " + formatDistance(distanceMeters) +
                                     if (hasLiveTraffic) "  ·  " + stringResource(R.string.steps_live_traffic) else "",
@@ -630,7 +628,7 @@ fun StepRow(
                             Text(
                                 m.instruction.ifEmpty { continueLabel }.let { romanize(it) },
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                                 color = ink,
                             )
                             val signs = roadSigns(m.instruction, m.ref)

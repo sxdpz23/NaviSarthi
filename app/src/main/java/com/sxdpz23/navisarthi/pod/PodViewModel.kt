@@ -4,10 +4,13 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sxdpz23.navisarthi.console.ConsoleType
 import com.sxdpz23.navisarthi.console.ConsoleNavigation
 import com.sxdpz23.navisarthi.console.SessionEpoch
 import com.sxdpz23.navisarthi.dash.map.LocationTracker
 import com.sxdpz23.navisarthi.dash.nav.*
+import com.sxdpz23.navisarthi.navigation.core.model.Maneuver as NavigationManeuver
+import com.sxdpz23.navisarthi.navigation.core.model.Route as NavigationRoute
 import com.sxdpz23.navisarthi.data.SharedLocation
 import com.sxdpz23.navisarthi.data.RideRecorder
 import com.sxdpz23.navisarthi.data.SyncRepository
@@ -15,6 +18,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 data class PodNavigation(
+    val navProjection: Boolean = false,
     val destination: String? = null,
     val cue: String = "Choose a route to start navigation",
     val turnMeters: Double? = null,
@@ -62,8 +66,25 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
     private var lastFetch = 0L
     private var offRouteSince = 0L
     private var lastRecordedFix = 0L
+    private var projectionAttached = false
+    private var projectionStopRequested = false
+    private var projectionRoute: NavigationRoute? = null
+    private var projectionSteps = emptyList<NavigationManeuver>()
+    private var projectionPacket: ByteArray? = null
 
     init {
+        viewModelScope.launch {
+            NavDisplaySession.state.collect { shared ->
+                val selected = shared.active && shared.target == ConsoleType.TRIPPER_POD
+                if (!selected) projectionStopRequested = false
+                if (enabled && selected && !projectionStopRequested) {
+                    attachProjection()
+                    updateProjectedGuidance(shared)
+                } else if (projectionAttached) {
+                    clearProjection()
+                }
+            }
+        }
         viewModelScope.launch {
             ble.state.map { it.stage }.distinctUntilChanged().collect { stage ->
                 if (enabled && stage in listOf(PodStage.CONNECTING, PodStage.RECONNECTING, PodStage.AUTHORIZING, PodStage.PIN_REQUIRED, PodStage.READY)) {
@@ -72,7 +93,7 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
                     }
                 } else if (stage in listOf(PodStage.OFFLINE, PodStage.ERROR)) {
                     // A retry can run without a foreground service for at most the bounded BLE window.
-                    if (stops.isEmpty()) PodKeepAliveService.stop(app)
+                    if (stops.isEmpty() && !projectionAttached) PodKeepAliveService.stop(app)
                 }
             }
         }
@@ -84,6 +105,7 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
         autoConnectAttempted = false
         ble.setEnabled(value)
         if (!value) { exitNavigation(); PodKeepAliveService.stop(getApplication()) }
+        else if (sharedPodActive()) startNavProjection()
     }
     fun autoConnectSaved() {
         if (!enabled || autoConnectAttempted) return
@@ -129,15 +151,27 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
             stopNumber = index + 1, stopCount = stops.size)
     }
 
-    override fun remainingJourney(): List<SharedLocation>? = stops.drop(index).takeIf {
-        it.isNotEmpty() && !navigation.value.arrived
+    override fun remainingJourney(): List<SharedLocation>? {
+        if (sharedPodActive()) return NavDisplaySession.state.value.remainingStops.takeIf { it.isNotEmpty() }
+        return stops.drop(index).takeIf { it.isNotEmpty() && !navigation.value.arrived }
     }
 
     override fun exitNavigation() {
+        if (projectionAttached || sharedPodActive()) {
+            projectionStopRequested = true
+            NavDisplaySession.requestStop()
+            clearProjection()
+            return
+        }
+        clearLegacyNavigation()
+    }
+
+    private fun clearLegacyNavigation() {
+        val ownedLegacyGuidance = stops.isNotEmpty() || loop?.isActive == true || fetch?.isActive == true
         epoch.next(); fetch?.cancel(); fetch = null; loop?.cancel(); loop = null
         location.stop(); direction.clear()
         if (recorder.isRecording) recorder.stop()?.let { repo.addRide(it) }
-        voice.stopGuidance()
+        if (ownedLegacyGuidance) voice.stopGuidance()
         stops = emptyList(); previews = emptyList(); index = 0; route = null
         ble.screen(null)
         mutable.value = PodNavigation()
@@ -145,6 +179,10 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
     }
 
     private fun updateGuidance() {
+        if (sharedPodActive()) {
+            if (enabled && projectionAttached) updateProjectedGuidance(NavDisplaySession.state.value)
+            return
+        }
         if (!enabled || stops.isEmpty() || navigation.value.arrived) return
         val fix = location.location.value ?: location.lastKnown()
         val now = SystemClock.elapsedRealtime()
@@ -204,7 +242,128 @@ class PodViewModel(app: Application) : AndroidViewModel(app), ConsoleNavigation 
         }
     }
 
+    private fun sharedPodActive(): Boolean = NavDisplaySession.state.value.let {
+        it.active && it.target == ConsoleType.TRIPPER_POD
+    }
+
+    /** The Pod consumes the Nav session; it never starts its own route, voice or GPS loop. */
+    fun startNavProjection() {
+        if (!enabled || !sharedPodActive()) return
+        projectionStopRequested = false
+        attachProjection()
+        updateProjectedGuidance(NavDisplaySession.state.value)
+    }
+
+    private fun attachProjection() {
+        if (projectionAttached) return
+        // Stop only the old Pod engine. Calling exitNavigation here would stop Nav recursively.
+        clearLegacyNavigation()
+        projectionAttached = true
+        lastRecordedFix = 0L
+        recorder.start()
+        runCatching { PodKeepAliveService.start(getApplication()) }.onFailure {
+            mutable.update { it.copy(error = "Could not start the background Pod connection. Keep the app open.") }
+        }
+        if (ble.state.value.stage in listOf(PodStage.OFFLINE, PodStage.ERROR)) {
+            if (ble.savedAddress != null) ble.connect() else ble.discover()
+        }
+    }
+
+    private fun clearProjection() {
+        projectionAttached = false
+        projectionRoute = null
+        projectionSteps = emptyList()
+        projectionPacket = null
+        if (recorder.isRecording) recorder.stop()?.let { repo.addRide(it) }
+        ble.screen(null)
+        mutable.value = PodNavigation()
+        if (ble.state.value.stage != PodStage.READY) PodKeepAliveService.stop(getApplication())
+    }
+
+    private fun updateProjectedGuidance(shared: NavDisplayState) {
+        if (!enabled || !projectionAttached || !shared.active || shared.target != ConsoleType.TRIPPER_POD) return
+        val current = shared.nav
+        if (!current.arrived && !recorder.isRecording) recorder.start()
+        val selectedRoute = current.route
+        if (projectionRoute !== selectedRoute) {
+            projectionRoute = selectedRoute
+            projectionSteps = selectedRoute?.maneuvers.orEmpty()
+        }
+        val fix = shared.fix
+        val fresh = fix != null && (SystemClock.elapsedRealtimeNanos() - fix.elapsedRealtimeNanos) in 0..10_000_000_000L
+        if (fresh && fix != null && recorder.isRecording && fix.elapsedRealtimeNanos != lastRecordedFix) {
+            recorder.add(fix.latitude, fix.longitude, if (fix.hasSpeed()) fix.speed else Float.NaN,
+                fix.accuracy, fix.elapsedRealtimeNanos / 1_000_000L)
+            lastRecordedFix = fix.elapsedRealtimeNanos
+        }
+        val stepIndex = current.nav.stepIndex.coerceIn(0, projectionSteps.lastIndex.coerceAtLeast(0))
+        val currentStep = projectionSteps.getOrNull(stepIndex)
+        val turn = projectedManeuver(currentStep)
+        val next = projectedManeuver(projectionSteps.getOrNull(stepIndex + 1))
+        val remaining = if (current.arrived) 0.0 else current.remainingDistance.finiteNonNegative()
+        val seconds = if (current.arrived) 0.0 else current.remainingDuration.finiteNonNegative()
+        val turnDistance = if (current.arrived) 0.0 else current.nav.distanceToNextManeuver.finiteNonNegative()
+        when {
+            !fresh || selectedRoute == null -> sendProjectedScreen(null)
+            current.nav.offRoute && !current.paused -> sendProjectedScreen(PodProtocol.recalculating(night.value))
+            else -> {
+                val arrival = java.time.LocalTime.now().plusSeconds(seconds.toLong())
+                val maneuver = if (current.arrived) Maneuver(ManeuverType.ARRIVE, "Arrived",
+                    turn?.location ?: GeoPoint(fix!!.latitude, fix.longitude), 0.0) else turn
+                sendProjectedScreen(PodProtocol.guidance(maneuver, next, turnDistance, remaining, seconds,
+                    night.value, bottom.value, arrival.hour, arrival.minute))
+            }
+        }
+        mutable.update { it.copy(
+            navProjection = true,
+            destination = current.destinationLabel.takeIf { label -> label.isNotBlank() }
+                ?: shared.remainingStops.lastOrNull()?.name,
+            cue = when {
+                current.arrived -> "You have arrived"
+                current.paused -> "Navigation paused"
+                !fresh -> "Waiting for GPS"
+                current.nav.offRoute -> "Recalculating route"
+                else -> current.maneuverText.ifBlank { currentStep?.instruction ?: "Continue straight" }
+            },
+            gpsReady = fresh,
+            turnMeters = turnDistance.takeIf { fresh && !current.nav.offRoute },
+            remainingMeters = remaining,
+            etaMinutes = (seconds / 60).toInt(),
+            arrived = current.arrived,
+            // Nav owns the stop plan; do not infer an original trip counter after edits/reroutes.
+            stopNumber = 0, stopCount = 0,
+        ) }
+        if (current.arrived && recorder.isRecording) recorder.stop()?.let { repo.addRide(it) }
+    }
+
+    private fun Double.finiteNonNegative(): Double = if (isFinite()) coerceAtLeast(0.0) else 0.0
+
+    private fun sendProjectedScreen(packet: ByteArray?) {
+        // The BLE client's existing heartbeat maintains the display. Unrelated map/style/heading
+        // emissions must not flood the transport with an identical guidance packet.
+        if (packet == null && projectionPacket == null) return
+        if (packet != null && projectionPacket?.contentEquals(packet) == true) return
+        projectionPacket = packet?.copyOf()
+        ble.screen(packet)
+    }
+
+    private fun projectedManeuver(step: NavigationManeuver?): Maneuver? = step?.let {
+        val type = runCatching { ManeuverType.valueOf(it.type.name) }.getOrElse { _ ->
+            when (it.type) {
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.FORK_LEFT,
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.RAMP_LEFT,
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.KEEP_LEFT -> ManeuverType.SLIGHT_LEFT
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.FORK_RIGHT,
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.RAMP_RIGHT,
+                com.sxdpz23.navisarthi.navigation.core.model.ManeuverType.KEEP_RIGHT -> ManeuverType.SLIGHT_RIGHT
+                else -> ManeuverType.CONTINUE
+            }
+        }
+        Maneuver(type, it.instruction, GeoPoint(it.location.lat, it.location.lng), 0.0, it.roundaboutExit)
+    }
+
     private fun requestRoute(origin: GeoPoint, heading: Int?) {
+        if (sharedPodActive()) return
         val now = SystemClock.elapsedRealtime()
         if (fetch?.isActive == true || (lastFetch != 0L && now - lastFetch < 15_000)) return
         val stop = stops.getOrNull(index) ?: return

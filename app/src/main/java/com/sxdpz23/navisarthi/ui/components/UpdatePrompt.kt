@@ -60,7 +60,7 @@ fun UpdatePrompt() {
             Text(
                 "Update available",
                 color = TextHi,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 fontFamily = GeistFamily,
             )
         },

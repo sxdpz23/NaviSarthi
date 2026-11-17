@@ -62,6 +62,7 @@ object TripShortcut {
 
     /** The glyph a shortcut starts with: its travel mode. */
     fun defaultIcon(mode: TravelMode): String = when (mode) {
+        TravelMode.MOTORBIKE -> "motorbike"
         TravelMode.TRANSIT -> "transit"
         TravelMode.BICYCLE -> "bike"
         TravelMode.WALK -> "walk"

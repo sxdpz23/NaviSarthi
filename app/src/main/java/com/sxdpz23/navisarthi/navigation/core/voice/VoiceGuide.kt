@@ -1,5 +1,6 @@
 package com.sxdpz23.navisarthi.navigation.core.voice
 
+
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -13,6 +14,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val VERBOSE_LOG_TAG = "NavigationSpeak"
+
 
 /** A selectable TTS engine, e.g. Google TTS, RHVoice, eSpeak NG. */
 data class VoiceEngine(val packageName: String, val label: String)
@@ -396,7 +400,7 @@ class VoiceGuide @Inject constructor(
         if (muted && !ignoreMute) return
         // The line itself, only when a developer asks (adb shell setprop log.tag.NavigationSpeak DEBUG):
         // it names stops and streets, which no log carries otherwise.
-        runCatching { if (android.util.Log.isLoggable("NavigationSpeak", android.util.Log.DEBUG)) android.util.Log.d("NavigationSpeak", text) }
+        runCatching { if (android.util.Log.isLoggable(VERBOSE_LOG_TAG, android.util.Log.DEBUG)) android.util.Log.d(VERBOSE_LOG_TAG, text) }
         runCatching { onSpoken?.invoke(text) }
         runCatching { onPromptAlert?.invoke() }
         if (!ready) {

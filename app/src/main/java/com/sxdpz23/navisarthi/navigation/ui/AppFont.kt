@@ -37,6 +37,7 @@ object AppFont {
 
     /** The bundled Google Sans Flex is the UI font. */
     val builtin = mutableStateOf(false)
+    val appDefault = mutableStateOf(true)
 
     /** One Font per weight the type scale uses, each pinning the variable font's weight axis. */
     @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
@@ -52,12 +53,22 @@ object AppFont {
         },
     )
 
+    fun setAppDefault(context: Context) {
+        appDefault.value = true
+        family.value = null
+        builtin.value = false
+        customName.value = null
+        fontFile(context).delete()
+        prefs(context).edit().remove(KEY_NAME).remove(KEY_SYSTEM).remove("ui_font_builtin").apply()
+    }
+
     fun setBuiltin(context: Context) {
+        appDefault.value = false
         family.value = flexFamily()
         builtin.value = true
         customName.value = null
         fontFile(context).delete()
-        prefs(context).edit().remove(KEY_NAME).remove(KEY_SYSTEM).apply()
+        prefs(context).edit().remove(KEY_NAME).remove(KEY_SYSTEM).putBoolean("ui_font_builtin", true).apply()
     }
 
     /** A font file is a few hundred KB; anything far past that is not a font we want to load. */
@@ -71,12 +82,14 @@ object AppFont {
         if (name != null) {
             val f = fontFile(context)
             val fam = if (f.exists()) load(f) else null
-            if (fam != null) { family.value = fam; customName.value = name; return }
+            if (fam != null) { appDefault.value = false; family.value = fam; customName.value = name; return }
             // Unreadable now (a corrupt copy): drop the choice and fall through to the default.
             f.delete(); p.edit().remove(KEY_NAME).apply()
         }
-        if (p.getBoolean(KEY_SYSTEM, false)) return
-        family.value = flexFamily(); builtin.value = true
+        if (p.getBoolean(KEY_SYSTEM, false)) { appDefault.value = false; return }
+        if (p.getBoolean("ui_font_builtin", false)) {
+            appDefault.value = false; family.value = flexFamily(); builtin.value = true
+        }
     }
 
     /**
@@ -111,6 +124,7 @@ object AppFont {
         val dest = fontFile(context)
         dest.delete()
         if (!tmp.renameTo(dest)) { tmp.delete(); return false }
+        appDefault.value = false
         family.value = fam
         customName.value = displayName
         builtin.value = false
@@ -120,6 +134,7 @@ object AppFont {
 
     /** The platform font, as an explicit choice (the default is the bundled font). */
     fun clear(context: Context) {
+        appDefault.value = false
         family.value = null
         customName.value = null
         builtin.value = false

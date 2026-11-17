@@ -56,7 +56,21 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         val accessoryBatteryLabel: String? = null,
         val accessoryBatteryIcon: AccessoryIcon? = null,
         val gpsLost: Boolean = false,      // no fresh fix → grey marker + "GPS lost" pill
+        val routeColor: Int? = null,       // Dash route ink: Nav geometry, blue/accent/gold presentation
+        val alternativeRoutes: List<List<GeoPoint>> = emptyList(),
+        val navBasemapArchive: String? = null, // the same downloaded region selected by Nav
     )
+
+    @Volatile private var navigationMap: NavDashMapRenderer? = null
+    @Volatile private var inheritsNavigation = false
+
+    /** Map ownership is permanent for this session: closing Nav never falls back to old raster tiles. */
+    fun setNavigationMap(source: NavDashMapRenderer?) {
+        val previous = navigationMap
+        inheritsNavigation = true
+        navigationMap = source
+        if (previous !== source) previous?.close()
+    }
 
     private val accessoryIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 1.6f; strokeCap = Paint.Cap.ROUND; color = Color.rgb(196, 201, 208)
@@ -220,6 +234,13 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
     private val perspectiveCamera = android.graphics.Camera()
 
     fun draw(canvas: Canvas, f: Frame) {
+        if (inheritsNavigation) {
+            val source = navigationMap
+            if (source != null) source.draw(canvas, f) else canvas.drawColor(Color.BLACK)
+            val ink = f.routeColor ?: if (f.goldenRoute) Color.rgb(212, 177, 92) else routeBlue
+            drawChrome(canvas, f, ink, congestionNearRider = false)
+            return
+        }
         val w = canvas.width
         val h = canvas.height
         canvas.drawColor(when (f.style) {
@@ -233,7 +254,7 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
             Style.Black -> null
         }
         val labelFree = f.style == Style.Black
-        val accent = when {
+        val accent = f.routeColor ?: when {
             labelFree && f.goldenRoute -> Color.rgb(212, 177, 92)
             f.style == Style.Light -> routeBlue
             else -> Color.rgb(80, 198, 250)
@@ -393,6 +414,13 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
         }
         if (labelFree) canvas.drawText("© OpenStreetMap contributors · OpenFreeMap", w / 2f, h - 7f, etaSmallPaint)
 
+        drawChrome(canvas, f, accent, congestionNearRider)
+    }
+
+    /** Instrument overlays are display presentation; location, route and voice remain owned by Nav. */
+    private fun drawChrome(canvas: Canvas, f: Frame, accent: Int, congestionNearRider: Boolean) {
+        val w = canvas.width
+        val h = canvas.height
         // ── ETA pill (screen-space so it stays upright; bottom-centre safe zone) ──
         // The dash is round, so it's kept narrow and centred. Shows ETA only (time +
         // arrival clock) — distance lives on the dash's own widget.

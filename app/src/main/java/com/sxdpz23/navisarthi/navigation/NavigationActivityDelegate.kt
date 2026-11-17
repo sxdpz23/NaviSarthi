@@ -32,7 +32,7 @@ class NavigationActivityDelegate(
 
     private fun pipParams(autoEnter: Boolean) = PictureInPictureParams.Builder()
         .setAspectRatio(android.util.Rational(3, 4))
-        .setAutoEnterEnabled(autoEnter)
+        .setAutoEnterEnabled(autoEnter && com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.value.target == null)
         .setSeamlessResizeEnabled(false).build()
 
     fun handleIntent(intent: Intent?) {

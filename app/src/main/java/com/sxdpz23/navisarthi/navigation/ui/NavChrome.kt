@@ -163,21 +163,6 @@ object PreferButtons {
  * away to make room for this one is the wrong trade. The chevron handle opens the step list on its
  * own in both layouts, so nothing becomes unreachable either way.
  */
-object PauseInBar {
-    val on = mutableStateOf(true)
-
-    fun init(context: Context) {
-        on.value = prefs(context).getBoolean(KEY, true)
-    }
-
-    fun set(context: Context, value: Boolean) {
-        on.value = value
-        prefs(context).edit().putBoolean(KEY, value).apply()
-    }
-
-    private fun prefs(c: Context) = c.getSharedPreferences("navigation_settings", Context.MODE_PRIVATE)
-    private const val KEY = "nav_pause_in_bar"
-}
 
 /**
  * What happens to a faster-route offer nobody answers (issue #594).

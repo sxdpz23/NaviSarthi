@@ -141,6 +141,11 @@ object AppTheme {
  * Every place that used to call `isSystemInDarkTheme()` should call this instead. */
 @Composable
 fun isAppInDarkTheme(): Boolean {
+    return resolveAppDark(isSystemInDarkTheme())
+}
+
+/** Shared with Nav's headless console display. */
+fun resolveAppDark(systemDark: Boolean): Boolean {
     // Navigating with the nav day/night toggle on overrides the chosen mode - that IS the setting
     // (issue #262: "my default is dark, but driving in daylight I want the light map"). Driving
     // mode with no route counts as driving (issue #727).
@@ -148,7 +153,7 @@ fun isAppInDarkTheme(): Boolean {
     return when (AppTheme.mode.value) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.SYSTEM -> systemDark
         ThemeMode.AUTO -> AppTheme.night.value
     }
 }
@@ -157,6 +162,10 @@ fun isAppInDarkTheme(): Boolean {
  *  map's own mode, then whatever the app is. */
 @Composable
 fun isMapDark(): Boolean {
+    return resolveMapDark(isSystemInDarkTheme())
+}
+
+fun resolveMapDark(systemDark: Boolean): Boolean {
     // A look Navigation does not paint is as dark as it comes: Navigation's layers over it follow the look.
     val look = com.sxdpz23.navisarthi.navigation.ui.MapLook.style.value
     if (!look.painted) return look.darkLook
@@ -164,7 +173,7 @@ fun isMapDark(): Boolean {
     return when (AppTheme.mapMode.value) {
         MapThemeMode.LIGHT -> false
         MapThemeMode.DARK -> true
-        MapThemeMode.FOLLOW -> isAppInDarkTheme()
+        MapThemeMode.FOLLOW -> resolveAppDark(systemDark)
     }
 }
 

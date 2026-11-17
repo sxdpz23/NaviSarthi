@@ -75,7 +75,7 @@ fun BoxScope.DrawBar(draw: DrawState, vm: MapViewModel) {
         shadowElevation = 6.dp,
         modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp).fillMaxWidth(),
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(selected = !draw.closed, onClick = { vm.drawSetClosed(false) }, label = { Text(stringResource(R.string.shape_line)) }, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape))
                 Spacer(Modifier.width(8.dp))

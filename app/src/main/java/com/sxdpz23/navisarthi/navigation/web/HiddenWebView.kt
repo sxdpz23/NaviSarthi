@@ -135,7 +135,7 @@ abstract class HiddenWebView(
     /** Whether request [id] is still waiting (a late poller for a dead request is a no-op). */
     protected fun isPending(id: String): Boolean = pending.containsKey(id)
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface") // Concrete bridge() objects annotate exported methods; the abstract return type is Any.
     protected fun ensureWebView(): WebView {
         webView?.let { return it }
         val wv = WebView(context)

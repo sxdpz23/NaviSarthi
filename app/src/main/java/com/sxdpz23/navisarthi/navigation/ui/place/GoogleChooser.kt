@@ -131,7 +131,7 @@ fun GoogleStyleDirectionsPanel(
     modifier: Modifier = Modifier,
     onShowTraffic: (() -> Unit)? = null,
 ) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = SheetPalette.ink(dark)
     val dim = SheetPalette.dim(dark)
     val collapsed = remember { mutableStateOf(true) } // Google opens at the summary, not the list
@@ -203,11 +203,10 @@ fun GoogleStyleDirectionsPanel(
         collapsed.value = true
     }
 
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = ink),
+        shape = RoundedCornerShape(28.dp),
+        docked = true,
     ) {
         Column(
             Modifier
@@ -504,7 +503,7 @@ fun GoogleStyleDirectionsPanel(
                                 stringResource(R.string.exp_chooser_along),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = ink,
-                                modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp),
+                                modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 8.dp),
                             )
                             Row(
                                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -525,7 +524,7 @@ fun GoogleStyleDirectionsPanel(
                                     stringResource(R.string.place_steps),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = ink,
-                                    modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 4.dp),
+                                    modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 4.dp),
                                 )
                                 Column(Modifier.padding(start = 20.dp, end = 8.dp)) {
                                     route.maneuvers.forEachIndexed { i, m ->
@@ -576,6 +575,7 @@ fun GoogleStyleDirectionsPanel(
 internal fun modeTitle(mode: TravelMode): String = stringResource(
     when (mode) {
         TravelMode.DRIVE -> R.string.place_mode_drive
+        TravelMode.MOTORBIKE -> R.string.place_mode_motorbike
         TravelMode.TRANSIT -> R.string.place_mode_transit
         TravelMode.WALK -> R.string.place_mode_walk
         TravelMode.BICYCLE -> R.string.place_mode_bike
@@ -630,9 +630,7 @@ internal fun ModeTabs(
     Row(modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp)) {
         listOf(
             Triple(TravelMode.DRIVE, R.string.place_mode_drive, Sym.DirectionsCar),
-            Triple(TravelMode.TRANSIT, R.string.place_mode_transit, Sym.DirectionsBus),
-            Triple(TravelMode.WALK, R.string.place_mode_walk, Sym.DirectionsWalk),
-            Triple(TravelMode.BICYCLE, R.string.place_mode_bike, Sym.DirectionsBike),
+            Triple(TravelMode.MOTORBIKE, R.string.place_mode_motorbike, com.sxdpz23.navisarthi.ui.NaviSarthiIcons.Motor),
         ).forEach { (mode, label, icon) ->
             val sel = mode == currentMode
             val tint = if (sel) MaterialTheme.colorScheme.primary else ink

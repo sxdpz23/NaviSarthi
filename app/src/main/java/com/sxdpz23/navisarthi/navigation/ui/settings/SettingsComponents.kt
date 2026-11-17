@@ -3,6 +3,7 @@ package com.sxdpz23.navisarthi.navigation.ui.settings
 import com.sxdpz23.navisarthi.navigation.ui.icons.Sym
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -80,7 +81,7 @@ internal fun SectionTitle(text: String) {
         text,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.settingsAnchor(text).padding(vertical = 8.dp),
     )
 }
@@ -89,7 +90,7 @@ internal fun SectionTitle(text: String) {
 @Composable
 internal fun CollapsibleSectionTitle(text: String, expanded: Boolean, modifier: Modifier = Modifier, onToggle: () -> Unit) {
     Row(
-        modifier.fillMaxWidth().settingsAnchor(text).dpadHighlight(DpadShape(6.dp)).dpadClickable(onClick = onToggle).padding(vertical = 8.dp),
+        modifier.fillMaxWidth().heightIn(min = 48.dp).settingsAnchor(text).dpadHighlight(DpadShape(6.dp)).dpadClickable(onClick = onToggle).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -110,7 +111,7 @@ internal fun CollapsibleSectionTitle(text: String, expanded: Boolean, modifier: 
 @Composable
 internal fun SelectableRow(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier.fillMaxWidth().settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).dpadClickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier.fillMaxWidth().heightIn(min = 48.dp).settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).dpadClickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // onClick = null: the RadioButton is display-only so the ROW is the single focus stop. A
@@ -160,7 +161,7 @@ internal fun SubHead(text: String) {
         text,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.settingsAnchor(text).padding(top = 10.dp, bottom = 4.dp, start = 16.dp),
     )
 }
@@ -221,7 +222,7 @@ internal fun ToggleRow(
     leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        Modifier.fillMaxWidth().settingsAnchor(label).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().settingsAnchor(label).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {

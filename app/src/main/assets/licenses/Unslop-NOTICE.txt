@@ -1,0 +1,12 @@
+NaviSarthi interface craft pass
+
+The Unslop design audit and nine-pass method were created by Damir Sokolovsky
+(@heydamir): https://heydamir.design/unslop
+Source skill: https://github.com/heydamir/unslop
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+Adapted for NaviSarthi's native Android/Compose interface: mobile spacing,
+typography, contrast, control states, icons, copy and purposeful motion.
+Existing NaviSarthi branding, approved glass navigation, map semantics and
+third-party software/data licenses remain separately attributed.

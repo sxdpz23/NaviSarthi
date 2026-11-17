@@ -114,6 +114,7 @@ fun AppNavigation(
     fun rank(route: String?) = tabs.indexOfFirst { it.route == route }.coerceAtLeast(0)
     val activity = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
     val navigationViewModel: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel = viewModel(viewModelStoreOwner = activity)
+    val pageMotion = com.sxdpz23.navisarthi.navigation.ui.PageTransitions.enabled.value
     val backdrop = rememberGraphicsLayer()
     var backdropOrigin by remember { mutableStateOf(Offset.Zero) }
     var compactBar by remember { mutableStateOf(false) }
@@ -126,13 +127,15 @@ fun AppNavigation(
             }
         }
     }
-    LaunchedEffect(currentRoute) { compactBar = false }
+    LaunchedEffect(currentRoute) {
+        compactBar = false
+        if (currentRoute != Screen.Nav.route) com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.hidePhone()
+    }
     LaunchedEffect(openNav) {
         if (openNav) { navigateTab(Screen.Nav.route); onNavOpened() }
     }
 
     val garageTab by appViewModel.garageTab.collectAsState()
-    val routeState by routeViewModel.state.collectAsState()
 
     // Single source of truth for connection status: the real dash stage. Fixes Home
     // claiming "Connected" while the Dash screen says it isn't.
@@ -159,26 +162,8 @@ fun AppNavigation(
         else -> ConnectionState.Offline
     }
 
-    // Prefetch map tiles the moment a destination resolves (internet still reachable here)
-    LaunchedEffect(routeState.destination?.lat, routeState.destination?.lng) {
-        val d = routeState.destination
-        if (!pod && d?.lat != null && d.lng != null) dashViewModel.prefetchTiles(d.lat, d.lng)
-    }
-
-    // Auto-navigate to Route when a Maps share arrives
-    LaunchedEffect(routeState.pendingNavigate, currentRoute) {
-        if (routeState.pendingNavigate && currentRoute != null) {
-            if (currentRoute != Screen.Route.route) {
-                navController.navigate(Screen.Route.route) { launchSingleTop = true }
-            }
-            routeViewModel.onNavigated()
-        }
-    }
-
     if (com.sxdpz23.navisarthi.navigation.ui.PipMode.active.value) {
-        com.sxdpz23.navisarthi.navigation.ui.theme.NavigationTheme(darkTheme = com.sxdpz23.navisarthi.navigation.ui.theme.isAppInDarkTheme()) {
-            com.sxdpz23.navisarthi.navigation.ui.NavigationRoot(vm = navigationViewModel)
-        }
+        NavScreen(navigationViewModel, pod, onOpenSettings = {})
         return
     }
 
@@ -190,8 +175,8 @@ fun AppNavigation(
             NavHost(
                 navController = navController,
                 startDestination = consoleRoute,
-                enterTransition = { slideInHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) 24 else -24 } + fadeIn(tween(220)) },
-                exitTransition = { slideOutHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) -24 else 24 } + fadeOut(tween(180)) },
+                enterTransition = { if (!pageMotion) androidx.compose.animation.EnterTransition.None else slideInHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) 24 else -24 } + fadeIn(tween(220)) },
+                exitTransition = { if (!pageMotion) androidx.compose.animation.ExitTransition.None else slideOutHorizontally(tween(240)) { if (rank(targetState.destination.route) >= rank(initialState.destination.route)) -24 else 24 } + fadeOut(tween(180)) },
             ) {
                 // Restore an older task directly into the new console-first shell.
                 composable(Screen.Home.route) {
@@ -204,55 +189,18 @@ fun AppNavigation(
                 }
 
                 composable(Screen.Nav.route) {
-                    NavScreen(navigationViewModel, pod, onOpenSettings = { navigateTab(Screen.Settings.route) }) { stops, legs, offline ->
-                        if (pod) {
-                            podViewModel.startJourney(stops, com.sxdpz23.navisarthi.dash.nav.RouteMode.Car, legs, offline)
-                            if (podViewModel.ble.state.value.stage != PodStage.READY) {
-                                if (podViewModel.ble.savedAddress != null) podViewModel.ble.connect() else podViewModel.ble.discover()
-                            }
-                        } else {
-                            dashViewModel.startJourney(stops, com.sxdpz23.navisarthi.dash.nav.RouteMode.Car, legs, offline)
-                            dashViewModel.connect()
-                        }
-                        navigateTab(consoleRoute)
-                    }
+                    NavScreen(navigationViewModel, pod, onOpenSettings = { navController.navigate(Screen.NavigationSettings.route) })
                 }
+                // Compatibility with restored tasks; there is only one route editor now.
                 composable(Screen.Route.route) {
-                    RouteScreen(
-                        routeViewModel = routeViewModel,
-                        onBack = { navController.popBackStack() },
-                        onSentToDash = { _ ->
-                            navigationViewModel.stopNav()
-                            val plan = routeViewModel.state.value
-                            if (pod) {
-                                podViewModel.startJourney(plan.stops, plan.mode, plan.legs, offline = plan.offline)
-                                if (podViewModel.ble.state.value.stage != PodStage.READY) {
-                                    if (podViewModel.ble.savedAddress != null) podViewModel.ble.connect()
-                                    else podViewModel.ble.discover()
-                                }
-                            } else {
-                                dashViewModel.startJourney(plan.stops, plan.mode, plan.legs, offline = plan.offline)
-                                // Wi-Fi → auth → stream; Pod navigation never enters this branch.
-                                dashViewModel.connect()
-                            }
-                            navController.navigate(consoleRoute) {
-                                popUpTo(consoleRoute)
-                            }
-                        },
-                    )
-                }
-
-                // The inactive console destination is absent from this vehicle's graph.
-                composable(consoleRoute) {
-                    Column(Modifier.fillMaxSize()) {
-                        com.sxdpz23.navisarthi.ui.components.NaviSarthiBtn(
-                            "Console route", onClick = { navController.navigate(Screen.Route.route) },
-                            icon = NaviSarthiIcons.Route,
-                            variant = com.sxdpz23.navisarthi.ui.components.BtnVariant.Secondary,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                        )
-                        Box(Modifier.weight(1f)) { if (pod) PodScreen(vm = podViewModel) else DashScreen(vm = dashViewModel) }
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Screen.Nav.route) {
+                            popUpTo(Screen.Route.route) { inclusive = true }; launchSingleTop = true
+                        }
                     }
+                }
+                composable(consoleRoute) {
+                    if (pod) PodScreen(vm = podViewModel) else DashScreen(vm = dashViewModel)
                 }
 
                 composable(Screen.Garage.route) {

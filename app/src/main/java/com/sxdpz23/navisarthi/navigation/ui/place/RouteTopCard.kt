@@ -91,18 +91,16 @@ fun RouteTopCard(
     onUpdateRoute: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val ink = MaterialTheme.colorScheme.onSurface
-    val dim = MaterialTheme.colorScheme.onSurfaceVariant
+    val ink = androidx.compose.ui.graphics.Color(0xFFF3F1EC)
+    val dim = androidx.compose.ui.graphics.Color(0xFFB9BEC5)
     // A trip from a link: while its places are looked up the card lists them as the link names
     // them, and nothing on it can be edited until they have all answered.
     val link = LinkTrip.view.value
     val resolving = link?.resolving == true
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(28.dp),
         // Same tone as the search bar it replaces, so the top chrome reads as one family.
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)) {
             IconButton(onClick = onClose, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {

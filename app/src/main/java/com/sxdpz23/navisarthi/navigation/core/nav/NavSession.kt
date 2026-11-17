@@ -705,24 +705,7 @@ class NavSession @Inject constructor(
      * junction, a car park round the back), reroute once from where we are; if we are still on
      * it, just carry on, and say the current instruction so the drive picks back up out loud.
      */
-    fun setPaused(on: Boolean) {
-        val s = _state.value
-        if (!s.navigating || s.paused == on) return
-        backOnRouteHits = 0
-        autoResumeArmed = false
-        _state.update { it.copy(paused = on) }
-        note(if (on) "paused" else "resumed")
-        if (on) return
-        val route = s.route ?: return
-        val loc = lastLoc ?: return
-        val off = perpendicularToRouteM(route, loc) > NavEngine.offRouteCorridor(mode, null)
-        if (off) {
-            note("resumed off the route -> rerouting")
-            reroute(loc, lastBearing)
-        } else {
-            voice.speak(_state.value.maneuverText, interrupt = false)
-        }
-    }
+
 
     /**
      * Rolling away from the stop resumes by itself, because forgetting to un-pause is the obvious
@@ -1148,7 +1131,7 @@ class NavSession @Inject constructor(
             // is the same turn. A failed second ask keeps the first answer.
             fun trustedNow() = lastTrustedFix?.takeIf { SystemClock.elapsedRealtime() - lastTrustedFixMs <= TRUSTED_FIX_MAX_AGE_MS }
             var lateAsks = 0
-            while (mode == TravelMode.DRIVE && lateAsks < LATE_TURN_ASKS) {
+            while (mode.isRoad && lateAsks < LATE_TURN_ASKS) {
                 val got = landed ?: break
                 val car = trustedNow() ?: break
                 val speed = lastTrustedSpeedMps

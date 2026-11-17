@@ -30,18 +30,24 @@ fun PodScreen(vm: PodViewModel) {
     val connection by vm.ble.state.collectAsState()
     val ctx = LocalContext.current
     val miles = ctx.getSharedPreferences("guidance", android.content.Context.MODE_PRIVATE).getString("units", "Kilometres") == "Miles"
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp).padding(bottom = 112.dp),
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ScreenHeader(title = "Meteor 350 · Tripper Pod", hint = "Turn-by-turn guidance over Bluetooth")
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        if (!nav.navProjection) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             PodPreview(nav.cue, nav.turnMeters?.let {
                 if (miles) "${(it * 3.28084).toInt()} ft" else "${it.toInt()} m"
             } ?: "Tripper Pod")
         }
-        if (nav.destination != null) {
+        if (nav.navProjection) {
+            NaviSarthiCard(modifier = Modifier.fillMaxWidth()) {
+                Text("Navigation is on Pod", color = TextHi)
+                ControlHint("Use Nav to temporarily view progress or edit the shared route")
+            }
+        }
+        if (!nav.navProjection && nav.destination != null) {
             NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp) {
                 Text(nav.destination!!, color = TextHi, fontSize = 19.sp)
-                Text("Stop ${nav.stopNumber} of ${nav.stopCount}", color = TextMid)
+                if (nav.stopCount > 0) Text("Stop ${nav.stopNumber} of ${nav.stopCount}", color = TextMid)
                 nav.remainingMeters?.let {
                     val distance = if (miles) "%.1f mi".format(it / 1609.344) else "%.1f km".format(it / 1000)
                     Text("$distance remaining · ${nav.etaMinutes ?: "—"} min", color = Gold)

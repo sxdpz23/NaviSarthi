@@ -155,7 +155,7 @@ internal fun BoxScope.DrivingChrome(state: MapUiState, vm: MapViewModel) {
             },
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -19,8 +19,8 @@ val Line3  = Color(0x33FFFFFF)
 // ---- Text ----
 val TextHi  = Color(0xFFF3F1EC)
 val TextMid = Color(0xFF9EA0A3)
-val TextLo  = Color(0xFF65686B)
-val TextDis = Color(0xFF44474A)
+val TextLo  = Color(0xFF91969C)
+val TextDis = Color(0xFF72777D)
 
 // Accent tokens follow the vehicle selected by the rider.
 val Gold: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.accent
@@ -34,7 +34,7 @@ val OnGold: Color @Composable @ReadOnlyComposable get() = LocalVehicle.current.o
 // ---- Status ----
 val Warn    = Color(0xFFD8853E)
 val Alert   = Color(0xFFD45C42)
-val Offline = Color(0xFF65686B)
+val Offline = Color(0xFF91969C)
 
 // ---- Map ----
 val MapBase = Color(0xFF0E1416)

@@ -1382,7 +1382,7 @@
     <string name="settings_google_uses_traffic">Trafego e rotas</string>
     <string name="list_delete_title">Remover %1$s?</string>
     <plurals name="lists_delete_count">
-        <item quantity="one">Remover esta lista?</item>
+        <item quantity="one">Remover %d lista?</item>
         <item quantity="many">Remover %d listas?</item>
         <item quantity="other">Remover %d listas?</item>
     </plurals>

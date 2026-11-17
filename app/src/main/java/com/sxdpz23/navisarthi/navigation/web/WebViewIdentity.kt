@@ -35,7 +35,7 @@ object WebViewIdentity {
         settings.allowFileAccess = false
         settings.allowContentAccess = false
         settings.setGeolocationEnabled(false)
-        val rwSupported = WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)
+        val rwSupported = WebViewFeature.isFeatureSupported("REQUESTED_WITH_HEADER_ALLOW_LIST")
         val rwResult = if (rwSupported) {
             runCatching {
                 WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())

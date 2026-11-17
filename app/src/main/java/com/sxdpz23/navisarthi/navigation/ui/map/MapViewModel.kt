@@ -64,6 +64,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -574,6 +575,8 @@ class MapViewModel @Inject constructor(
     }
 
     init {
+        com.sxdpz23.navisarthi.navigation.ui.TransitLayer.set(appContext, false)
+        com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.bind(appContext, viewModelScope, state, navSession, ::stopNav)
         // The drive's opening line is synthesized while its route preview is up (settled for
         // 1.5 s), so Start plays it instead of synthesizing during the fly-in: two voice threads
         // on the 4a's fast cores held the map to 5-7 fps in seconds 3-4 of every drive start.
@@ -857,29 +860,7 @@ class MapViewModel @Inject constructor(
      *  elapsed time, and HOLDS the dot at a standstill so a parked car's GPS noise doesn't make it
      *  hop (Google keeps it still). Reused by the live collector and the replay collector. */
     private fun sanePosition(here: LatLng, prev: LatLng?, lastSpeed: Float?, dt: Double, outlierStreak: IntArray): LatLng {
-        // No baseline, or the FIRST fix of a session (dt < 0) → anchor here. Without this, a
-        // replay that starts away from your live position rejected EVERY fix as an "outlier" vs
-        // the stale start point, so the dot never moved ("replay thinks I'm stationary").
-        if (prev == null || dt < 0.0) { outlierStreak[0] = 0; return here }
-        val moved = prev.distanceTo(here)
-        val sp = lastSpeed ?: 0f
-        // Outlier: farther than (last speed + accel headroom) × elapsed + GPS slack is implausible
-        // for one step → a NETWORK/multipath leap; keep the prior position. BUT if the leap
-        // PERSISTS a couple of fixes it's the new reality (a real teleport), so accept + re-anchor
-        // instead of getting stuck rejecting forever against a stale point.
-        val plausible = (sp + 12f) * dt + 35.0
-        if (moved > plausible) {
-            if (outlierStreak[0] >= 2) { outlierStreak[0] = 0; return here }
-            outlierStreak[0]++
-            return prev
-        }
-        outlierStreak[0] = 0
-        // Speed-adaptive LOW-PASS on the position: heavy smoothing at low speed (so parked/idle
-        // GPS jitter barely nudges the dot — Google smooths this, OsmAnd doesn't), easing to a 1:1
-        // follow by ~10 m/s where real movement dominates the noise. Replaces a binary standstill
-        // hold whose hard speed cliff the GPS speed-noise kept tripping (the "still jumps at idle").
-        val k = (sp / 10f).coerceIn(0.12f, 1f).toDouble()
-        return LatLng(prev.lat + (here.lat - prev.lat) * k, prev.lng + (here.lng - prev.lng) * k)
+        return com.sxdpz23.navisarthi.navigation.core.location.NavPositionFilter.filter(here, prev, lastSpeed, dt, outlierStreak)
     }
 
     fun startLocation() {
@@ -953,7 +934,11 @@ class MapViewModel @Inject constructor(
             val posOutlierStreak = intArrayOf(0)
             var lastAccM = Float.NaN // accuracy of the last fix the dot took, and when (issue #630)
             var lastAccRtNanos = 0L
-            locationProvider.updates().collect { loc ->
+            com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state
+                .map { if (it.active && !it.phoneVisible && !it.editing) it.locationIntervalMs else 1_000L }
+                .distinctUntilChanged()
+                .flatMapLatest { locationProvider.updates(minIntervalMs = it) }
+                .collect { loc ->
                 // Belt-and-suspenders with the startLocation guard: if this collector was already in
                 // flight when a replay began (cancel hadn't landed yet), drop every real fix while the
                 // trace is playing so it can't snap the puck back to the user's actual location.
@@ -1107,6 +1092,16 @@ class MapViewModel @Inject constructor(
                 // accuracy for minutes), SAY so — the frozen banner used to be indistinguishable
                 // from working nav (the stale timer never fires while coarse fixes keep coming).
                 if (isGps && (!loc.hasAccuracy() || loc.accuracy <= 50f)) {
+                    // Dash gets the same accepted Nav measurement, never a network fix or a held outlier.
+                    if (com.sxdpz23.navisarthi.navigation.core.location.NavPositionFilter.accepted(here, prev)) {
+                        val displayFix = android.location.Location(loc).apply {
+                            latitude = here.lat; longitude = here.lng
+                            if (!hasAccuracy()) accuracy = accM // same GPS fallback Nav accepted
+                            if (fixBearing != null) this.bearing = fixBearing else removeBearing()
+                            if (speed != null) this.speed = speed else removeSpeed()
+                        }
+                        com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.publishFix(displayFix)
+                    }
                     navSession.onLocation(
                         here, com.sxdpz23.navisarthi.navigation.ui.Units.imperial.value, speed?.toDouble(),
                         accuracyM = if (loc.hasAccuracy()) loc.accuracy.toDouble() else null,
@@ -1114,7 +1109,7 @@ class MapViewModel @Inject constructor(
                         // reroute's departure heading. Fresh only: stopped = null.
                         bearingDeg = fixBearing?.toDouble(),
                         // An outlier hold steers with the last good position; it never starts a recheck.
-                        fromFix = here == rawHere,
+                        fromFix = com.sxdpz23.navisarthi.navigation.core.location.NavPositionFilter.accepted(here, prev),
                     )
                     nav.lastNavFedMs = nowMs
                     nav.recordDriveFix(here)
@@ -3254,7 +3249,7 @@ class MapViewModel @Inject constructor(
         val mids = all.filter { !it.via }
         LinkTrip.view.value = LinkTrip.View(start?.let { LinkTrip.Row(it.label) }, mids.map { LinkTrip.Row(it.label) }, LinkTrip.Row(link.label))
         linkTripFor = null
-        val mode = link.mode ?: stickyTravelMode()
+        val mode = (link.mode ?: stickyTravelMode()).roadMode()
         val (avTolls, avHighways, avFerries) = stickyAvoid()
         _state.update {
             it.copy(
@@ -5556,7 +5551,7 @@ class MapViewModel @Inject constructor(
 
     /** Point the routing flag at this trip's traffic choice ([com.sxdpz23.navisarthi.navigation.ui.RouteTrafficOnTap]). */
     fun syncRouteTraffic() {
-        com.sxdpz23.navisarthi.navigation.core.data.RoutingPrefs.googleTraffic = !com.sxdpz23.navisarthi.navigation.ui.RouteTrafficOnTap.on.value || _state.value.routeTrafficRequested
+        com.sxdpz23.navisarthi.navigation.core.data.RoutingPrefs.googleTraffic = !com.sxdpz23.navisarthi.navigation.ui.RouteTrafficOnTap.on.value || _state.value.routeTrafficRequested || com.sxdpz23.navisarthi.navigation.ui.Traffic.on.value
     }
 
     /** "Show traffic" tapped: ask Google for this trip and refetch the routes. */
@@ -5598,13 +5593,13 @@ class MapViewModel @Inject constructor(
         _state.update { it.copy(avoidTolls = avTolls, avoidHighways = avHighways, avoidFerries = avFerries) }
         syncRoutingAvoid()
         val fromLink = linkMode.also { linkMode = null }
-        val mode = fromLink ?: if (sel.id.startsWith("parking:")) TravelMode.WALK else stickyTravelMode()
+        val mode = (fromLink ?: stickyTravelMode()).roadMode()
         // A fresh trip carries no link's dragged points or not-found note: a link's trip sets
         // those itself (openTripLink) and never comes through here.
         linkPlan = null
         clearLinkTrip()
         when {
-            fromLink != null -> { _state.update { it.copy(travelMode = fromLink) }; route(fromLink) }
+            fromLink != null -> { _state.update { it.copy(travelMode = mode) }; route(mode) }
             mode != _state.value.travelMode -> setTravelMode(mode)
             else -> route(mode)
         }
@@ -5900,7 +5895,7 @@ class MapViewModel @Inject constructor(
 
     init {
         com.sxdpz23.navisarthi.navigation.ui.ParkingActions.saveHere = ::saveParkingSpot
-        com.sxdpz23.navisarthi.navigation.ui.ParkingActions.arrivedByCar = { _state.value.travelMode == TravelMode.DRIVE }
+        com.sxdpz23.navisarthi.navigation.ui.ParkingActions.arrivedByCar = { _state.value.travelMode.isRoad }
         com.sxdpz23.navisarthi.navigation.ui.ParkingActions.parkedAt = { _state.value.parkedAtMillis }
     }
     init { com.sxdpz23.navisarthi.navigation.ui.SavedActions.rename = ::renamePlace; com.sxdpz23.navisarthi.navigation.ui.ShapeActions.delete = ::deleteOpenedShape; com.sxdpz23.navisarthi.navigation.ui.ShapeActions.edit = ::editOpenedShape; com.sxdpz23.navisarthi.navigation.ui.RouteActions.pinTrip = ::pinTripShortcut; com.sxdpz23.navisarthi.navigation.ui.RouteActions.modeKey = { com.sxdpz23.navisarthi.navigation.ui.TripShortcut.defaultIcon(_state.value.travelMode) }; com.sxdpz23.navisarthi.navigation.ui.RouteActions.camerasChanged = { if (_state.value.directionsOpen) route(_state.value.travelMode) } }
@@ -6467,7 +6462,8 @@ class MapViewModel @Inject constructor(
             .getOrNull() ?: route.copy(provisional = false)
     }
 
-    fun setTravelMode(mode: TravelMode) {
+    fun setTravelMode(requestedMode: TravelMode) {
+        val mode = requestedMode.roadMode()
         if (_state.value.travelMode == mode) return
         // Sticky: the pick becomes the default for the NEXT directions session too (a cyclist
         // shouldn't re-tap Bike every trip; Google remembers the same way). No Settings row -
@@ -6527,7 +6523,7 @@ class MapViewModel @Inject constructor(
             appContext.getSharedPreferences("navigation_settings", android.content.Context.MODE_PRIVATE)
                 .getString("travel_mode", null) ?: return TravelMode.DRIVE,
         )
-    }.getOrDefault(TravelMode.DRIVE)
+    }.getOrDefault(TravelMode.DRIVE).roadMode()
 
     /** Set the depart/arrive time for directions (mode 0=now, 1=depart at, 2=arrive by, 3=last available;
      *  [epochSec] null for now) and re-route so transit shows departures at that time. */
@@ -6543,7 +6539,9 @@ class MapViewModel @Inject constructor(
         if (_state.value.travelMode == TravelMode.TRANSIT) route(TravelMode.TRANSIT)
     }
 
-    private fun route(mode: TravelMode) {
+    private fun route(requestedMode: TravelMode) {
+        val mode = requestedMode.roadMode()
+        if (_state.value.travelMode != mode) _state.update { it.copy(travelMode = mode) }
         val s = _state.value
         val place = s.selected?.location ?: return
         // The "from" endpoint: a custom origin if set, else your live location.
@@ -6743,7 +6741,7 @@ class MapViewModel @Inject constructor(
      *  own travel mode, without touching the sticky one. */
     fun openSavedRoute(r: com.sxdpz23.navisarthi.navigation.core.model.SavedRoute) {
         val dest = Place(id = "saved-route:${r.id}", name = r.destLabel.ifBlank { r.name }, location = r.dest)
-        linkMode = runCatching { TravelMode.valueOf(r.mode) }.getOrNull()
+        linkMode = runCatching { TravelMode.valueOf(r.mode).roadMode() }.getOrNull()
         selectPlace(dest)
         routeToSelected()
         if (r.isRun) {
@@ -6899,7 +6897,7 @@ class MapViewModel @Inject constructor(
             // re-rank and was the only one tried). One request budget for the trip, shared in list
             // order (the leader first), and a cluster already tried from another route is skipped,
             // since routes share arterials and the same corner gets the same side streets.
-            if (com.sxdpz23.navisarthi.navigation.ui.FlockDetour.on.value && mode == TravelMode.DRIVE) {
+            if (com.sxdpz23.navisarthi.navigation.ui.FlockDetour.on.value && mode.isRoad) {
                 val routesNow = _state.value.routes
                 val countsNow = _state.value.flockOnRoute
                 if (routesNow.size == countsNow.size && countsNow.any { it > 0 }) {
@@ -7131,7 +7129,7 @@ class MapViewModel @Inject constructor(
         modeEtaJob?.cancel()
         val known = modeEtaCache[key].orEmpty()
         // Cheap OSRM modes first; transit last because it is a hidden-WebView page load.
-        val missing = listOf(TravelMode.DRIVE, TravelMode.WALK, TravelMode.BICYCLE, TravelMode.TRANSIT)
+        val missing = TravelMode.roadModes
             .filter { it != except && it !in known }
             .filter { it != TravelMode.TRANSIT || com.sxdpz23.navisarthi.navigation.core.data.RoutingPrefs.googleTraffic || googleOff() } // a Google page load, unless the planner answers
         if (missing.isEmpty()) return
@@ -7351,11 +7349,7 @@ class MapViewModel @Inject constructor(
     /** Hold the drive where it is, or let it go again (the nav Pause button). The route, the
      *  stops and the figures stay put; the puck keeps following you. Resuming reroutes from here
      *  if the stop took us off the route, and driving on resumes it by itself. */
-    fun toggleNavPause() {
-        val s = _state.value
-        if (!s.navigating) return
-        navSession.setPaused(!s.navPaused)
-    }
+
 
     /** The drive's speaker button: On, then Alerts only, then Off, then On again (issue 735). */
     fun toggleVoice() = when {
@@ -9546,7 +9540,7 @@ class MapViewModel @Inject constructor(
         // House-number labels are browse furniture for a CAR: during drive-nav the layers are
         // hidden anyway (the declutter effect), so skip the per-viewport manifest/source churn too
         // (battery). Walking/biking keeps them - you navigate TO house numbers on foot.
-        if (_state.value.navigating && _state.value.travelMode == TravelMode.DRIVE) return
+        if (_state.value.navigating && _state.value.travelMode.isRoad) return
         viewModelScope.launch {
             runCatching {
                 val man = addressManifestCache
@@ -9870,7 +9864,7 @@ class MapViewModel @Inject constructor(
 
     private fun refreshTransitLines(south: Double, west: Double, north: Double, east: Double, zoom: Double) {
         val off = !com.sxdpz23.navisarthi.navigation.ui.TransitLayer.on.value || zoom < TRANSIT_LINES_MIN_ZOOM ||
-            (_state.value.navigating && _state.value.travelMode == TravelMode.DRIVE)
+            (_state.value.navigating && _state.value.travelMode.isRoad)
         if (off) {
             transitLinesKey = null
             transitLinesJob?.cancel()

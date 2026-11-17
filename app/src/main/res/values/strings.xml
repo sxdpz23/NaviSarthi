@@ -1993,7 +1993,8 @@
 
 <string name="settings_parking_history_empty">No parking spots saved yet. Tap the P button on the map to save where you parked.</string>
 
-<string name="mapscreen_section_lists">Your lists</string>
+<string name="mapscreen_section_lists">Saved Destinations</string>
+<string name="place_mode_motorbike">Motorbike</string>
 
 <string name="mapscreen_new_list">New</string>
 
@@ -2087,7 +2088,7 @@
 
 <string name="draw_delete">Delete this drawing</string>
 
-<string name="map_list_saved">Saved “%1$s” to your lists</string>
+<string name="map_list_saved">Saved “%1$s” to Saved Destinations</string>
 
 <string name="settings_update_nightly">Include nightly builds</string>
 
@@ -2453,7 +2454,7 @@
 
 <string name="settings_hub_offline_sub">Offline maps, routing, places</string>
 
-<string name="settings_hub_saved_sub">Your lists, export, parking history</string>
+<string name="settings_hub_saved_sub">Saved Destinations, export, parking history</string>
 
 <string name="settings_hub_privacy_sub">What Google receives, clearing history</string>
 
@@ -2967,4 +2968,6 @@
 <string name="navigation_credits_title">Map data and licenses</string>
 <string name="navigation_credits_intro">Navigation is part of NaviSarthi. It includes adapted Vela source under GPL-3.0 and the map, voice, and data libraries credited below.</string>
 <string name="navigation_license">Read navigation software license</string>
+    <string name="craft_back">Back</string>
+    <string name="craft_app_font">NaviSarthi default · Geist</string>
 </resources>

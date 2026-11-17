@@ -56,12 +56,12 @@ class NavigationMenuScope internal constructor(internal val dpad: Boolean) {
  * DOWN/UP walk, BACK/outside dismiss.
  */
 @Composable
-fun NavigationMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Composable NavigationMenuScope.() -> Unit) {
+fun NavigationMenu(expanded: Boolean, onDismissRequest: () -> Unit, glass: Boolean = false, content: @Composable NavigationMenuScope.() -> Unit) {
     val dpadFirst = rememberDpadFirstDevice()
     if (dpadFirst) {
         if (expanded) {
             Dialog(onDismissRequest = onDismissRequest) {
-                Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 6.dp) {
+                com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(shape = RoundedCornerShape(28.dp)) {
                     // Cap to 85% of the screen and scroll — a long menu (many items) must not run off
                     // a small screen with the bottom items unreachable. Focus follows into view as
                     // DOWN walks past the fold.
@@ -85,10 +85,13 @@ fun NavigationMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Co
             expanded = expanded,
             onDismissRequest = onDismissRequest,
             offset = androidx.compose.ui.unit.DpOffset(0.dp, 6.dp),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
+            containerColor = if (glass) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = if (glass) 0.dp else 8.dp,
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp),
         ) {
-            NavigationMenuScope(dpad = false).content()
+            if (glass) com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard { NavigationMenuScope(dpad = false).content() }
+            else NavigationMenuScope(dpad = false).content()
         }
     }
 }

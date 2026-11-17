@@ -40,6 +40,7 @@ import com.sxdpz23.navisarthi.navigation.ui.theme.ThemeMode
 internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     SettingsScaffold(stringResource(R.string.settings_appearance), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
         SettingsGroup {
@@ -145,7 +146,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 // downloads the file synchronously inside openInputStream (an ANR on Drive).
                 fontScope.launch {
                     val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val name = queryDisplayName(context, uri) ?: context.getString(R.string.settings_font_custom)
+                        val name = queryDisplayName(context, uri) ?: contextResources.getString(R.string.settings_font_custom)
                         com.sxdpz23.navisarthi.navigation.ui.AppFont.setCustom(context, uri, name)
                     }
                     if (!ok) android.widget.Toast.makeText(context, fontBad, android.widget.Toast.LENGTH_SHORT).show()
@@ -153,6 +154,12 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             }
         }
         SettingsGroup(title = stringResource(R.string.settings_font)) {
+            SelectableRow(
+                label = stringResource(R.string.craft_app_font),
+                selected = com.sxdpz23.navisarthi.navigation.ui.AppFont.appDefault.value,
+                onClick = { com.sxdpz23.navisarthi.navigation.ui.AppFont.setAppDefault(context) },
+            )
+            GroupDivider()
             // The font's own name, not translated; open-licensed (OFL), so it ships in the app.
             // First because it is the default.
             SelectableRow(
@@ -163,7 +170,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             GroupDivider()
             SelectableRow(
                 label = stringResource(R.string.settings_font_system),
-                selected = com.sxdpz23.navisarthi.navigation.ui.AppFont.customName.value == null && !com.sxdpz23.navisarthi.navigation.ui.AppFont.builtin.value,
+                selected = com.sxdpz23.navisarthi.navigation.ui.AppFont.customName.value == null && !com.sxdpz23.navisarthi.navigation.ui.AppFont.builtin.value && !com.sxdpz23.navisarthi.navigation.ui.AppFont.appDefault.value,
                 onClick = { com.sxdpz23.navisarthi.navigation.ui.AppFont.clear(context) },
             )
             GroupDivider()

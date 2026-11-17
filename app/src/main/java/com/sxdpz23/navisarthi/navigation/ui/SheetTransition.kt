@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 internal val LocalSheetActive = androidx.compose.runtime.compositionLocalOf { true }
 
 /** Retains the outgoing snapshot until it has slid away, including after model data is cleared. */
+@android.annotation.SuppressLint("NoCollectCallFound") // consumeSheetBack collects the progress flow and handles cancellation.
 @Composable
 internal fun <T> SheetTransition(
     targetState: T,

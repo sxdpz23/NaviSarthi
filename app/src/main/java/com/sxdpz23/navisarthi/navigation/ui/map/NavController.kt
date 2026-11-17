@@ -904,7 +904,7 @@ internal class NavController(
         if (lat.isNaN() || lng.isNaN()) { clearPersistedNav(); return }
         resumeDest = LatLng(lat.toDouble(), lng.toDouble())
         resumeMode = runCatching { TravelMode.valueOf(navResumePrefs.getString("mode", null) ?: "DRIVE") }
-            .getOrDefault(TravelMode.DRIVE)
+            .getOrDefault(TravelMode.DRIVE).roadMode()
         _state.update { it.copy(resumeNavLabel = navResumePrefs.getString("label", "") ?: "") }
     }
 

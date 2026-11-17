@@ -63,6 +63,7 @@ import kotlinx.coroutines.withContext
 internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onCloseSettings: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val prefs = remember { context.getSharedPreferences("navigation_settings", android.content.Context.MODE_PRIVATE) }
     SettingsScaffold(stringResource(R.string.settings_diagnostics), onBack) { topRow ->
         Spacer(Modifier.height(4.dp))
@@ -100,7 +101,7 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                     if (intent != null) runCatching { context.startActivity(intent) }
                     else android.widget.Toast.makeText(
                         context,
-                        context.getString(R.string.settings_diag_nothing),
+                        contextResources.getString(R.string.settings_diag_nothing),
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                 }) { Text(stringResource(R.string.settings_diag_export)) }
@@ -136,7 +137,7 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                     if (intent != null) runCatching { context.startActivity(intent) }
                     else android.widget.Toast.makeText(
                         context,
-                        context.getString(R.string.settings_nav_trace_empty),
+                        contextResources.getString(R.string.settings_nav_trace_empty),
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                 }) { Text(stringResource(R.string.settings_nav_trace_export)) }
@@ -359,7 +360,7 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                         // redraw the old name, which reads as the button doing nothing.
                         if (!ok) android.widget.Toast.makeText(
                             context,
-                            context.getString(R.string.settings_trip_rename_failed),
+                            contextResources.getString(R.string.settings_trip_rename_failed),
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                         reloadTrips()

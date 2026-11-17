@@ -39,6 +39,7 @@ object LocalBasemapTiles : Interceptor {
                 okhttp3.OkHttpClient.Builder()
                     .dispatcher(okhttp3.Dispatcher().apply { maxRequestsPerHost = 20 })
                     .addInterceptor(this)
+                    .addInterceptor(SnapshotBasemapTiles)
                     .addInterceptor(StreamedPmtiles) // a streamed archive's tiles, read by Navigation, not by MapLibre's PMTiles path
                     // After the local hooks: a tile answered from a file or an archive is not proof of a network.
                     .addInterceptor(com.sxdpz23.navisarthi.navigation.core.net.NetHealth.interceptor)

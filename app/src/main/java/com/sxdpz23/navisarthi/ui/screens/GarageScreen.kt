@@ -109,7 +109,7 @@ fun GarageScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(18.dp)
+            .padding(20.dp)
             .padding(bottom = ControlSpacing.PageBottom),
     ) {
         ScreenHeader(
@@ -125,7 +125,7 @@ fun GarageScreen(
             options = listOf("Maintenance", "Fuel diary", "Glovebox"),
             selected = tab,
             onSelect = onTabChange,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
         )
 
         when (tab) {
@@ -218,7 +218,7 @@ private fun MaintenanceTab(
             Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
                 Column {
                     Eyebrow("Most urgent")
-                    Text(hero.item.name, color = TextHi, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = GeistFamily, letterSpacing = (-0.36).sp, modifier = Modifier.padding(top = 5.dp))
+                    Text(hero.item.name, color = TextHi, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily, letterSpacing = 0.sp, modifier = Modifier.padding(top = 5.dp))
                 }
                 NaviSarthiChip(
                     hero.dueLabel,
@@ -260,7 +260,7 @@ private fun MaintenanceTab(
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(row.svc.label, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-                            if (row.svc.free) { Spacer(Modifier.width(6.dp)); Text("FREE", color = Gold, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily) }
+                            if (row.svc.free) { Spacer(Modifier.width(6.dp)); Text("Free", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily) }
                         }
                         Text(
                             if (row.availed) "Done · ${dfLog.format(Date(row.availedDateMs))} · ${"%,d".format(row.availedOdoKm)} km"
@@ -288,7 +288,7 @@ private fun MaintenanceTab(
 
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.maint.isEmpty()) {
-            Text("No intervals yet — add one below.", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+            Text("No intervals yet — add one below.", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
         }
         ui.maint.forEachIndexed { i, row ->
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -300,11 +300,11 @@ private fun MaintenanceTab(
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(row.item.name, color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
+                    Text(row.item.name, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
                     Text("Every ${intervalLabel(row.item)}", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(row.dueLabel, color = color, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
+                    Text(row.dueLabel, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                     Spacer(Modifier.height(6.dp))
                     Box(Modifier.width(56.dp).height(4.dp).clip(CircleShape).background(Surf3)) {
                         Box(Modifier.fillMaxWidth(fill).fillMaxHeight().clip(CircleShape).background(color))
@@ -333,7 +333,7 @@ private fun MaintenanceTab(
                             Text(rec.title.ifBlank { "Service" }, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
                             Spacer(Modifier.width(6.dp))
                             Text(if (rec.kind == "diy") "DIY" else if (rec.kind == "company") "Company" else "Other",
-                                color = TextLo, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily)
+                                color = TextLo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                         }
                         Text(
                             buildString {
@@ -356,11 +356,11 @@ private fun MaintenanceTab(
 
 @Composable
 private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> Unit) {
-    NaviSarthiCard(modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+    NaviSarthiCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
         Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
             Column {
                 Eyebrow("Avg. efficiency · 30 days")
-                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 7.dp)) {
+                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
                     Text(ui.avgKmpl30?.let { "%.1f".format(it) } ?: "—", color = Gold, fontSize = 38.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily, letterSpacing = (-0.76).sp)
                     Spacer(Modifier.width(6.dp))
                     Text("km / l", color = TextMid, fontSize = 14.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(bottom = 5.dp))
@@ -378,12 +378,12 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
         }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 18.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 20.dp)) {
         listOf(
             Pair("₹${"%,.0f".format(ui.spent30)}", "Spent · 30 days"),
             Pair("%.1f l".format(ui.litres30), "Fuel · ${ui.fills30} fills"),
         ).forEach { (v, k) ->
-            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Surf1).border(1.dp, Line, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Surf1).border(1.dp, Line, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 16.dp)) {
                 Text(v, color = TextHi, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                 Eyebrow(k, Modifier.padding(top = 4.dp))
             }
@@ -393,7 +393,7 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
     ControlSection("Fill-ups")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.fuel.isEmpty()) {
-            Text("No fill-ups yet — add your first below.", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+            Text("No fill-ups yet — add your first below.", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
         }
         ui.fuel.forEachIndexed { i, row ->
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -404,11 +404,11 @@ private fun FuelTab(ui: GarageUi, onAdd: () -> Unit, onDelete: (FuelFillup) -> U
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("%.1f l · ₹%,.0f".format(f.litres, f.cost), color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
+                    Text("%.1f l · ₹%,.0f".format(f.litres, f.cost), color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
                     Text("${dfRow.format(Date(f.dateMs))} · ${"%,d".format(f.odometerKm)} km${if (f.location.isNotBlank()) " · ${f.location}" else ""}", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp), maxLines = 1)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(row.kmpl?.let { "%.1f".format(it) } ?: "—", color = Gold, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
+                    Text(row.kmpl?.let { "%.1f".format(it) } ?: "—", color = Gold, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                     Eyebrow("km/l", Modifier.padding(top = 2.dp))
                 }
             }
@@ -468,7 +468,7 @@ private fun AddServiceDialog(onAdd: (String, String, Int, Int) -> Unit, onDismis
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 NumField(interval, { interval = it }, "Every (km) — optional", false)
                 NumField(months, { months = it }, "Every (months) — optional", false)
-                Text("Set km, months, or both (whichever comes first).", color = TextLo, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Set km, months, or both (whichever comes first).", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 Spacer(Modifier.height(10.dp))
                 Eyebrow("Icon")
                 Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -538,7 +538,7 @@ private fun LogVisitDialog(
                             if (on) Icon(NaviSarthiIcons.Check, null, tint = Gold, modifier = Modifier.size(15.dp))
                         }
                         Spacer(Modifier.width(10.dp))
-                        Text(item.name, color = TextHi, fontSize = 13.5.sp)
+                        Text(item.name, color = TextHi, fontSize = 14.sp)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -552,7 +552,7 @@ private fun LogVisitDialog(
                     size = BtnSize.Sm,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Photo or PDF — stored on this phone.", color = TextLo, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Photo or PDF — stored on this phone.", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         },
         containerColor = Surf1,
@@ -637,7 +637,7 @@ private fun GloveboxTab(
     ControlSection("Documents")
     NaviSarthiCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
         if (ui.documents.isEmpty()) {
-            Text("No documents yet — add insurance, PUC, RC, licence…", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+            Text("No documents yet — add insurance, PUC, RC, licence…", color = TextLo, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
         }
         ui.documents.forEachIndexed { i, d ->
             if (i > 0) NaviSarthiDivider(Modifier.padding(horizontal = 4.dp))
@@ -650,8 +650,8 @@ private fun GloveboxTab(
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(d.title.ifBlank { docLabel(d.type) }, color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
-                        Spacer(Modifier.width(6.dp)); Text(docLabel(d.type).uppercase(), color = TextLo, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily)
+                        Text(d.title.ifBlank { docLabel(d.type) }, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily)
+                        Spacer(Modifier.width(6.dp)); Text(docLabel(d.type).uppercase(), color = TextLo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                     }
                     Text(
                         buildString {
@@ -715,7 +715,7 @@ private fun IdRow(label: String, value: String) {
 private fun SpecRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
         Text(label, color = TextLo, fontSize = 13.sp, modifier = Modifier.weight(0.34f))
-        Text(value, color = TextHi, fontSize = 12.5.sp, lineHeight = 18.sp, textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily, modifier = Modifier.weight(0.66f).padding(start = 12.dp))
+        Text(value, color = TextHi, fontSize = 14.sp, lineHeight = 18.sp, textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily, modifier = Modifier.weight(0.66f).padding(start = 12.dp))
     }
 }
 
@@ -766,7 +766,7 @@ private fun DocumentDialog(
                     size = BtnSize.Sm,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Stored on this phone. Insurance / PUC / Licence get expiry reminders.", color = TextLo, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Stored on this phone. Insurance / PUC / Licence get expiry reminders.", color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         },
         containerColor = Surf1,
@@ -780,7 +780,7 @@ private fun RowScope.DocTypeChip(label: String, on: Boolean, onClick: () -> Unit
         modifier = Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
             .background(if (on) GoldTint else Surf2).border(1.dp, if (on) Gold else Line, RoundedCornerShape(9.dp))
             .clickable { onClick() }.padding(vertical = 8.dp),
-    ) { Text(label, color = if (on) Gold else TextMid, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+    ) { Text(label, color = if (on) Gold else TextMid, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable

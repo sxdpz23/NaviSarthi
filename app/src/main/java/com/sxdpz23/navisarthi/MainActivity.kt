@@ -27,23 +27,21 @@ class MainActivity : ComponentActivity() {
     private var openNav by mutableStateOf(false)
     private val navigationViewModel: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel by viewModels()
     private val navigation by lazy {
-        com.sxdpz23.navisarthi.navigation.NavigationActivityDelegate(this, navigationViewModel) {
-            if (dashViewModel.remainingJourney() != null) dashViewModel.exitNavigation()
-            if (podViewModel.remainingJourney() != null) podViewModel.exitNavigation()
-        }
+        com.sxdpz23.navisarthi.navigation.NavigationActivityDelegate(this, navigationViewModel) { }
     }
     private val dashViewModel: DashViewModel by viewModels()
     private val routeViewModel: RouteViewModel by viewModels()
     private val podViewModel: PodViewModel by viewModels()
 
     private fun enableVehicle(model: VehicleModel?) {
+        com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setTarget(model?.consoleType)
         dashViewModel.setConsoleEnabled(model?.consoleType == ConsoleType.TRIPPER_DASH)
         podViewModel.setConsoleEnabled(model?.consoleType == ConsoleType.TRIPPER_POD)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        navigation.onCreate(handleStartupIntent = activeJourney() == null)
+        navigation.onCreate()
         if (navigationViewModel.state.value.navigating) openNav = true
         enableEdgeToEdge()
 
@@ -80,6 +78,7 @@ class MainActivity : ComponentActivity() {
                     .putLong("sessionGeneration", vehiclePrefs.getLong("sessionGeneration", 0) + 1).apply()
             },
             activate = { type ->
+                com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.setTarget(type)
                 dashViewModel.setConsoleEnabled(type == ConsoleType.TRIPPER_DASH)
                 podViewModel.setConsoleEnabled(type == ConsoleType.TRIPPER_POD)
             })
@@ -109,26 +108,15 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         // An active console journey receives the share as its next stop in the route editor.
         // Do not also apply the phone map's automatic-start link preference to the same share.
-        if (activeJourney() == null) navigation.handleIntent(intent)
+        navigation.handleIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if ((intent?.action in listOf(Intent.ACTION_SEND, Intent.ACTION_VIEW, com.sxdpz23.navisarthi.navigation.ui.TripShortcut.ACTION)) && activeJourney() == null) {
-            openNav = true // The shared map ViewModel has received the link.
-            return
-        }
-        when (intent?.action) {
-            Intent.ACTION_SEND -> {
-                if (intent.type == "text/plain") {
-                    val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-                    routeViewModel.handleSharedText(text, activeJourney())
-                }
-            }
-            Intent.ACTION_VIEW -> {
-                val uri = intent.data?.toString() ?: return
-                routeViewModel.handleSharedText(uri, activeJourney())
-            }
+        if (intent?.action in listOf(Intent.ACTION_SEND, Intent.ACTION_VIEW, com.sxdpz23.navisarthi.navigation.ui.TripShortcut.ACTION)) {
+            if (com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.value.active)
+                com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.showPhone(edit = true)
+            openNav = true
         }
     }
 
@@ -142,6 +130,7 @@ class MainActivity : ComponentActivity() {
         super.onPictureInPictureModeChanged(active, config)
         navigation.onPictureInPictureChanged(active)
     }
+    @android.annotation.SuppressLint("RestrictedApi") // Public Activity override must delegate to AndroidX's inherited dispatcher.
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         if (!event.isPrintingKey && com.sxdpz23.navisarthi.navigation.ui.ZoomKeys.handle(event)) return true
         return super.dispatchKeyEvent(event) || (event.isPrintingKey && com.sxdpz23.navisarthi.navigation.ui.ZoomKeys.handle(event))

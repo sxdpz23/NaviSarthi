@@ -62,6 +62,7 @@ object DirectionsPb {
         placeGroup: String = DEFAULT_PLACE_GROUP,
     ): String {
         val modeCode = when (mode) {
+            TravelMode.MOTORBIKE -> error("Motorbike requests must use the motorcycle router")
             TravelMode.DRIVE -> 0
             TravelMode.BICYCLE -> 1
             TravelMode.WALK -> 2

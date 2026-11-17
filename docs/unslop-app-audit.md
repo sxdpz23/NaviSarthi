@@ -1,6 +1,6 @@
 # NaviSarthi screen craft audit
 
-Status: source audit and proposed direction, awaiting the direction checkpoint required by Unslop. No product UI edits have been made in this pass. Do not bump the version, run an APK build, or package 0.6.1.
+Status: baseline source audit. The user approved the direction and later explicitly authorized building the completed changes. Implementation and 0.6.1 verification are recorded in the companion report; the findings below describe the pre-polish source.
 
 Unslop method: Damir Sokolovsky ([@heydamir](https://x.com/heydamir)), https://heydamir.design/unslop, CC BY 4.0.
 

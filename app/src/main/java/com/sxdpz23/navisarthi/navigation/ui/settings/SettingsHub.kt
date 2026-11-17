@@ -250,7 +250,7 @@ private fun HubRow(
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .dpadHighlight(DpadShape(26.dp))
             .dpadClickable(onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 18.dp),
+            .padding(vertical = 16.dp, horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Outlined stock-style glyph in the quiet ink (single-ink rule - never the teal primary).
@@ -367,7 +367,6 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_pip_turn_card to SettingsSection.NAVIGATION,
     R.string.settings_region_updates to SettingsSection.OFFLINE,
     R.string.settings_faster_auto to SettingsSection.NAVIGATION,
-    R.string.settings_pause_in_bar to SettingsSection.NAVIGATION,
     R.string.settings_traffic_lights to SettingsSection.NAVIGATION,
     R.string.settings_nav_tap_places to SettingsSection.NAVIGATION,
     R.string.settings_vibrate_on_turns to SettingsSection.NAVIGATION,

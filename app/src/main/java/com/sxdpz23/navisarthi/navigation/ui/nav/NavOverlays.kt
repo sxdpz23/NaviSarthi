@@ -166,14 +166,12 @@ fun ManeuverBanner(
     // as live guidance.
     val container = if (previewing) MaterialTheme.colorScheme.surfaceVariant
     else NavBannerGreen
-    val content = if (previewing) MaterialTheme.colorScheme.onSurfaceVariant
-    else androidx.compose.ui.graphics.Color.White
+    val content = Color(0xFFF3F1EC)
     // The detached "then" strip under the card is darker than the banner (Google's reads
     // as a dimmer tab); preview follows the main card's own treatment.
     val thenContainer = if (previewing) MaterialTheme.colorScheme.surfaceVariant
     else MaterialTheme.colorScheme.surfaceContainerHigh
-    val thenContent = if (previewing) MaterialTheme.colorScheme.onSurfaceVariant
-    else MaterialTheme.colorScheme.onSurface
+    val thenContent = Color(0xFFF3F1EC)
     // The card tracks your finger as you drag (translationX = offsetX); on release
     // past a threshold it slides the rest of the way out, swaps to the next/prev
     // step, then the new card slides in from the opposite edge — like flicking a
@@ -224,7 +222,7 @@ fun ManeuverBanner(
             }
         },
     ) {
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         Modifier
             .fillMaxWidth()
             .onSizeChanged { cardW = it.width }
@@ -270,8 +268,6 @@ fun ManeuverBanner(
                 if (previewing) Modifier.clickable(onClick = onExitPreview) else Modifier.focusable(),
             ),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = if (tabSpans) 0.dp else 24.dp, bottomStart = if (thenShown) 0.dp else 24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
         Column(Modifier.padding(horizontal = if (compact) 12.dp else 18.dp, vertical = if (compact) 8.dp else 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -312,7 +308,7 @@ fun ManeuverBanner(
                         val distStyle = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium
                         FitText(
                             distText,
-                            style = distStyle.copy(fontWeight = FontWeight.Bold),
+                            style = distStyle.copy(fontWeight = FontWeight.SemiBold),
                             color = LocalContentColor.current,
                             modifier = Modifier.weight(1f),
                             resetKey = distText.length,
@@ -414,14 +410,13 @@ fun ManeuverBanner(
         if (thenShown) {
             // Google's "Then" tab: hangs off the card's lower left in the card's own color,
             // the word and the arrow only.
-            Card(
+            com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
                 // As wide as its text needs, up to the whole card.
                 Modifier.fillMaxWidth().wrapContentWidth(Alignment.Start).onSizeChanged { tabW = it.width },
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
             ) {
                 Row(
-                    Modifier.padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 8.dp),
+                    Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(stringResource(R.string.nav_compound_then).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
@@ -524,7 +519,7 @@ internal fun SignChip(sign: Sign, onBanner: Boolean = false) {
                 sign.label,
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
@@ -796,7 +791,7 @@ fun NavSearchChips(
                         },
                         // dpadFieldEscape: UP/DOWN leave the field instead of being eaten as cursor
                         // moves, so the tiles below stay key-reachable (docs/dpad.md).
-                        modifier = Modifier.weight(1f).padding(vertical = 14.dp).dpadFieldEscape(),
+                        modifier = Modifier.weight(1f).padding(vertical = 16.dp).dpadFieldEscape(),
                     )
                 }
                 // The same categories as everywhere else (fuel and charging first), as large tiles: three to a row.
@@ -814,7 +809,7 @@ fun NavSearchChips(
                                         .clip(tile)
                                         .dpadHighlight(tile)
                                         .clickable { onPick(chip.query) }
-                                        .padding(vertical = 14.dp, horizontal = 4.dp),
+                                        .padding(vertical = 16.dp, horizontal = 4.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     Icon(chip.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
@@ -876,7 +871,6 @@ fun NavControls(
     // The road you are on, shown in the handle row instead of the floating pill (issue #553).
     roadName: String? = null,
     // Pause in the bar's right slot; null leaves the slot as it was.
-    onPause: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val dark = isAppInDarkTheme()
@@ -895,7 +889,7 @@ fun NavControls(
     // The preview's natural height (set in the well's layout pass): the drag never opens the
     // well past the rows it has, or the card would stand taller than the sheet that replaces it.
     val previewNaturalPx = remember { floatArrayOf(0f) }
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier
             .fillMaxWidth()
             // dpad-ok: OK on NavBarTop's handle opens the step list, the same as this drag.
@@ -931,12 +925,7 @@ fun NavControls(
         // Google's bar is OLED BLACK in both themes (the bottom bar in the screenshots);
         // white figures sit on it, so it saves power and matches the map chrome.
         shape = navBarShape(),
-        border = if (amoled) BorderStroke(1.dp, SheetPalette.BorderAmoled) else null,
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = navBarLook().bg,
-            contentColor = navBarLook().ink,
-        ),
+        docked = true,
     ) {
         // LAYOUT (issue #273): End on the LEFT as an icon, the trip figures CENTERD, Steps on the
         // right. Previously the figures sat left with two controls crowded right, one an icon and
@@ -954,7 +943,6 @@ fun NavControls(
             showListButton = showListButton,
             handleUp = true,
             roadName = roadName,
-            onPause = onPause,
         )
         // The well the drag opens under the figures: exactly the lift tall, clipped, holding the
         // step rows at the sheet's own list padding so they do not move at the handover. Read in
@@ -996,30 +984,22 @@ fun NavBarButton(onClick: () -> Unit, filled: Boolean = false, end: Boolean = fa
  *  map; with wallpaper colors turned on (Settings > Appearance) it takes the theme's instead. */
 @Composable
 fun NavFab(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val themed = com.sxdpz23.navisarthi.navigation.ui.theme.wallpaperColorsInUse()
-    androidx.compose.material3.FloatingActionButton(
-        onClick = onClick, modifier = modifier, shape = androidx.compose.foundation.shape.CircleShape,
-        // Off wallpaper colors the buttons wear what the bar wears: white in the light theme, near black in the dark ones.
-        containerColor = if (themed) MaterialTheme.colorScheme.primaryContainer else navBarLook().bg,
-        contentColor = if (themed) MaterialTheme.colorScheme.onPrimaryContainer else navBarLook().ink,
-    ) { content() }
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(modifier.size(56.dp)) {
+        androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.fillMaxSize(), content = content)
+    }
 }
 
 /** Google's Re-center: a labeled pill at the bottom left while the camera is away from the car. */
 @Composable
 fun NavRecenterPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val themed = com.sxdpz23.navisarthi.navigation.ui.theme.wallpaperColorsInUse()
-    androidx.compose.material3.ExtendedFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
-        shape = androidx.compose.foundation.shape.CircleShape,
-        // Off wallpaper colors the buttons wear what the bar wears: white in the light theme, near black in the dark ones.
-        containerColor = if (themed) MaterialTheme.colorScheme.primaryContainer else navBarLook().bg,
-        contentColor = if (themed) MaterialTheme.colorScheme.onPrimaryContainer else navBarLook().ink,
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
+        modifier.heightIn(min = 56.dp).dpadHighlight(CircleShape).clickable(onClick = onClick),
     ) {
-        Icon(SymOutlined.Navigation, contentDescription = null, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.mapscreen_recenter), style = MaterialTheme.typography.titleMedium)
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(SymOutlined.Navigation, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.mapscreen_recenter), style = MaterialTheme.typography.titleMedium)
+        }
     }
 }
 
@@ -1033,12 +1013,7 @@ val NavBarColor = androidx.compose.ui.graphics.Color(0xFF101214)
 class NavBarLook(val bg: Color, val ink: Color, val dim: Color, val onDark: Boolean)
 
 @Composable
-fun navBarLook(): NavBarLook =
-    if (com.sxdpz23.navisarthi.navigation.ui.theme.wallpaperColorsInUse()) NavBarLook(
-        MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface,
-        MaterialTheme.colorScheme.onSurfaceVariant, isAppInDarkTheme(),
-    ) else if (!isAppInDarkTheme()) NavBarLook(SheetPalette.bg(false, false), SheetPalette.InkLight, SheetPalette.DimLight, false)
-    else NavBarLook(NavBarColor, SheetPalette.InkDark, SheetPalette.DimDark, true)
+fun navBarLook(): NavBarLook = NavBarLook(NavBarColor, SheetPalette.InkDark, SheetPalette.DimDark, true)
 
 /** Portrait: the bar sits flush on the screen's bottom edge, like Google's. Landscape: a card. */
 @Composable
@@ -1046,7 +1021,7 @@ fun navBarFlush(): Boolean = true
 
 @Composable
 fun navBarShape(): androidx.compose.ui.graphics.Shape =
-    RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    RoundedCornerShape(28.dp)
 
 /** The bar's top: the chevron handle and the End | figures | list row. Drawn by [NavControls] and,
  *  with [handleUp] false, as the header of the expanded [StepsSheet] during nav, so the two are
@@ -1066,7 +1041,6 @@ fun NavBarTop(
     // Pause in the bar's right slot (user 2026-09-18). Null keeps the slot empty, which is what a
     // touch phone had there: a 54 dp spacer holding the figures centered against End. The list
     // button still wins the slot when it is asked for.
-    onPause: (() -> Unit)? = null,
 ) {
     val dark = isAppInDarkTheme()
     // The bar surface is OLED black (see NavControls), so the handle chevron and
@@ -1130,7 +1104,7 @@ fun NavBarTop(
             }
         }
         Row(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1210,19 +1184,7 @@ fun NavBarTop(
                     Icon(Sym.List, contentDescription = stringResource(R.string.nav_steps), modifier = Modifier.size(26.dp))
                 }
             }
-            if (showListButton && onPause != null) Spacer(Modifier.width(6.dp))
-            if (onPause != null) {
-                // Paused, it fills like End does: the bar already says "Paused" beside the figures,
-                // and the control that put the drive on hold should look held.
-                NavBarButton(onClick = onPause, filled = paused) {
-                    Icon(
-                        if (paused) Sym.PlayArrow else Sym.Pause,
-                        contentDescription = stringResource(if (paused) R.string.nav_resume else R.string.nav_pause),
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-            }
-            if (!showListButton && onPause == null) {
+            if (!showListButton) {
                 Spacer(Modifier.size(54.dp)) // keeps the figures centered against the End button
             }
         }
@@ -1264,18 +1226,13 @@ fun ArrivalSummary(
             )
         }
     }
-    Card(
-        modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(modifier.fillMaxWidth(), docked = true,
     ) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Sym.CheckCircle, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
                 Column {
-                    Text(stringResource(R.string.nav_arrived), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.nav_arrived), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     if (destinationLabel.isNotBlank()) {
                         Text(destinationLabel, style = MaterialTheme.typography.bodyLarge)
                     }
@@ -1393,7 +1350,7 @@ fun NavStopOffer(
         shadowElevation = 6.dp,
     ) {
         Row(
-            Modifier.padding(start = 18.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+            Modifier.padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -1471,106 +1428,6 @@ fun NavStopOffer(
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun NavHoldControls(
-    paused: Boolean,
-    muted: Boolean,
-    onPause: () -> Unit,
-    onVoice: (muted: Boolean, alertsOnly: Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var open by remember { mutableStateOf(false) }
-    var openedAt by remember { mutableStateOf(0L) }
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    LaunchedEffect(open, openedAt) {
-        if (open) {
-            kotlinx.coroutines.delay(OPEN_MS)
-            open = false
-        }
-    }
-    // A pick by keypad removes the focused choice with the slide-out, so focus comes back to the
-    // button instead of jumping to the turn card.
-    val buttonFocus = remember { androidx.compose.ui.focus.FocusRequester() }
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        VoiceSlideOut(
-            open = open,
-            muted = muted,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            onVoice = onVoice,
-        ) { open = false; runCatching { buttonFocus.requestFocus() } }
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
-            contentColor = if (paused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
-            shadowElevation = 6.dp,
-        ) {
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .focusRequester(buttonFocus)
-                    .dpadHighlight(RoundedCornerShape(16.dp))
-                    .combinedClickable(
-                        // The FIRST tap only opens the pop-out (user 2026-09-18). Pausing on that
-                        // tap meant the one way to reach mute was to hold the drive first, which
-                        // is not what the reach was for; the second tap on the same target, which
-                        // has not moved, pauses. Anyone who knows the long press never sees this.
-                        onClick = {
-                            // Paused, the glyph already says what a tap does, so resuming is never
-                            // the two-tap case.
-                            if (open || paused) onPause() else open = true
-                            openedAt = System.currentTimeMillis()
-                        },
-                        onLongClick = {
-                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            // Steps on, alerts only, off, for people who know where it is.
-                            val alertsOnly = com.sxdpz23.navisarthi.navigation.ui.VoiceAlertsOnly.on.value
-                            if (!muted) onVoice(true, true) else if (alertsOnly) onVoice(true, false) else onVoice(false, false)
-                            open = false
-                        },
-                        onClickLabel = stringResource(
-                            when {
-                                paused -> R.string.nav_resume
-                                open -> R.string.nav_pause
-                                else -> R.string.nav_hold_controls
-                            }
-                        ),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (paused) Sym.PlayArrow else Sym.Pause,
-                    contentDescription = stringResource(R.string.nav_hold_controls),
-                )
-                if (muted) {
-                    // The second state, as a badge rather than a second button: a held drive and a
-                    // silent one are different things and the button has to say which it is.
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .size(18.dp),
-                    ) {
-                        Icon(
-                            if (com.sxdpz23.navisarthi.navigation.ui.VoiceAlertsOnly.on.value) Sym.NotificationsActive else Sym.VolumeOff,
-                            contentDescription = null,
-                            modifier = Modifier.padding(3.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * The drive's speaker button with Pause in the bar: the glyph is the current voice mode, and a
- * tap slides the three choices out beside it for [OPEN_MS] (issue 735). It wears what the other
- * floating buttons wear, and so does its slide-out.
- */
-@Composable
 fun NavVoiceButton(
     muted: Boolean,
     onVoice: (muted: Boolean, alertsOnly: Boolean) -> Unit,
@@ -1631,12 +1488,8 @@ private fun VoiceSlideOut(
         exit = androidx.compose.animation.shrinkHorizontally(shrinkTowards = Alignment.End) +
             androidx.compose.animation.fadeOut(),
     ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = color,
-            contentColor = contentColor,
-            shadowElevation = 6.dp,
-            modifier = Modifier.padding(end = 8.dp),
+        com.sxdpz23.navisarthi.navigation.ui.map.NavGlassSurface(
+            shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(end = 8.dp),
         ) {
             val alertsOnly = com.sxdpz23.navisarthi.navigation.ui.VoiceAlertsOnly.on.value
             Row {

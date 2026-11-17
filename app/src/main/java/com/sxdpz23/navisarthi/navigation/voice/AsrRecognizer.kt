@@ -384,7 +384,7 @@ class AsrRecognizer @Inject constructor(
         val minBuf = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
         )
-        val audio = runCatching {
+        val audio = try {
             AudioRecord(
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 SAMPLE_RATE,
@@ -392,7 +392,11 @@ class AsrRecognizer @Inject constructor(
                 AudioFormat.ENCODING_PCM_16BIT,
                 maxOf(minBuf, SAMPLE_RATE * 2),
             )
-        }.getOrNull()
+        } catch (_: SecurityException) {
+            null
+        } catch (_: Exception) {
+            null
+        }
         if (audio == null || audio.state != AudioRecord.STATE_INITIALIZED) {
             val detail = if (audio == null) "constructor threw" else "state=${audio.state} minBuf=$minBuf"
             audio?.release(); vad.release()

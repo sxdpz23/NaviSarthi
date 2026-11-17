@@ -66,6 +66,7 @@ object RouteGeometry {
         TravelMode.BICYCLE -> "routed-bike"
         TravelMode.WALK -> "routed-foot"
         TravelMode.TRANSIT -> null
+        TravelMode.MOTORBIKE -> null // Motorcycle costing is handled by Valhalla / on-device routing.
     }
 
     /** Path-following polyline for origin→dest in [mode], or null on any failure. */

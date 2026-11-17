@@ -3,6 +3,8 @@ package com.sxdpz23.navisarthi.navigation.ui.map
 import com.sxdpz23.navisarthi.navigation.ui.icons.Sym
 import com.sxdpz23.navisarthi.navigation.ui.icons.SymOutlined
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import android.Manifest
 import android.app.Activity
 import android.content.ContextWrapper
@@ -40,6 +42,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
@@ -298,6 +301,7 @@ private fun androidx.compose.foundation.layout.BoxScope.OsmCredit(
     movingFree: Boolean,
 ) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val shown by androidx.compose.animation.core.animateFloatAsState(
         if (com.sxdpz23.navisarthi.navigation.ui.nav.VoiceSlideOutOpen.value) 0f else 1f,
         label = "osmCredit",
@@ -435,6 +439,7 @@ fun MapScreen(
         else -> 0
     }
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
 
     // Keep the display awake during turn-by-turn so a driver glancing at the next
     // turn never has to tap to wake it. Gated by the "Keep screen on while
@@ -478,7 +483,7 @@ fun MapScreen(
     // silent choice between them meant the pause default never reached the people who asked for
     // buttons. A keypad-first phone keeps pause in the right-edge stack, where the key path is.
     val navListButton = com.sxdpz23.navisarthi.navigation.ui.PreferButtons.on.value || dpadFirst
-    val navPauseInBar = com.sxdpz23.navisarthi.navigation.ui.PauseInBar.on.value && !dpadFirst
+
     val mapDpad = remember { MapDpadController() }
     var mapFocused by remember { mutableStateOf(false) }
     var mapEngaged by remember { mutableStateOf(false) } // arrows pan only while engaged (docs/dpad.md)
@@ -1015,7 +1020,7 @@ fun MapScreen(
             vm.startLocation()
             proceedStartNav()
         } else {
-            android.widget.Toast.makeText(context, context.getString(R.string.nav_precise_toast), android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(context, contextResources.getString(R.string.nav_precise_toast), android.widget.Toast.LENGTH_LONG).show()
         }
     }
     val onStartNav: () -> Unit = {
@@ -1138,7 +1143,7 @@ fun MapScreen(
     // cameras wouldn't appear until the next pan). Clears the layer when turned off.
     LaunchedEffect(com.sxdpz23.navisarthi.navigation.ui.Flock.on.value) { vm.refreshFlockNow() }
     LaunchedEffect(com.sxdpz23.navisarthi.navigation.ui.SpeedCams.on.value) { vm.refreshSpeedCamsNow() }
-    Box(Modifier.fillMaxSize()) {
+    NavGlassHost(Modifier.fillMaxSize()) {
         MapSurface(
             state = state,
             vm = vm,
@@ -1313,7 +1318,7 @@ fun MapScreen(
                         Text(
                             stringResource(R.string.mapscreen_dpad_engage),
                             style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
                 }
@@ -1453,13 +1458,14 @@ fun MapScreen(
                             Modifier.fillMaxWidth()
                         },
                     ),
+                contentAlignment = Alignment.TopCenter,
             ) {
                 // Landscape: the open search page keeps clear of the camera cutout's strip, in line
                 // with the keyboard and the status bar, which the system already insets.
                 Column(
-                    Modifier.statusBarsPadding()
+                    Modifier.then(if (!landscapeChrome && !searchOpen) Modifier.widthIn(max = 512.dp) else Modifier).statusBarsPadding()
                         .then(if (searchOpen && landscapeChrome) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start)) else Modifier)
-                        .padding(12.dp),
+                        .padding(16.dp),
                 ) {
                     // Landscape bare-map chrome collapses to one line (bar | chips) below. NB the
                     // condition must NOT include !searchOpen: focusing the bar flips searchOpen,
@@ -1527,7 +1533,6 @@ fun MapScreen(
                             focusManager.clearFocus()
                             vm.search()
                         },
-                        onOpenSettings = onOpenSettings,
                         onClear = vm::clearSearch,
                         onFocusChange = {
                             searchFocused = it
@@ -1627,7 +1632,7 @@ fun MapScreen(
                                 Sym.PublicOff,
                                 contentDescription = stringResource(R.string.search_offline_recheck),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(7.dp),
+                                modifier = Modifier.padding(8.dp),
                             )
                         }
                     }
@@ -1678,20 +1683,8 @@ fun MapScreen(
                     if (state.inNavOverview) Icon(Sym.ZoomInMap, contentDescription = stringResource(R.string.mapscreen_recenter))
                     else Icon(Sym.ZoomOutMap, contentDescription = stringResource(R.string.nav_overview))
                 }
-                // With pause in the bar, this slot is plain mute: one button, one meaning, no
-                // pop-out to reach past. Otherwise the two hold controls share one button here
-                // (tap opens, second tap pauses, long press mutes).
-                if (navPauseInBar) {
-                    // The glyph is the state; a tap opens the three voice choices (issue 735).
-                    com.sxdpz23.navisarthi.navigation.ui.nav.NavVoiceButton(muted = state.voiceMuted, onVoice = vm::setVoiceMode)
-                } else {
-                    com.sxdpz23.navisarthi.navigation.ui.nav.NavHoldControls(
-                        paused = state.navPaused,
-                        muted = state.voiceMuted,
-                        onPause = vm::toggleNavPause,
-                        onVoice = vm::setVoiceMode,
-                    )
-                }
+                NavViewToggle()
+                com.sxdpz23.navisarthi.navigation.ui.nav.NavVoiceButton(muted = state.voiceMuted, onVoice = vm::setVoiceMode)
                 com.sxdpz23.navisarthi.navigation.ui.nav.NavFab(
                     onClick = {
                         // Three things have to line up for this panel to appear, and when it does
@@ -1751,7 +1744,7 @@ fun MapScreen(
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
         }
@@ -1871,7 +1864,7 @@ fun MapScreen(
                 onDismiss = vm::closeStopsEditor,
                 modifier = Modifier
                     .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
-                    .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp).navGlassPanel(landscapeChrome).imePadding(),
             )
 
             BottomOverlay.STEPS -> StepsSheet(
@@ -1898,7 +1891,6 @@ fun MapScreen(
                         roadName = barRoadName(state),
                         // The sheet wears the bar's own top, so the control has to stay in the
                         // same place when the list is open.
-                        onPause = if (navPauseInBar) vm::toggleNavPause else null,
                     )
                 } else null,
                 maneuvers = state.activeRoute?.maneuvers ?: emptyList(),
@@ -2030,7 +2022,6 @@ fun MapScreen(
                     },
                     trafficRatio = state.activeRoute?.trafficRatio,
                     showListButton = navListButton,
-                    onPause = if (navPauseInBar) vm::toggleNavPause else null,
                     // Measured AFTER the padding → the bar surface itself; navBarClearance adds the
                     // padding + gap back. Everything stacked above the bar keys off this.
                     modifier = Modifier.onGloballyPositioned {
@@ -2060,7 +2051,10 @@ fun MapScreen(
                 onApply = vm::applyTrip,
                 onAddStop = vm::beginPickStopFromEditor,
                 onDismiss = vm::closeStopsEditor,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                    .navGlassPanel(landscapeChrome).imePadding(),
             )
 
             // Tapping "Directions" opens a dedicated panel (popup) — mode tabs, the
@@ -2144,7 +2138,7 @@ fun MapScreen(
                                 }.coerceAtLeast(CHOOSER_CARD_MIN_LAND_DP),
                             ),
                         )
-                        .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+                        .landscapeColumn(landscapeChrome, sidePanelWidthDp).navGlassPanel(landscapeChrome),
                 )
             }
 
@@ -2216,7 +2210,7 @@ fun MapScreen(
                 onClearParking = {
                     vm.clearParkingSpot()
                     vm.clearSelection()
-                    Toast.makeText(context, context.getString(R.string.map_parking_cleared), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, contextResources.getString(R.string.map_parking_cleared), Toast.LENGTH_SHORT).show()
                 },
                 lists = state.lists,
                 onAddToList = { listId -> vm.addPlaceToList(listId, state.selected!!) },
@@ -2234,6 +2228,7 @@ fun MapScreen(
                 modifier = Modifier
                     .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
                     .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                    .then(if (!landscapeChrome) Modifier.padding(horizontal = 16.dp, vertical = 12.dp).widthIn(max = 480.dp) else Modifier)
                     // Live top edge for the layers button's overlap gate (see placeSheetTopPx).
                     .then(sheetEdge.report),
             )
@@ -2476,8 +2471,8 @@ fun MapScreen(
             FloatingActionButton(
                 onClick = onRecenter,
                 shape = mapButtonShape,
-                containerColor = mapButtonColor(darkTheme), contentColor = mapButtonInk(darkTheme),
-                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 10.dp),
+                containerColor = Color.Transparent, contentColor = mapButtonInk(darkTheme),
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .dpadHighlight(mapButtonShape)
                     .align(Alignment.BottomEnd)
@@ -2585,8 +2580,8 @@ fun MapScreen(
                 FloatingActionButton(
                     onClick = onRecenter,
                     shape = mapButtonShape,
-                    containerColor = mapButtonColor(darkTheme), contentColor = mapButtonInk(darkTheme),
-                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 10.dp),
+                    containerColor = Color.Transparent, contentColor = mapButtonInk(darkTheme),
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .dpadHighlight(mapButtonShape)
                         .align(Alignment.TopEnd)
@@ -2876,7 +2871,7 @@ private fun markersOf(state: MapUiState, filteredIds: Set<String>?): List<MapMar
 /** The nav bar and the step sheet it opens into: flush with the screen's bottom edge in portrait
  *  (the card pads its own content off the system bar), a floating card in the landscape column. */
 private fun Modifier.navBarHost(landscape: Boolean): Modifier =
-    if (landscape) this.padding(start = NAV_LAND_EDGE_DP, end = 16.dp) else this
+    if (landscape) this.padding(start = NAV_LAND_EDGE_DP, end = 16.dp) else this.navGlassPanel(false)
 
 /** Landscape nav cards sit this far from the safe left edge, as Google's do. */
 private val NAV_LAND_EDGE_DP = 8.dp
@@ -2957,13 +2952,11 @@ private val mapButtonShape: androidx.compose.ui.graphics.Shape get() = com.sxdpz
  *  modifier chain ends in its position). */
 @Composable
 private fun LocateGlyph(dark: Boolean) {
-    val ring = mapButtonRing(dark)
-    Box(
-        Modifier.size(56.dp).then(if (ring != null) Modifier.border(ring, mapButtonShape) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
+    NavGlassSurface(Modifier.size(56.dp), shape = mapButtonShape) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         // Blue, as the dot it sends you back to is: the one place on these buttons blue means "you".
         Icon(Sym.MyLocation, contentDescription = stringResource(R.string.mapscreen_center_on_my_location), tint = if (com.sxdpz23.navisarthi.navigation.ui.theme.wallpaperColorsInUse()) androidx.compose.material3.LocalContentColor.current else if (dark) Color(0xFF8AB4F8) else Color(0xFF1A73E8))
+    }
     }
 }
 
@@ -3531,7 +3524,7 @@ private fun ResultPlaceCard(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .padding(top = 14.dp),
+                .padding(top = 16.dp),
         ) {
         // Bigger, more legible rows (the address/category line read too
         // small before): name at titleMedium, the secondary lines bumped
@@ -3561,7 +3554,7 @@ private fun ResultPlaceCard(
                 Text(
                     String.format(Locale.US, "%.1f", r),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = SheetPalette.ink(dark),
                 )
                 // One line, as on Google's cards: the number, one star, the count, then distance,
@@ -3625,7 +3618,7 @@ private fun ResultPlaceCard(
                 Text(
                     fp,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = SheetPalette.ink(dark),
                     modifier = Modifier.padding(start = 5.dp),
                 )
@@ -3710,7 +3703,7 @@ private fun ResultPlaceCard(
         }
         // Per-row action buttons, all filled: they act on the ROW's place directly, without opening it.
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 14.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 16.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -3899,12 +3892,14 @@ private fun MapSurface(
     onNavZoomOverride: (Boolean) -> Unit,
 ) {
     val hostOverflow = with(LocalDensity.current) { com.sxdpz23.navisarthi.navigation.ui.LocalHostMapOverflow.current.roundToPx() }
+    val navDisplay by com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.state.collectAsStateWithLifecycle()
     // The MAP can be lit apart from the chrome (Settings > Appearance > Map): the style, the route
     // colors and the map's own overlays take these; sheets, cards and bars keep the app theme.
     // Resolved HERE, not in MapScreen, whose method is at ART's verifier limit (PipNavOverlay).
     val mapDark = com.sxdpz23.navisarthi.navigation.ui.theme.isMapDark()
     val mapAmoled = com.sxdpz23.navisarthi.navigation.ui.theme.isMapAmoled()
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     // MapTiler (when a key is built in) gives the Google-like look + its own
     // light/dark styles; otherwise fall back to the keyless OpenFreeMap basemap
     // with our own dark/light recolor.
@@ -4031,11 +4026,11 @@ private fun MapSurface(
         routePolyline = state.activeRoute?.let { it.drawPolyline ?: it.polyline }.let { p -> remember(p) { if (p == null) emptyList() else com.sxdpz23.navisarthi.navigation.core.nav.RouteSmoothing.roundBends(com.sxdpz23.navisarthi.navigation.core.nav.RouteSmoothing.removeZigzags(com.sxdpz23.navisarthi.navigation.core.nav.RouteSmoothing.straightenCircles(p))) } },
         // A PAUSED drive draws its line in slate (user 2026-09-21): the map should say the
         // guidance is on hold without reading the bar. Traffic spans keep their colors.
-        routeColor = if (state.navPaused) ROUTE_PAUSED_COLOR else routeTrafficColor(state.activeRoute),
+        routeColor = if (com.sxdpz23.navisarthi.navigation.ui.Traffic.on.value) routeTrafficColor(state.activeRoute) else "#1F6FEB",
         routeDashed = state.travelMode == com.sxdpz23.navisarthi.navigation.core.model.TravelMode.WALK ||
             state.travelMode == com.sxdpz23.navisarthi.navigation.core.model.TravelMode.BICYCLE,
         // Paused: one color end to end, no traffic colors over the lavender.
-        routeTrafficSpans = if (state.navPaused) emptyList() else routeTrafficSpans(state.activeRoute),
+        routeTrafficSpans = if (com.sxdpz23.navisarthi.navigation.ui.Traffic.on.value) routeTrafficSpans(state.activeRoute) else emptyList(),
         // The expanded transit row's legs (issue #233) while the chooser owns the map, and the
         // WHOLE guided itinerary during step-by-step transit nav (issue #232) — there the camera
         // frames the CURRENT leg and re-frames as Next/auto-advance moves through the trip.
@@ -4052,7 +4047,7 @@ private fun MapSurface(
                 state.directionsWaypoints.map { it.location } + listOfNotNull(state.selected?.location)
         } else emptyList(),
         // Grayed, tappable alternates (Google-style) — only off-nav, with a chooser up.
-        alternates = if (state.navigating) emptyList() else run {
+        alternates = if (state.navigating || !navDisplay.showAlternatives) emptyList() else run {
             val activeIdx = state.routes.indexOf(state.activeRoute)
             state.routes.mapIndexedNotNull { i, r ->
                 if (i != activeIdx && r.polyline.size >= 2) i to r.polyline else null
@@ -4074,7 +4069,7 @@ private fun MapSurface(
         onSelectAlternate = vm::selectRoute,
         // Every route wears its time on the map, placed where it runs apart from the others;
         // tapping a bubble picks that route. Both choosers (the classic one since 2026-09-17).
-        routeBubbles = if (state.directionsOpen && !state.navigating && state.routes.size > 1 &&
+        routeBubbles = if (navDisplay.showAlternatives && state.directionsOpen && !state.navigating && state.routes.size > 1 &&
             state.travelMode != com.sxdpz23.navisarthi.navigation.core.model.TravelMode.TRANSIT
         ) {
             remember(state.routes, state.activeRoute, altsOpen) {
@@ -4098,7 +4093,7 @@ private fun MapSurface(
         // The flag is left for a trip that ends at "your location", which has no place to draw.
         destinationPin = if (chooserUp && chooserDest == null) state.myLocation else null,
         navMode = state.navigating,
-        navDriveMode = state.travelMode == com.sxdpz23.navisarthi.navigation.core.model.TravelMode.DRIVE,
+        navDriveMode = state.travelMode.isRoad,
         navLabelExclude = navLabelExclude,
         navUpcomingRoads = navUpcomingRoads,
         onNavRoadLatin = { vm.onNavRoadLatin(it) },
@@ -4165,7 +4160,7 @@ private fun MapSurface(
         onPoiTap = vm::onPoiTap,
         onMarkerTap = { i -> if (!chooserUp) displayedPlaces(state).getOrNull(i)?.let(vm::selectPlace) },
         parkingSpot = state.parkingSpot,
-        onParkingTap = { vm.showParkedCar(context.getString(R.string.map_parked_car)) },
+        onParkingTap = { vm.showParkedCar(contextResources.getString(R.string.map_parked_car)) },
         // Saved places stick out while browsing (issue #171): every list place + quick-save
         // draws its list's icon/emoji in the list's color. Hidden while a result set owns the
         // map (a list's own results would double-draw) and during nav/replay (declutter).
@@ -4250,7 +4245,7 @@ private fun MapSurface(
         inNavOverview = state.inNavOverview,
         navShields = remember(state.activeRoute, state.navigating, state.travelMode) {
             val r = state.activeRoute
-            if (!state.navigating || r == null || state.travelMode != com.sxdpz23.navisarthi.navigation.core.model.TravelMode.DRIVE) emptyList()
+            if (!state.navigating || r == null || !state.travelMode.isRoad) emptyList()
             else com.sxdpz23.navisarthi.navigation.core.nav.RouteShields.points(r)
         },
         basemapArchive = state.basemapArchive,
@@ -4277,7 +4272,7 @@ private fun MapSurface(
         onAddressLabelTap = vm::onAddressLabelTap,
         onViewport = vm::onViewport,
         dpadController = mapDpad,
-        modifier = Modifier.fillMaxSize().layout { measurable, constraints ->
+        modifier = Modifier.fillMaxSize().navGlassBackdrop().layout { measurable, constraints ->
             val height = constraints.maxHeight + hostOverflow
             val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
             layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
@@ -4362,7 +4357,7 @@ private fun BoxScope.ClassicDirectionsHost(
         modifier = Modifier
             .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
             .onGloballyPositioned { onTopPx(it.boundsInWindow().top.roundToInt()) }
-            .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+            .landscapeColumn(landscapeChrome, sidePanelWidthDp).navGlassPanel(landscapeChrome),
     )
 }
 
@@ -4452,7 +4447,7 @@ private fun BoxScope.PipTurnCardOverlay(state: MapUiState) {
                     Text(
                         formatDistance(state.nav.distanceToNextManeuver),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                     )
                     // The road the turn enters, not the whole sentence: "Turn left o..." said
@@ -4487,7 +4482,7 @@ private fun BoxScope.PipTurnCardOverlay(state: MapUiState) {
                 Text(
                     formatDuration(secs),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
                 Text(
@@ -4534,8 +4529,8 @@ private fun BoxScope.BuildingDebugBadge(overlayDebugState: String) {
             .background(androidx.compose.ui.graphics.Color(0xCC000000), RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
-        Text("$fps fps", color = androidx.compose.ui.graphics.Color.White, fontSize = 11.sp)
-        Text(label, color = androidx.compose.ui.graphics.Color.White, fontSize = 11.sp)
+        Text("$fps fps", color = androidx.compose.ui.graphics.Color.White, fontSize = 12.sp)
+        Text(label, color = androidx.compose.ui.graphics.Color.White, fontSize = 12.sp)
     }
 }
 
@@ -4721,14 +4716,12 @@ private fun CategoryChips(onPick: (String) -> Unit, modifier: Modifier = Modifie
         com.sxdpz23.navisarthi.navigation.ui.CategoryChipsPref.Mode.BUTTON -> {
             var open by remember { mutableStateOf(false) }
             Box(modifier) {
-                ElevatedAssistChip(
-                    onClick = { open = true },
-                    modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
-                    label = { Text(stringResource(R.string.cat_menu)) },
-                    leadingIcon = { Icon(Sym.Category, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    shape = CircleShape,
-                )
-                com.sxdpz23.navisarthi.navigation.ui.NavigationMenu(expanded = open, onDismissRequest = { open = false }) {
+                NavGlassChip(stringResource(R.string.cat_menu), { open = true },
+                    Modifier.dpadHighlight(CircleShape)) {
+                    Icon(Sym.Category, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                com.sxdpz23.navisarthi.navigation.ui.NavigationMenu(expanded = open, onDismissRequest = { open = false }, glass = true) {
                     categories.forEach { (labelRes, query, icon) ->
                         item(stringResource(labelRes), icon) { open = false; onPick(query) }
                     }
@@ -4747,21 +4740,9 @@ private fun CategoryChips(onPick: (String) -> Unit, modifier: Modifier = Modifie
         // the settings gear (issue #290): on the far left it competed with the quick-category
         // chips, which are a different kind of control, and the reach was awkward.
         categories.forEach { (labelRes, query, icon) ->
-            ElevatedAssistChip(
-                onClick = { onPick(query) },
-                modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
-                label = { Text(stringResource(labelRes)) },
-                leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                // Full pill, Google-style — the M3 default 8dp corners read dated on a map chip row.
-                shape = androidx.compose.foundation.shape.CircleShape,
-                // MONOCHROME glyphs (user 2026-07-06), SOFT ink (user 2026-07-11): the M3
-                // default tints the icon primary teal; full onSurface made the solid glyph
-                // read DARKER than the label. onSurfaceVariant matches the glyph weight to
-                // the text, like Google's rows.
-                colors = androidx.compose.material3.AssistChipDefaults.elevatedAssistChipColors(
-                    leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
+            NavGlassChip(stringResource(labelRes), { onPick(query) }, Modifier.dpadHighlight(CircleShape)) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         // Every chip, hidden ones included, behind one More (issue #779).
         MoreCategoriesChip(onPick)
@@ -5934,6 +5915,7 @@ private val NOTES_HEADING = Regex("""^#*\s*What's (new|changed) in \d""")
 @Composable
 private fun NoticeCard(notice: Notice, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val container = when (notice.level) {
         Notice.LEVEL_ERROR -> MaterialTheme.colorScheme.errorContainer
         Notice.LEVEL_WARN -> MaterialTheme.colorScheme.tertiaryContainer
@@ -6100,7 +6082,7 @@ private fun ListsSheet(
                         Text(
                             androidx.compose.ui.res.pluralStringResource(R.plurals.bulk_selected, pickedNowLists.size, pickedNowLists.size),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                         )
                         IconButton(onClick = { deletingPicked = true }, enabled = pickedNowLists.isNotEmpty(), modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
@@ -6113,7 +6095,7 @@ private fun ListsSheet(
                         Text(
                             stringResource(R.string.mapscreen_section_lists),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                         )
                         // Icons alone: the words crowded the title (issue #748).
@@ -6344,7 +6326,7 @@ private fun ParkingHistorySheet(
                     Text(
                         stringResource(R.string.parking_history_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = onClearAll, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.parking_history_clear_all)) }
@@ -6376,7 +6358,7 @@ private fun ParkingHistorySheet(
                                         android.text.format.DateUtils.MINUTE_IN_MILLIS,
                                     ).toString(),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                                 )
                                 Text(
                                     com.sxdpz23.navisarthi.navigation.ui.formatDateTime(androidx.compose.ui.platform.LocalContext.current, entry.savedAtMillis),
@@ -6525,7 +6507,7 @@ private fun PlaceIconDialog(
         val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.padding(20.dp).widthIn(max = 420.dp).heightIn(max = maxDialogHeight)) {
-                Text(stringResource(R.string.place_icon_title, placeName), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.place_icon_title, placeName), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                     IconPicker(icon, color) { icon = it }
@@ -6555,6 +6537,7 @@ private fun PlaceIconDialog(
 @Composable
 private fun BoxScope.ParkingControl(state: MapUiState, vm: MapViewModel, darkTheme: Boolean, chromeLift: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val parkingSavedMsg = stringResource(R.string.map_parking_saved)
     val parkingNoFixMsg = stringResource(R.string.map_parking_no_fix)
     val parkingMovedMsg = stringResource(R.string.map_parking_moved)
@@ -6572,17 +6555,12 @@ private fun BoxScope.ParkingControl(state: MapUiState, vm: MapViewModel, darkThe
     val onOk = { if (!parkingSet && hasHistory) showParkingMenu = true else onTap() }
     // Settings > Map can hide it (issue #626); a saved spot keeps it, the way back to the car.
     if (com.sxdpz23.navisarthi.navigation.ui.ParkingButton.on.value || parkingSet) {
-        Surface(
+        NavGlassSurface(
             shape = mapButtonShape,
-            // Same surface as the locate button, saved spot or not; the glyph carries the state.
-            color = mapButtonColor(darkTheme),
-            contentColor = mapButtonInk(darkTheme, accent = if (parkingSet) Color(0xFF8AB4F8) else null),
-            border = mapButtonRing(darkTheme),
-            shadowElevation = 6.dp,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .padding(end = 20.dp, bottom = chromeLift + 92.dp)
+                .padding(end = 16.dp, bottom = chromeLift + 92.dp)
                 .dpadHighlight(mapButtonShape),
         ) {
             Box(
@@ -6685,7 +6663,7 @@ private fun ListEditorDialog(
                     Text(
                         stringResource(if (initial == null) R.string.list_new_title else R.string.list_edit_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
                     // This one list as a file (#822), up here: a fourth control in the button row
@@ -6811,7 +6789,7 @@ private fun RoadPillText(name: String) {
         onTextLayout = { if (it.hasVisualOverflow && scale.floatValue > 0.8f) scale.floatValue = (scale.floatValue * 0.94f).coerceAtLeast(0.8f) },
         modifier = Modifier
             .onSizeChanged { NavChromeEdges.pill(it.height, pillKey) }
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
     )
 }
 
@@ -6869,7 +6847,7 @@ private fun SpeedWidget(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             if (limitDisp != null) {
@@ -6881,11 +6859,11 @@ private fun SpeedWidget(
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         ) {
                             Text("SPEED", color = Color(0xFF3C4043), fontSize = 7.sp, fontWeight = FontWeight.SemiBold, lineHeight = 8.sp)
                             Text("LIMIT", color = Color(0xFF3C4043), fontSize = 7.sp, fontWeight = FontWeight.SemiBold, lineHeight = 8.sp)
-                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
+                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
                         }
                     }
                 } else {
@@ -6896,14 +6874,14 @@ private fun SpeedWidget(
                         modifier = Modifier.size(42.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("$value", fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp, color = if (over) overColor else SheetPalette.ink(dark))
-                Text(unit, fontSize = 9.sp, color = SheetPalette.dim(dark), lineHeight = 10.sp)
+                Text("$value", fontSize = 25.sp, fontWeight = FontWeight.SemiBold, lineHeight = 27.sp, color = if (over) overColor else SheetPalette.ink(dark))
+                Text(unit, fontSize = 12.sp, color = SheetPalette.dim(dark), lineHeight = 10.sp)
             }
         }
     }
@@ -7052,7 +7030,7 @@ private fun BoxScope.AreaPickOverlay(state: MapUiState, vm: MapViewModel, zoomBu
         shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
             val region = plan?.region
             Text(
                 when {
@@ -7145,7 +7123,7 @@ private fun SheetSectionLabel(text: String) {
         text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
     )
 }
 
@@ -7260,6 +7238,7 @@ private fun BoxScope.ShapeBottomBar(state: MapUiState, vm: MapViewModel) {
 @Composable
 private fun BoxScope.ShapesOnlySaveBar(title: String, vm: MapViewModel) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     val savedMsg = stringResource(R.string.map_list_saved, title)
     Surface(
         shape = RoundedCornerShape(28.dp),
@@ -7290,6 +7269,7 @@ class MapLayers(val names: List<String>, val hidden: Set<String>, val onToggle: 
 @Composable
 private fun BoxScope.LocationTip(networkOff: Boolean, vm: MapViewModel) {
     val context = LocalContext.current
+    val contextResources = androidx.compose.ui.platform.LocalResources.current
     InfoCard(
         title = stringResource(if (networkOff) R.string.mapscreen_location_tip_title else R.string.mapscreen_psds_tip_title),
         body = stringResource(if (networkOff) R.string.mapscreen_location_tip_body else R.string.mapscreen_psds_tip_body),

@@ -9,8 +9,8 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Edit
@@ -60,8 +60,8 @@ object NaviSarthiIcons {
     val Gear          = Icons.Outlined.Settings
     val Bt            = Icons.Outlined.Bluetooth
     val Wifi          = Icons.Outlined.Wifi
-    val ChevronRight  = Icons.Outlined.ChevronRight
-    val ChevronLeft   = Icons.Outlined.ChevronLeft
+    val ChevronRight  = Icons.AutoMirrored.Outlined.KeyboardArrowRight
+    val ChevronLeft   = Icons.AutoMirrored.Outlined.KeyboardArrowLeft
     val ChevronDown   = Icons.Outlined.ExpandMore
     val Plus          = Icons.Outlined.Add
     val Minus         = Icons.Outlined.Remove

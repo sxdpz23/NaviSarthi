@@ -4,12 +4,13 @@ Source inventory for the Unslop audit; not a rendered-screen or runtime validati
 
 Includes nested Compose sheets/dialogs, supporting components, themes and Android Auto template screens.
 
-91 rendering/template source files; annotation counts are discovery aids, not a count of user-visible screens.
+92 rendering/template source files; annotation counts are discovery aids, not a count of user-visible screens.
 
 | Source under `com/sxdpz23/navisarthi` | @Composable annotations |
 | --- | ---: |
 | `ui/components/BarChart.kt` | 1 |
 | `ui/components/CircularDash.kt` | 1 |
+| `ui/components/CraftFocus.kt` | 1 |
 | `ui/components/Joystick.kt` | 1 |
 | `ui/components/NaviSarthiComponents.kt` | 15 |
 | `ui/components/NaviSarthiMap.kt` | 1 |

@@ -14,8 +14,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sxdpz23.navisarthi.pod.*
-import com.sxdpz23.navisarthi.dash.nav.VoiceManager
-import com.sxdpz23.navisarthi.dash.nav.VoiceMode
 import com.sxdpz23.navisarthi.ui.components.*
 import com.sxdpz23.navisarthi.ui.theme.*
 import com.sxdpz23.navisarthi.util.DeviceReadiness
@@ -43,9 +41,9 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScreenHeader(title = "Settings", onBack = onBack, hint = "Meteor 350 · Tripper Pod, Bluetooth and turn guidance")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        ScreenHeader(title = "Settings", onBack = onBack, hint = "Meteor 350 · Tripper Pod, Bluetooth and display preferences")
         ControlSection("Vehicle")
         NaviSarthiBtn(LocalVehicle.current.label, onClick = { showPicker = true }, variant = BtnVariant.Secondary,
             modifier = Modifier.fillMaxWidth())
@@ -95,7 +93,7 @@ internal fun PodSettingsScreen(vm: PodViewModel, onVehicleSelected: (VehicleMode
             settingsError = runCatching { settings.launch(DeviceReadiness.appSettingsIntent(ctx)) }.isFailure
         }, variant = BtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
         if (settingsError) ControlHint("Open Android Settings → Apps → NaviSarthi → Battery and allow background usage.")
-        SharedVoiceAndUnitsSettings(pod = true)
+        SharedUnitsSettings(pod = true)
         DriveBackupSettings()
         TestBuildCard()
         Text("NAVISARTHI v${com.sxdpz23.navisarthi.BuildConfig.VERSION_NAME}", color = TextLo)
@@ -113,15 +111,8 @@ private fun PodToggle(title: String, hint: String, checked: Boolean, onChange: (
 }
 
 @Composable
-internal fun SharedVoiceAndUnitsSettings(pod: Boolean = false) {
+internal fun SharedUnitsSettings(pod: Boolean = false) {
     val ctx = LocalContext.current
-    val voice = remember { VoiceManager.get(ctx) }
-    val mode by voice.mode.collectAsState()
-    ControlSection("Voice & guidance")
-    NaviSarthiSegmented(listOf("Off", "Chime", "Full TTS"), when (mode) {
-        VoiceMode.OFF -> "Off"; VoiceMode.CHIME -> "Chime"; VoiceMode.FULL -> "Full TTS"
-    }, { voice.setMode(when (it) { "Off" -> VoiceMode.OFF; "Full TTS" -> VoiceMode.FULL; else -> VoiceMode.CHIME }) }, Modifier.fillMaxWidth())
-    ControlHint("Voice guidance uses your phone's selected audio output. Pair your helmet headset in Android settings.")
     ControlSection("Units")
     // Units here describe phone-side summaries. Pod wire distances remain the verified metric format.
     val prefs = remember { ctx.getSharedPreferences("guidance", android.content.Context.MODE_PRIVATE) }

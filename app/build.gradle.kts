@@ -58,8 +58,8 @@ android {
         buildConfigField("String", "ROAD_FEATURES_MANIFEST_URL", "\"\"")
         buildConfigField("String", "MAP_FONTS_URL", "\"\"")
         // Independent NaviSarthi version sequence.
-        versionCode = 31
-        versionName = "0.6.0"
+        versionCode = 34
+        versionName = "0.6.3"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for
@@ -106,6 +106,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    lint {
+        // Imported locales are deliberately partial; Android falls back to the default English strings.
+        // Keep coverage findings visible, without treating missing translations as runtime failures.
+        warning += "MissingTranslation"
     }
     buildFeatures {
         compose = true

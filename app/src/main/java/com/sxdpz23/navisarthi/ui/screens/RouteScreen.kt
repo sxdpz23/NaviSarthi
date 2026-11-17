@@ -135,7 +135,7 @@ fun RouteScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        if (permissionError) Text(if (pod) "Allow precise location and Nearby devices access to start Pod navigation." else "Allow precise location and Nearby Wi-Fi access to start Dash navigation.", color = com.sxdpz23.navisarthi.ui.theme.Warn, modifier = Modifier.padding(18.dp))
+        if (permissionError) Text(if (pod) "Allow precise location and Nearby devices access to start Pod navigation." else "Allow precise location and Nearby Wi-Fi access to start Dash navigation.", color = com.sxdpz23.navisarthi.ui.theme.Warn, modifier = Modifier.padding(20.dp))
         // Map preview (top 46%)
         Box(
             Modifier
@@ -163,12 +163,13 @@ fun RouteScreen(
                     .background(
                         Brush.verticalGradient(listOf(Color(0xD9080C0C), Color.Transparent))
                     )
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
             ) {
                 NaviSarthiIconBtn(
                     NaviSarthiIcons.ChevronLeft,
                     onClick = onBack,
-                    size = 40.dp,
+                    contentDescription = "Back",
+                    size = 48.dp,
                     modifier = Modifier.background(Color(0xB30D0F11), IconBtnShape),
                 )
                 Spacer(Modifier.width(12.dp))
@@ -240,9 +241,9 @@ fun RouteScreen(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     if (routeState.isResolving) {
-                        Text("Resolving…", color = TextLo, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = GeistFamily, letterSpacing = (-0.38).sp)
+                        Text("Resolving…", color = TextLo, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily, letterSpacing = 0.sp)
                     } else {
-                        Text(destName, color = TextHi, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = GeistFamily, letterSpacing = (-0.38).sp)
+                        Text(destName, color = TextHi, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily, letterSpacing = 0.sp)
                     }
                     if (destSub.isNotBlank()) {
                         Text(destSub, color = TextMid, fontSize = 13.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(top = 2.dp))
@@ -267,12 +268,12 @@ fun RouteScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(Surf1)
                             .border(1.dp, Line, RoundedCornerShape(14.dp))
-                            .padding(13.dp),
+                            .padding(12.dp),
                     ) {
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(v, color = TextHi, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
                             Spacer(Modifier.width(4.dp))
-                            Text(u, color = TextLo, fontSize = 11.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(bottom = 2.dp))
+                            Text(u, color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(bottom = 2.dp))
                         }
                         Eyebrow(k, Modifier.padding(top = 4.dp))
                     }
@@ -288,7 +289,7 @@ fun RouteScreen(
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             ) {
                 Eyebrow("Voice guidance")
                 Icon(
@@ -496,7 +497,7 @@ fun RouteScreen(
                             ) { Icon(NaviSarthiIcons.LocationPin, null, tint = Gold, modifier = Modifier.size(20.dp)) }
                             Spacer(Modifier.width(13.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(loc.name, color = TextHi, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily, maxLines = 1)
+                                Text(loc.name, color = TextHi, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistFamily, maxLines = 1)
                                 Text(
                                     if (loc.note.isNotBlank()) loc.note else "%.4f, %.4f".format(loc.lat, loc.lng),
                                     color = TextLo, fontSize = 12.sp, fontFamily = GeistMonoFamily,

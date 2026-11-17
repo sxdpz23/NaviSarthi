@@ -3,6 +3,8 @@ package com.sxdpz23.navisarthi.navigation.ui.place
 import com.sxdpz23.navisarthi.navigation.ui.icons.Sym
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -71,7 +73,7 @@ fun StopsEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = SheetPalette.ink(dark)
     val dim = SheetPalette.dim(dark)
     val dpadMode = rememberDpadMode()
@@ -87,18 +89,19 @@ fun StopsEditorSheet(
         order = list
     }
 
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = ink),
+        shape = RoundedCornerShape(28.dp),
     ) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
+        // Keep the taskbar clearance outside the scroll area, so even the final Done
+        // action can scroll fully above the dock on short screens and in landscape.
+        Column(Modifier.navigationBarsPadding().padding(bottom = 96.dp)
+            .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.stops_editor_title),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = ink,
                     modifier = Modifier.weight(1f),
                 )
@@ -174,7 +177,7 @@ fun StopsEditorSheet(
                                 "${i + 1}",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                         Spacer(Modifier.width(12.dp))
@@ -260,7 +263,7 @@ fun TripEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dark = isAppInDarkTheme()
+    val dark = true
     val ink = SheetPalette.ink(dark)
     val dim = SheetPalette.dim(dark)
     val dpadMode = rememberDpadMode()
@@ -275,18 +278,19 @@ fun TripEditorSheet(
         val t = list[a]; list[a] = list[b]; list[b] = t
         order = list
     }
-    Card(
+    com.sxdpz23.navisarthi.navigation.ui.map.NavGlassCard(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = ink),
+        shape = RoundedCornerShape(28.dp),
     ) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
+        // Keep the taskbar clearance outside the scroll area, so even the final Done
+        // action can scroll fully above the dock on short screens and in landscape.
+        Column(Modifier.navigationBarsPadding().padding(bottom = 96.dp)
+            .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.stops_editor_title),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = ink,
                     modifier = Modifier.weight(1f),
                 )
@@ -326,7 +330,7 @@ fun TripEditorSheet(
                                     Modifier.size(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text("$i", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                    Text("$i", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }

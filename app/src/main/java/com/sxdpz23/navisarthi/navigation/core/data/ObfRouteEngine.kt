@@ -127,13 +127,14 @@ class ObfRouteEngine(private val obfRootOf: () -> File) : RouteEngine {
                     val leftMs = maxMs?.let { it - (System.currentTimeMillis() - startMs) }
                     if (leftMs != null && leftMs <= 0) return emptyList()
                     val params = buildMap {
+                        if (mode == TravelMode.MOTORBIKE) put("profile_motorcycle", "true")
                         // routing.xml parameter ids - the router excludes matching roads at
                         // calc time, no baked profiles needed (unlike the GraphHopper CH pair).
                         if (avoidTolls) put("avoid_toll", "true")
                         if (avoidHighways) put("avoid_motorway", "true") // the car profile's id (avoid_highway is horse riding only)
                         // `avoid_ferries` is the car profile parameter id in the vendored
                         // routing.xml. DRIVE only, like the chip.
-                        if (avoidFerries && mode == TravelMode.DRIVE) put("avoid_ferries", "true")
+                        if (avoidFerries && mode.isRoad) put("avoid_ferries", "true")
                     }
                     val config = builder().build(
                         profile,
@@ -471,6 +472,7 @@ class ObfRouteEngine(private val obfRootOf: () -> File) : RouteEngine {
         // routing.xml profile names.
         private fun profileFor(mode: TravelMode): String? = when (mode) {
             TravelMode.DRIVE -> "car"
+            TravelMode.MOTORBIKE -> "car" // routing.xml derived profile selected by profile_motorcycle.
             TravelMode.BICYCLE -> "bicycle"
             TravelMode.WALK -> "pedestrian"
             else -> null

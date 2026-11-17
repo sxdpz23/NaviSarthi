@@ -52,7 +52,7 @@ fun ScaleBar(
         Text(
             text = label,
             color = ink,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             modifier = Modifier.width(barDp).padding(bottom = 1.dp),

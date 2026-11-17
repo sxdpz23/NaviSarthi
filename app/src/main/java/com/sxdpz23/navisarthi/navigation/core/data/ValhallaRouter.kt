@@ -53,6 +53,76 @@ object ValhallaRouter {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Road-legal motorcycle costing, never bicycle or car geometry with a different label. */
+    fun motorcycleRoutes(
+        http: OkHttpClient, points: List<LatLng>, avoidTolls: Boolean, avoidHighways: Boolean,
+        avoidFerries: Boolean, bearing: Double? = null, timeoutMs: Long = 20_000L,
+        alternates: Boolean = true,
+    ): List<Route> {
+        if (points.size < 2 || timeoutMs <= 0L) return emptyList()
+        val body = motorcycleRequest(points, avoidTolls, avoidHighways, avoidFerries, bearing, alternates)
+        val request = Request.Builder().url(BASE).header("User-Agent", NavigationConfig.NAVISARTHI_UA)
+            .post(body.toRequestBody("application/json; charset=utf-8".toMediaType())).build()
+        return runCatching {
+            val client = http.newBuilder().callTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use emptyList<Route>()
+                parseMotorcycleRoutes(response.body?.string().orEmpty(), avoidTolls, avoidHighways, avoidFerries)
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    internal fun motorcycleRequest(
+        points: List<LatLng>, avoidTolls: Boolean, avoidHighways: Boolean, avoidFerries: Boolean,
+        bearing: Double?, alternates: Boolean,
+    ): String {
+        return buildJsonObject {
+            putJsonArray("locations") {
+                points.forEachIndexed { i, p ->
+                    add(buildJsonObject {
+                        put("lat", p.lat); put("lon", p.lng)
+                        put("type", "break") // Keep real stop legs in the returned trip.
+                        if (i == 0 && bearing != null) {
+                            put("heading", ((bearing % 360.0) + 360.0) % 360.0)
+                            put("heading_tolerance", 60)
+                        }
+                    })
+                }
+            }
+            put("costing", "motorcycle")
+            putJsonObject("costing_options") {
+                putJsonObject("motorcycle") {
+                    if (avoidTolls) put("use_tolls", 0.0)
+                    if (avoidHighways) put("use_highways", 0.0)
+                    if (avoidFerries) put("use_ferry", 0.0)
+                }
+            }
+            put("units", "kilometers")
+            if (alternates && points.size == 2) put("alternates", 2)
+        }.toString()
+    }
+
+    /** Each break remains a separate leg so stopping/reordering does not lose the journey structure. */
+    internal fun parseMotorcycleRoutes(text: String, tolls: Boolean, highways: Boolean, ferries: Boolean): List<Route> {
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return emptyList()
+        val trips = listOfNotNull(root["trip"]?.jsonObject) + root["alternates"]?.jsonArray.orEmpty()
+            .mapNotNull { it.jsonObject["trip"]?.jsonObject }
+        return trips.mapNotNull { trip ->
+            if ((tolls || highways || ferries) && usesAvoided(JsonObject(mapOf("trip" to trip)).toString(), tolls, highways, ferries)) return@mapNotNull null
+            val legs = trip["legs"]?.jsonArray.orEmpty().mapNotNull { leg ->
+                parseTrip(JsonObject(mapOf("legs" to kotlinx.serialization.json.JsonArray(listOf(leg)))))
+            }
+            if (legs.isEmpty() || legs.size != trip["legs"]?.jsonArray?.size) return@mapNotNull null
+            val first = legs.first()
+            first.copy(
+                polyline = legs.flatMapIndexed { i, route -> if (i == 0) route.polyline else route.polyline.drop(1) },
+                legs = legs.flatMap { it.legs }, distanceMeters = legs.sumOf { it.distanceMeters },
+                durationSeconds = legs.sumOf { it.durationSeconds }, durationInTrafficSeconds = null,
+                legTimes = legs.map { com.sxdpz23.navisarthi.navigation.core.model.LegTime(it.distanceMeters, it.durationSeconds, null) },
+            )
+        }
+    }
+
     /** Safety-weighted bicycle route(s) through [points] (origin, stops, destination). Alternates
      *  only for a plain origin-to-destination trip, like OSRM. Empty on any failure. */
     fun route(http: OkHttpClient, points: List<LatLng>, alternates: Boolean, tries: Int = 2): List<Route> {

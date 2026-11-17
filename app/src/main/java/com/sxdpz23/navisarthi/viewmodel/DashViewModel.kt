@@ -3,6 +3,7 @@ package com.sxdpz23.navisarthi.viewmodel
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.compose.ui.graphics.toArgb
 import android.os.SystemClock
 import com.sxdpz23.navisarthi.dash.map.FixFreshness
 import android.os.PowerManager
@@ -20,6 +21,8 @@ import com.sxdpz23.navisarthi.dash.map.TileProvider
 import com.sxdpz23.navisarthi.dash.nav.GeoPoint
 import com.sxdpz23.navisarthi.dash.nav.Route
 import com.sxdpz23.navisarthi.dash.nav.RouteMode
+import com.sxdpz23.navisarthi.dash.nav.NavDisplaySession
+import com.sxdpz23.navisarthi.dash.nav.DashRouteColor
 import com.sxdpz23.navisarthi.dash.nav.Router
 import com.sxdpz23.navisarthi.dash.protocol.DashCommands
 import com.sxdpz23.navisarthi.dash.protocol.EtaDisplayMode
@@ -28,6 +31,7 @@ import com.sxdpz23.navisarthi.dash.video.DashEncoder
 import com.sxdpz23.navisarthi.dash.video.NalProcessor
 import com.sxdpz23.navisarthi.dash.video.RtpPacketizer
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +72,8 @@ data class DashUiState(
     val etaDisplayMode: EtaDisplayMode = EtaDisplayMode.RIBBON,
     val perspective: Boolean = false,
     val goldenRoute: Boolean = false,
+    val routeColor: DashRouteColor = DashRouteColor.BLUE,
+    val navProjection: Boolean = false,
     val trafficEnabled: Boolean = false,
     val trafficConfigured: Boolean = false,
     val mapStyle: MapRenderer.Style = MapRenderer.Style.Light,
@@ -140,6 +146,40 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
     private val location    = LocationTracker(app)
     private val trafficTiles = com.sxdpz23.navisarthi.dash.map.TrafficTiles(app, viewModelScope)
     private val mapRenderer = MapRenderer(tiles, trafficTiles)
+    private var sharedRendererInstalled = false
+    private var projectionRoute: com.sxdpz23.navisarthi.navigation.core.model.Route? = null
+    private var projectionCumulative = doubleArrayOf()
+    private var projectionFixNs = 0L
+    private fun currentDisplayFix() = if (NavDisplaySession.state.value.active &&
+        NavDisplaySession.state.value.target == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH)
+        NavDisplaySession.state.value.fix else location.location.value
+
+    init {
+        viewModelScope.launch {
+            yield() // let constructor fields initialize before observing an already-active drive
+            var wasProjecting = false
+            NavDisplaySession.state.collect { shared ->
+                val projecting = shared.active && shared.target == com.sxdpz23.navisarthi.console.ConsoleType.TRIPPER_DASH && consoleEnabled
+                _ui.update { it.copy(navProjection = projecting, perspective = shared.perspective,
+                    routeColor = shared.routeColor, goldenRoute = shared.routeColor == DashRouteColor.GOLDEN_LINE) }
+                if (projecting && !wasProjecting) {
+                    routeFetchJob?.cancel(); rerouteJob?.cancel()
+                    journey = emptyList(); route = null
+                    location.stop() // Nav supplies the only live navigation fixes.
+                    _previewFrame.value = null
+                    if (session.state.value != DashState.STREAMING && !userWantsConnection) connect()
+                }
+                if (!projecting && wasProjecting) {
+                    projectionRoute = null; route = null; displayRoute = emptyList(); destLat = null; destLng = null
+                    _ui.update { it.copy(destinationName = null, hasRoute = false, maneuver = null, remainingKm = null, etaMinutes = null) }
+                    disconnect() // no second free-roam map after the shared drive ends
+                }
+                wasProjecting = projecting
+                invalidateMap()
+            }
+        }
+    }
+
 
     init {
         _ui.update { it.copy(trafficConfigured = trafficTiles.configured, trafficEnabled = trafficTiles.enabled) }
@@ -306,12 +346,16 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
     private var arrivalAverageKmh: Double? = null
     private var arrivalMaxKmh: Double? = null
 
+    fun setRouteColor(color: DashRouteColor) { NavDisplaySession.setRouteColor(color); invalidateMap() }
+
     fun setGoldenRoute(enabled: Boolean) {
+        NavDisplaySession.setRouteColor(if (enabled) DashRouteColor.GOLDEN_LINE else DashRouteColor.BLUE)
         _ui.update { it.copy(goldenRoute = enabled) }
         invalidateMap()
     }
 
     fun setPerspective(enabled: Boolean) {
+        NavDisplaySession.setPerspective(enabled)
         _ui.update { it.copy(perspective = enabled) }
         invalidateMap()
     }
@@ -707,8 +751,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         )
         loggedFirstFrame = false
         DashKeepAliveService.start(getApplication())
-        location.setUpdateInterval(500L)
-        location.start()
+        // Pairing never starts a second GPS feed; active guidance comes from Nav.
         startRecording()
 
         // We must know the EXACT dash SSID before connecting — the dash validates it inside
@@ -805,7 +848,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                     val v = getApplication<Application>().getSystemService(android.os.Vibrator::class.java)
                     v?.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300, 200, 300), -1))
                 }
-                voice.alert("Dash disconnected. Restart the dash to reconnect.")
+                Unit // Connection status is shown; Nav owns spoken guidance.
             }
         }
     }
@@ -814,7 +857,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         connLostAlertJob?.cancel(); connLostAlertJob = null
         if (connLostAlerted) {
             connLostAlerted = false
-            voice.alert("Dash reconnected")
+            Unit // Nav owns spoken guidance.
         }
     }
 
@@ -823,7 +866,9 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         if (recorder.isRecording) return
         recorder.start()
         recordJob = viewModelScope.launch {
-            location.location.collect { loc ->
+            kotlinx.coroutines.flow.combine(location.location, NavDisplaySession.state) { local, shared ->
+                if (_ui.value.navProjection) shared.fix else local
+            }.distinctUntilChangedBy { it?.elapsedRealtimeNanos }.collect { loc ->
                 if (loc != null) recorder.add(loc.latitude, loc.longitude,
                     if (loc.hasSpeed()) loc.speed else Float.NaN, loc.accuracy, loc.elapsedRealtimeNanos / 1_000_000L)
             }
@@ -847,7 +892,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
     // ── Destination + routing ───────────────────────────────────────────────
 
     fun prefetchTiles(lat: Double, lng: Double) {
-        val loc = location.location.value
+        val loc = currentDisplayFix()
         tiles.prefetch(lat, lng, loc?.latitude, loc?.longitude)
     }
 
@@ -875,10 +920,11 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
 
     @Synchronized
     override fun remainingJourney(): List<com.sxdpz23.navisarthi.data.SharedLocation>? =
-        if (journey.isEmpty() || arrived) null else journey.drop(journeyIndex).map { it.place }
+        if (_ui.value.navProjection) NavDisplaySession.state.value.remainingStops.takeIf { it.isNotEmpty() } else if (journey.isEmpty() || arrived) null else journey.drop(journeyIndex).map { it.place }
 
     @Synchronized
     fun skipStop() {
+        if (_ui.value.navProjection) { NavDisplaySession.skipStop(); return }
         advanceStop(journey, journeyIndex, usePreview = false)
     }
 
@@ -938,6 +984,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
     /** Drop the destination/route → free roam. The map keeps streaming and follows the rider. */
     @Synchronized
     override fun exitNavigation() {
+        if (_ui.value.navProjection) { NavDisplaySession.requestStop(); return }
         rerouteJob?.cancel(); rerouteJob = null; rerouting = false
         navigationMotion = null
         journey = emptyList()
@@ -1079,7 +1126,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         tiles.setSpeculativePrefetchEnabled(true)
         session.startStreaming()
         startMediaForwarding()
-        location.location.value?.let { tiles.prefetch(it.latitude, it.longitude) }
+        if (!sharedRendererInstalled) {
+            mapRenderer.setNavigationMap(com.sxdpz23.navisarthi.dash.map.NavDashMapRenderer(getApplication()) { invalidateMap() })
+            sharedRendererInstalled = true
+        }
 
         streamJob = viewModelScope.launch(Dispatchers.Default) {
             var lastPrefetch = 0L
@@ -1100,7 +1150,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                     ensureActive()
                     renderDurationMs = SystemClock.elapsedRealtime() - tickStart
                     val nowMs = SystemClock.elapsedRealtime()
-                    val fix = location.location.value
+                    val fix = currentDisplayFix()
                     val profile = navigationPower.select(nowMs, fix?.speed ?: 0f,
                         _ui.value.gpsStatus == GpsStatus.GOOD && fix?.hasSpeed() == true, powerMatched, powerNextTurnM,
                         _ui.value.recalculating, nowMs < fastRefreshUntilMs, thermalStatus, batterySaver)
@@ -1116,7 +1166,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                         (profile.locationMs < locationProfileMs || nowMs - candidateLocationSinceMs >= 5_000L)) {
                         locationProfileMs = profile.locationMs
                         launch(Dispatchers.Main) {
-                            if (session.state.value == DashState.STREAMING) location.setUpdateInterval(profile.locationMs)
+                            if (_ui.value.navProjection) NavDisplaySession.setLocationInterval(profile.locationMs)
+                            if (session.state.value == DashState.STREAMING && !_ui.value.navProjection) location.setUpdateInterval(profile.locationMs)
                         }
                     }
                     val bmp = frameBitmap
@@ -1141,7 +1192,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                     sendPaceMs = if (sendPaceMs <= 0.0) gap.toDouble() else sendPaceMs + (gap - sendPaceMs) * 0.1
                     if (gap > sendPaceMaxMs) sendPaceMaxMs = gap
                     // Avoid repeating a multi-zoom warm-up in the same area or while power constrained.
-                    if (profile.prefetch && sendNow - lastPrefetch > 60_000L) {
+                    if (!_ui.value.navProjection && profile.prefetch && sendNow - lastPrefetch > 60_000L) {
                         lastPrefetch = sendNow
                         fix?.let {
                             val cell = Mercator.lngToTileX(it.longitude, 16).toInt() to Mercator.latToTileY(it.latitude, 16).toInt()
@@ -1190,13 +1241,14 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
      * @return true if the visible map content changed this tick (drives the motion-adaptive cadence).
      */
     private fun tick(): Boolean {
+        if (_ui.value.navProjection) return tickNavProjection()
         // Revert to follow mode after the rider stops nudging the joystick.
         if (!followMode && System.currentTimeMillis() - lastManualPanAt > MANUAL_IDLE_MS) {
             panX = 0f; panY = 0f; followMode = true
             _ui.update { it.copy(followMode = true) }
         }
 
-        val loc = location.location.value
+        val loc = currentDisplayFix()
         val fixAgeMs = loc?.let { FixFreshness.ageMs(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) } ?: Long.MAX_VALUE
         val navigationFixValid = loc != null && loc.hasAccuracy() &&
             FixFreshness.usable(loc.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos(), loc.accuracy)
@@ -1329,7 +1381,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
             }
             session.updateNavInfo(ns.nextManeuver?.dashCode ?: DashCommands.NAV_MANEUVER_CONTINUE, pv, pu, tv, tu, etaHHMM)
             // Spoken/chime turn guidance (no-op when voice mode is OFF).
-            voice.maybeAnnounce(ns.nextManeuver, ns.nextTurnM, ns.remainingM)
+            Unit // Legacy console voice is retired; Nav speaks for the shared session.
         } else if (!arrived && loc != null && dLat != null && dLng != null) {
             remainingM = GeoPoint.distMeters(
                 GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng)
@@ -1564,7 +1616,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
                 val requestedMode = routeMode
                 val r = Router.route(GeoPoint(loc.latitude, loc.longitude), GeoPoint(dLat, dLng), requestedMode, departureHeading)
                 val took = System.currentTimeMillis() - startMs
-                val currentHeading = departureHeadingFor(location.location.value)
+                val currentHeading = departureHeadingFor(currentDisplayFix())
                 if (r != null && currentHeading != null &&
                     com.sxdpz23.navisarthi.dash.nav.DepartureDirection.accepts(r, currentHeading) &&
                     !arrived && destLat == dLat && destLng == dLng && routeMode == requestedMode) {
@@ -1586,11 +1638,75 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
         }
     }
 
+
+    private val projectionAccent: Int get() {
+        val name = getApplication<Application>().getSharedPreferences("vehicle", 0).getString("model", null)
+        val model = com.sxdpz23.navisarthi.ui.theme.VehicleModel.entries.firstOrNull { it.name == name }
+            ?: com.sxdpz23.navisarthi.ui.theme.VehicleModel.Himalayan450
+        return model.accent.toArgb()
+    }
+    private fun sharedMapStyle(): MapRenderer.Style {
+        val systemDark = (getApplication<Application>().resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val dark = com.sxdpz23.navisarthi.navigation.ui.theme.resolveMapDark(systemDark)
+        val amoled = com.sxdpz23.navisarthi.navigation.ui.MapLook.style.value.painted &&
+            com.sxdpz23.navisarthi.navigation.ui.theme.AppTheme.mapMode.value == com.sxdpz23.navisarthi.navigation.ui.theme.MapThemeMode.FOLLOW &&
+            com.sxdpz23.navisarthi.navigation.ui.theme.AppTheme.mode.value == com.sxdpz23.navisarthi.navigation.ui.theme.ThemeMode.AMOLED &&
+            com.sxdpz23.navisarthi.navigation.ui.theme.resolveAppDark(systemDark)
+        return if (amoled) MapRenderer.Style.Black else if (dark) MapRenderer.Style.Dark else MapRenderer.Style.Light
+    }
+
+    /** Display Nav's selected route/progress; no console progress engine, router or speech runs. */
+    private fun tickNavProjection(): Boolean {
+        val shared = NavDisplaySession.state.value
+        val ns = shared.nav
+        val source = ns.route ?: return false
+        val loc = shared.fix
+        if (projectionRoute !== source) {
+            projectionRoute = source
+            route = com.sxdpz23.navisarthi.dash.nav.NavigationRouting.consoleRoute(source)
+            projectionCumulative = com.sxdpz23.navisarthi.navigation.core.nav.RouteProjection.cumulative(source.polyline)
+            invalidateMap()
+        }
+        val valid = loc != null && loc.hasAccuracy() && FixFreshness.usable(loc.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos(), loc.accuracy, FixFreshness.windowMs(shared.locationIntervalMs))
+        gpsStatus = if (!valid) GpsStatus.LOST else if (loc!!.accuracy > 25f) GpsStatus.WEAK else GpsStatus.GOOD
+        val next = source.legs.flatMap { it.maneuvers }.getOrNull(ns.nav.stepIndex)
+        val remaining = ns.remainingDistance.coerceAtLeast(0.0)
+        val minutes = kotlin.math.ceil(ns.remainingDuration / 60.0).toInt().coerceAtLeast(0)
+        etaArrivalMs = System.currentTimeMillis() + (ns.remainingDuration * 1000).toLong()
+        arrived = ns.arrived; arrivalMini = ns.arrived
+        destLat = source.polyline.lastOrNull()?.lat; destLng = source.polyline.lastOrNull()?.lng
+        displayRoute = if (ns.arrived) emptyList() else source.polyline.map { GeoPoint(it.lat,it.lng) }
+        powerMatched = valid && !ns.nav.offRoute
+        powerNextTurnM = ns.nav.distanceToNextManeuver
+        val fallback = loc?.let { com.sxdpz23.navisarthi.navigation.core.model.LatLng(it.latitude,it.longitude) }
+            ?: source.polyline.firstOrNull() ?: return false
+        // The same monotonic Nav progress supplies display-only interpolation between GPS fixes.
+        val age = loc?.let { FixFreshness.ageMs(it.elapsedRealtimeNanos,SystemClock.elapsedRealtimeNanos()) } ?: 0L
+        val lead = if (powerMatched && !ns.paused && !ns.arrived) (loc?.speed ?: 0f) * (age.coerceIn(0,1500) / 1000.0) else 0.0
+        val position = if (powerMatched) com.sxdpz23.navisarthi.navigation.core.nav.RouteProjection.pointAt(source.polyline, projectionCumulative, ns.nav.traveledM + lead) else fallback
+        val heading = if (powerMatched) com.sxdpz23.navisarthi.navigation.core.nav.RouteProjection.bearingAt(source.polyline, projectionCumulative, ns.nav.traveledM + lead).toFloat() else loc?.bearing ?: 0f
+        frameRiderLat = position.lat; frameRiderLng = position.lng
+        _ui.update { it.copy(destinationName = ns.destinationLabel, hasRoute = true,
+            hasGps = valid, gpsStatus = gpsStatus, remainingKm = remaining / 1000.0, etaMinutes = minutes,
+            maneuver = if (ns.paused) "Navigation paused" else ns.maneuverText,
+            offRoute = ns.nav.offRoute, recalculating = ns.nav.offRoute,
+            riderLat = position.lat, riderLng = position.lng, riderBearing = heading,
+            routePoints = emptyList(), destLatLng = destLat?.let { lat -> destLng?.let { lat to it } }) }
+        val turn = route?.maneuvers?.getOrNull(ns.nav.stepIndex)
+        val (pv,pu) = toDashDistance(ns.nav.distanceToNextManeuver)
+        val (tv,tu) = toDashDistance(remaining)
+        session.updateNavInfo(turn?.dashCode ?: DashCommands.NAV_MANEUVER_CONTINUE,pv,pu,tv,tu)
+        refreshEtaRibbon()
+        redrawFrame(position.lat,position.lng,heading,remaining)
+        return true
+    }
+
     private fun redrawFrame(
         centerLat: Double, centerLng: Double, heading: Float, remainingM: Double?,
     ) {
         val bmp = frameBitmap ?: return
-        val loc = location.location.value
+        val loc = currentDisplayFix()
         // Glanceable ETA — minutes remaining + a stable 12-hour arrival clock. Both come
         // from the smoothed estimate so they don't flicker every second.
         val mins = _ui.value.etaMinutes
@@ -1618,7 +1734,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
             zoom = zoom,
             panX = panX,
             panY = panY,
-            headingUp = (headingUp || _ui.value.perspective) && loc != null,
+            headingUp = NavDisplaySession.state.value.headingUp && loc != null,
             heading = heading,
             riderLat = frameRiderLat,
             riderLng = frameRiderLng,
@@ -1629,13 +1745,20 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
             maneuverText = _ui.value.maneuver,
             remainingText = remainingM?.let { fmtDist(it) },
             tilt3d = _ui.value.perspective && destLat != null && !arrived,
-            style = _ui.value.mapStyle,
+            style = sharedMapStyle(),
             arrived = arrivalMini,
             arrivalDuration = arrivalDuration,
             journeyAverageKmh = arrivalAverageKmh,
             journeyMaxKmh = arrivalMaxKmh,
             goldenRoute = _ui.value.goldenRoute,
-            traffic = trafficTiles.enabled && _ui.value.trafficAvailable && !offlineJourney && !arrived && displayRoute.size >= 2,
+            routeColor = when (_ui.value.routeColor) {
+                DashRouteColor.BLUE -> 0xFF1F6FEB.toInt()
+                DashRouteColor.VEHICLE_ACCENT -> projectionAccent
+                DashRouteColor.GOLDEN_LINE -> 0xFFE9B949.toInt()
+            },
+            alternativeRoutes = if (NavDisplaySession.state.value.showAlternatives) NavDisplaySession.state.value.alternatives.map { r -> r.polyline.map { GeoPoint(it.lat,it.lng) } } else emptyList(),
+            navBasemapArchive = NavDisplaySession.state.value.basemapArchive,
+            traffic = !_ui.value.navProjection && trafficTiles.enabled && _ui.value.trafficAvailable && !offlineJourney && !arrived && displayRoute.size >= 2,
             etaPrimary = etaPrimary,
             etaSecondary = etaSecondary,
             gpsWeak = gpsStatus == GpsStatus.WEAK,
@@ -1784,6 +1907,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app), com.sxdpz23.navis
 
     private fun teardown() {
         navigationPower.reset()
+        mapRenderer.setNavigationMap(null); sharedRendererInstalled = false
         tiles.setSpeculativePrefetchEnabled(false)
         tiles.setSpeculativePrefetchEnabled(true) // Cancel old jobs; allow subsequent route planning.
         locationProfileMs = 500L; candidateLocationMs = 500L; candidateLocationSinceMs = 0L
