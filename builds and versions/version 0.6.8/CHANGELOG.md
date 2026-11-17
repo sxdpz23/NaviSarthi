@@ -6,4 +6,4 @@
 - Speed up shared glass toggles from 1,550 ms to 360 ms, starting travel immediately.
 - Preserve the 0.6.7 wallpaper aspect-ratio fix, close-zoom perspective route clipping, consistent Ready for Adventure typography and full search-bar tap target.
 
-Package, signing certificate, APK integrity, 16 KiB alignment and checksum verification are required before delivery. JVM regression results are recorded in VERIFICATION.json. Lint is deferred per project preference. Device visuals and real Dash/Pod operation have not been validated on hardware for this release.
+Validation passed: 153 JVM tests across 34 suites (zero failures/errors/skips), correct package/version, matching signing certificate, APK integrity, 16 KiB alignment and checksum. Full results are recorded in VERIFICATION.json. Lint is deferred per project preference. Device visuals and real Dash/Pod operation have not been validated on hardware for this release.
