@@ -41,17 +41,17 @@ fun VehicleGlassSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, 
         // Keyframes use Compose's duration scale, including instant reduced-motion updates.
         coroutineScope {
             launch { lens.animateTo(0f, keyframes {
-                durationMillis = 360
+                durationMillis = 900
                 initialLens at 0 using FastOutSlowInEasing
-                1f at 80 using FastOutSlowInEasing
-                1f at 220 using FastOutSlowInEasing
-                0f at 360
+                1f at 200 using FastOutSlowInEasing
+                1f at 550 using FastOutSlowInEasing
+                0f at 900
             }) }
             launch { travel.animateTo(target, keyframes {
-                durationMillis = 360
+                durationMillis = 900
                 from at 0 using FastOutSlowInEasing
-                target at 220
-                target at 360
+                target at 550
+                target at 900
             }) }
         }
     }

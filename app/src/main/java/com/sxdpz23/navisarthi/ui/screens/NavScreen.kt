@@ -21,7 +21,15 @@ fun NavScreen(vm: MapViewModel, pod: Boolean, onOpenSettings: () -> Unit) {
     val mapBottomSpace = if (placeOpen) 0.dp else 112.dp
     val console = if (pod) "Pod" else "Dash"
     BackHandler(shared.active && shared.phoneVisible) { NavDisplaySession.hidePhone() }
-    Column(Modifier.fillMaxSize().padding(bottom = mapBottomSpace)) {
+    // Nav normally draws edge-to-edge and handles insets within the map. During
+    // console navigation this host also owns the return action above that map.
+    // Inset the whole active host so the button stays below status/cutout areas;
+    // consuming those insets here prevents the map's guidance adding them again.
+    Column(Modifier.fillMaxSize()
+        .then(if (shared.active) Modifier.windowInsetsPadding(
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        ) else Modifier)
+        .padding(bottom = mapBottomSpace)) {
         if (shared.active && !shared.phoneVisible) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 ScreenHeader(title = "Navigation is on $console", hint = "Nav is handling the route and voice guidance. You can lock the phone while riding.")
