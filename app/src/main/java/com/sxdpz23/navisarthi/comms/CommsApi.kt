@@ -16,7 +16,9 @@ internal class CommsApiException(val status: Int, val code: String) : IOExceptio
 /** Dedicated client: no shared cache, analytics interceptor, credential logging or cross-origin redirects. */
 internal class CommsApi(val origin: String) {
     private val http = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
-        .retryOnConnectionFailure(false).callTimeout(25, TimeUnit.SECONDS).build()
+        // Allow a sleeping service to wake without automatically replaying a write.
+        .retryOnConnectionFailure(false).connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS).callTimeout(100, TimeUnit.SECONDS).build()
     suspend fun request(path: String, method: String = "POST", payload: JsonObject = buildJsonObject {}, credential: String? = null,
                         installation: String? = null, retryId: String? = null): JsonObject = suspendCancellableCoroutine { continuation ->
         val request = Request.Builder().url(origin.toHttpUrl().resolve(path)!!).header("Cache-Control", "no-store")

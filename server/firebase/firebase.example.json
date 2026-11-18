@@ -1,6 +1,6 @@
 {
   "firestore": [
-    { "database": "groups", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
+    { "database": "navidb", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
   ],
   "database": { "instance": "REPLACE_WITH_DEDICATED_GROUPS_RTDB_INSTANCE", "rules": "database.rules.json" }
 }

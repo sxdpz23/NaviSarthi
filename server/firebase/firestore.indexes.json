@@ -1,11 +1,4 @@
 {
   "indexes": [],
-  "fieldOverrides": [
-    { "collectionGroup": "rideGroups", "fieldPath": "members", "indexes": [] },
-    { "collectionGroup": "rideGroups", "fieldPath": "pendingAudio", "indexes": [] },
-    { "collectionGroup": "rideCleanup", "fieldPath": "members", "indexes": [] },
-    { "collectionGroup": "rideCleanup", "fieldPath": "pendingAudio", "indexes": [] },
-    { "collectionGroup": "messages", "fieldPath": "text", "indexes": [] },
-    { "collectionGroup": "rideReceipts", "fieldPath": "ciphertext", "indexes": [] }
-  ]
+  "fieldOverrides": []
 }

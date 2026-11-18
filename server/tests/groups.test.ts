@@ -6,6 +6,7 @@ import { MemoryStore, MemoryLocations } from '../src/store.js';
 import { disabledAudio, type Audio } from '../src/audio.js';
 import { secret, hash } from '../src/crypto.js';
 import { ApiError } from '../src/errors.js';
+import { COMMS_PATHS } from '../src/paths.js';
 
 function fixture(audio: Audio = disabledAudio) {
   let clock = 1_800_000_000_000;
@@ -31,7 +32,7 @@ test('create retry returns the original response without storing plaintext crede
   const f = fixture(); const installation = secret(); const requestId = randomUUID();
   const first = await f.create(installation, requestId); const retry = await f.create(installation, requestId);
   assert.deepEqual(retry, first);
-  assert.equal((await f.store.list('rideGroups')).length, 1);
+  assert.equal((await f.store.list(COMMS_PATHS.sessions)).length, 1);
   await assert.rejects(f.groups.admit(installation, requestId, { nickname: 'Changed', name: 'Weekend ride', expiresAt: f.now() + DAY }), code('IDEMPOTENCY_CONFLICT'));
 });
 test('join retry recovers membership and concurrent joins never exceed twelve', async () => {
@@ -127,7 +128,7 @@ test('expiry denies access immediately and cleanup removes all ride data', async
   await assert.rejects(f.groups.auth(owner.credential), code('SESSION_ENDED'));
   await assert.rejects(f.groups.extend(owner.credential, f.now() + DAY), code('SESSION_ENDED'));
   assert.equal((await f.groups.maintenance()).cleaned, 1);
-  assert.equal([...f.store.records.keys()].filter(k => !k.startsWith('rideRates/')).length, 0);
+  assert.equal([...f.store.records.keys()].filter(k => !k.startsWith(COMMS_PATHS.rates + '/')).length, 0);
   assert.deepEqual(await f.locations.get(owner.groupId), {});
   assert.equal(await f.groups.cleanup(owner.groupId), false);
 });
@@ -136,7 +137,7 @@ test('cleanup of an old group preserves a newer installation membership', async 
   f.advance(DAY); const current = await f.create(installation);
   await f.groups.cleanup(old.groupId);
   await f.groups.auth(current.credential);
-  assert.equal((await f.store.get<any>(`rideInstallations/${hash(installation)}`)).groupId, current.groupId);
+  assert.equal((await f.store.get<any>(`${COMMS_PATHS.installations}/${hash(installation)}`)).groupId, current.groupId);
 });
 test('provider failures retain cleanup work and maintenance retries successfully', async () => {
   let fail = true; const removed: string[] = [];
@@ -190,10 +191,10 @@ test('a failed recursive delete is recoverable even after the group parent was d
   };
   assert.equal((await f.groups.end(owner.credential)).cleanupPending, true);
   assert.equal(await f.store.get(f.groups.groupPath(owner.groupId)), undefined);
-  assert.ok(await f.store.get(`rideCleanup/${owner.groupId}`));
+  assert.ok(await f.store.get(`${COMMS_PATHS.cleanup}/${owner.groupId}`));
   f.store.deleteTree = deleteTree;
   assert.equal((await f.groups.maintenance()).cleaned, 1);
-  assert.equal([...f.store.records.keys()].filter(k => !k.startsWith('rideRates/')).length, 0);
+  assert.equal([...f.store.records.keys()].filter(k => !k.startsWith(COMMS_PATHS.rates + '/')).length, 0);
 });
 test('loss of audio configuration retains cleanup rather than treating an existing room as closed', async () => {
   const audio: Audio = { enabled: true, async token() { return { url: 'wss://test.invalid', token: 'test-only' }; }, async remove() {}, async end() {} };
@@ -201,6 +202,6 @@ test('loss of audio configuration retains cleanup rather than treating an existi
   await f.groups.audioToken(owner.credential);
   const restarted = new Groups(f.store, f.locations, disabledAudio, f.now);
   assert.equal((await restarted.end(owner.credential)).cleanupPending, true);
-  assert.ok(await f.store.get(`rideCleanup/${owner.groupId}`));
+  assert.ok(await f.store.get(`${COMMS_PATHS.cleanup}/${owner.groupId}`));
   assert.equal((await f.groups.maintenance()).cleaned, 1);
 });

@@ -1,5 +1,12 @@
 node_modules/
 dist/
-.env
+.env*
+!.env.example
 *.log
 *-credentials.json
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+*.pem
+*.p12
+*.jks

@@ -10,6 +10,9 @@ export interface Store {
   get<T = RecordData>(path: string): Promise<T | undefined>;
   transaction<T>(run: (tx: Transaction) => Promise<T>): Promise<T>;
   list<T = RecordData>(collection: string, query?: Query): Promise<Array<{ path: string; data: T }>>;
+  /** Includes missing parent documents that still have subcollections (migration safety). */
+  listDocuments(collection: string): Promise<string[]>;
+  listCollections(document: string): Promise<string[]>;
   watch(path: string, changed: () => void, failed: () => void): () => void;
   deleteTree(path: string): Promise<void>;
   close(): Promise<void>;
@@ -60,6 +63,14 @@ export class MemoryStore implements Store {
   watch(path: string, changed: () => void): () => void {
     const set = this.listeners.get(path) ?? new Set(); this.listeners.set(path, set); set.add(changed);
     return () => { set.delete(changed); if (!set.size) this.listeners.delete(path); };
+  }
+  async listDocuments(collection: string) {
+    const depth = collection.split('/').length + 1;
+    return [...new Set([...this.records.keys()].filter(path => path.startsWith(collection + '/')).map(path => path.split('/').slice(0, depth).join('/')))];
+  }
+  async listCollections(document: string) {
+    const depth = document.split('/').length + 1;
+    return [...new Set([...this.records.keys()].filter(path => path.startsWith(document + '/') && path.split('/').length > depth).map(path => path.split('/').slice(0, depth).join('/')))];
   }
   async deleteTree(path: string): Promise<void> {
     await this.transaction(async tx => { for (const key of this.records.keys()) if (key === path || key.startsWith(path + '/')) tx.delete(key); });

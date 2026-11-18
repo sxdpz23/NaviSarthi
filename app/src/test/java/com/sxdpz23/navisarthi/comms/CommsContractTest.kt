@@ -8,6 +8,12 @@ import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 
 class CommsContractTest {
+    @Test fun configuredBackendUsesASecureRootOrigin() {
+        assertEquals("https://navisarthi.onrender.com/", commsOrigin("https://navisarthi.onrender.com/", false))
+        val configured = commsOrigin(com.sxdpz23.navisarthi.BuildConfig.COMMS_API_URL, false)
+        assertTrue(configured.isNotBlank())
+        assertTrue(configured.startsWith("https://"))
+    }
     @Test fun qrRequiresOurExplicitVersionAndType() {
         val token = "aB1".repeat(10) + "Z9"
         assertEquals(token, parseCommsQr("""{"v":1,"type":"navisarthi-ride","inviteToken":"$token"}"""))

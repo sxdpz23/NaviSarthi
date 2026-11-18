@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
 import websocket from '@fastify/websocket';
 import helmet from '@fastify/helmet';
 import { timingSafeEqual } from 'node:crypto';
@@ -6,6 +6,8 @@ import { z, ZodError } from 'zod';
 import { Groups } from './groups.js';
 import { ApiError, ensure } from './errors.js';
 import { hash } from './crypto.js';
+import { registerAdmin } from './admin.js';
+import { OperationsLog } from './operations.js';
 
 const secretSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const id = z.string().uuid();
@@ -20,15 +22,20 @@ const bearer = (header?: string) => {
   ensure(parsed.success, 401, 'INVALID_CREDENTIAL'); return parsed.data;
 };
 
-export async function buildApp(groups: Groups, options: { maintenanceKey?: string; backgroundMaintenance?: boolean; logger?: boolean } = {}) {
-  // No request logging: paths, request bodies, credentials and QR values must not enter logs.
+export async function buildApp(groups: Groups, options: { maintenanceKey?: string; backgroundMaintenance?: boolean; logger?: boolean; adminPasscode?: string; secureAdminCookies?: boolean; operationsLog?: OperationsLog } = {}) {
+  // Operational metadata only: never raw URLs, bodies, headers, credentials or QR values.
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024, trustProxy: false, requestTimeout: 15_000 });
+  const journal = options.operationsLog ?? new OperationsLog(groups.now);
+  const errors = new WeakMap<FastifyRequest, string>();
+  const authenticatedSockets = new Set<import('ws').WebSocket>();
   await app.register(helmet);
   await app.register(websocket, { options: { maxPayload: 4096, perMessageDeflate: false } });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     if (request.url.split('?')[0] === '/healthz' || request.url.split('?')[0] === '/internal/maintenance') return;
     ensure(!request.url.includes('?'), 400, 'QUERY_NOT_SUPPORTED');
+    const route = request.routeOptions.url;
+    if (route === '/' || route?.startsWith('/admin/')) return;
     await groups.rate(`ip:${request.ip}`, 600);
     if (request.headers.authorization) {
       const token = bearer(request.headers.authorization);
@@ -36,20 +43,33 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
       await groups.rate(`member:${hash(token)}`, 180);
     }
   });
-  app.setErrorHandler((error, _request, reply) => {
+  app.addHook('onResponse', async (request, reply) => {
+    const route = request.routeOptions.url ?? 'unmatched';
+    if ((route === '/healthz' || route === '/admin/summary') && reply.statusCode < 400) return;
+    journal.record(reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warn' : 'info', 'request', {
+      method: request.method, route, status: reply.statusCode, durationMs: Math.round(reply.elapsedTime),
+      ...(errors.has(request) ? { code: errors.get(request)! } : {}),
+    });
+  });
+  app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
+      errors.set(request, error.code);
       if (error.status === 429) reply.header('Retry-After', '60');
       return reply.code(error.status).send({ error: error.code });
     }
     const status = (error as { statusCode?: number })?.statusCode;
     if (error instanceof ZodError || status === 400 || status === 413 || status === 415) {
+      errors.set(request, 'INVALID_REQUEST');
       return reply.code(status ?? 400).send({ error: 'INVALID_REQUEST' });
     }
     // Intentionally exclude exception messages, which can contain provider payloads or URLs.
+    const providerCode = (error as { code?: unknown })?.code;
+    errors.set(request, typeof providerCode === 'number' && Number.isInteger(providerCode) && providerCode >= 0 && providerCode <= 16 ? `UPSTREAM_RPC_${providerCode}` : 'INTERNAL_ERROR');
     if (options.logger) console.error(JSON.stringify({ event: 'request_failed', category: 'internal' }));
     return reply.code(503).send({ error: 'SERVICE_UNAVAILABLE' });
   });
   app.get('/healthz', async () => ({ status: 'ok' }));
+  await registerAdmin(app, groups, journal, { passcode: options.adminPasscode, secureCookies: options.secureAdminCookies, connections: () => authenticatedSockets.size });
   app.post('/v1/groups', async (request, reply) => {
     const installation = secretSchema.parse(request.headers['x-installation-secret']);
     const requestId = id.parse(request.headers['idempotency-key']);
@@ -96,6 +116,7 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
     const key = request.headers['x-maintenance-key'];
     ensure(options.maintenanceKey && typeof key === 'string' && timingSafeEqual(Buffer.from(hash(key)), Buffer.from(hash(options.maintenanceKey))), 401, 'UNAUTHORISED');
     const result = await groups.maintenance();
+    journal.record(result.failed ? 'error' : 'info', 'maintenance', result);
     if (result.failed) reply.code(503);
     return result;
   });
@@ -153,6 +174,7 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
           identity = await groups.consumeTicket(input.ticket); cursor = input.afterSeq;
           clearTimeout(authTimer);
           if (socket.readyState !== 1) return;
+          authenticatedSockets.add(socket); journal.record('info', 'websocket_open');
           unwatchGroup = groups.store.watch(groups.groupPath(identity.groupId), () => { void refresh(); }, close);
           unwatchPositions = groups.locations.watch(identity.groupId, () => { void refresh(); }, close);
           await refresh();
@@ -163,6 +185,7 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
     socket.on('close', () => {
       clearTimeout(authTimer); clearTimeout(deadline); clearInterval(heartbeat);
       unwatchGroup(); unwatchPositions(); sockets.delete(socket);
+      if (authenticatedSockets.delete(socket)) journal.record('info', 'websocket_closed');
     });
   });
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -172,12 +195,14 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
       if (running) return;
       running = true;
       void groups.maintenance().then(result => {
+        if (result.failed || result.cleaned) journal.record(result.failed ? 'error' : 'info', 'maintenance', result);
         if (options.logger && result.failed) console.error(JSON.stringify({ event: 'maintenance_failed', count: result.failed }));
-      }).catch(() => { if (options.logger) console.error(JSON.stringify({ event: 'maintenance_failed' })); }).finally(() => { running = false; });
+      }).catch(() => { journal.record('error', 'maintenance', { code: 'MAINTENANCE_FAILED' }); if (options.logger) console.error(JSON.stringify({ event: 'maintenance_failed' })); }).finally(() => { running = false; });
     }, 60_000);
     timer.unref();
   }
-  app.addHook('preClose', async () => { clearInterval(timer); for (const socket of sockets) socket.terminate(); });
+  app.addHook('onListen', async () => { journal.record('info', 'service_ready'); });
+  app.addHook('preClose', async () => { journal.record('info', 'service_stopping'); clearInterval(timer); for (const socket of sockets) socket.terminate(); });
   app.addHook('onClose', async () => { await groups.store.close(); });
   return app;
 }

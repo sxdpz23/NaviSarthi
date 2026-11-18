@@ -8,6 +8,10 @@
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
 .DS_Store
+# Local environment secrets; keep only the non-secret example templates in Git.
+.env
+.env.*
+!.env.example
 /build
 /navigation-runtime/build/
 /captures

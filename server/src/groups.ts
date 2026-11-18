@@ -3,6 +3,7 @@ import { hash, invitation, secret, seal, unseal } from './crypto.js';
 import { ensure } from './errors.js';
 import type { Store, Transaction, Locations } from './store.js';
 import type { Audio } from './audio.js';
+import { COMMS_PATHS } from './paths.js';
 
 export const DAY = 86_400_000;
 export interface Member {
@@ -22,7 +23,7 @@ interface Receipt { groupId: string; inputHash: string; ciphertext: string }
 export interface Message { id: string; memberId: string; text: string; seq: number; sentAt: number }
 export class Groups {
   constructor(readonly store: Store, readonly locations: Locations, readonly audio: Audio, readonly now: () => number = Date.now) {}
-  groupPath(id: string) { return `rideGroups/${id}`; }
+  groupPath(id: string) { return `${COMMS_PATHS.sessions}/${id}`; }
   private live(group: Group | undefined): asserts group is Group {
     ensure(group && group.status === 'active' && group.expiresAt > this.now(), 410, 'SESSION_ENDED');
   }
@@ -37,7 +38,7 @@ export class Groups {
   }
   async authHash(credentialHash: string, tx?: Transaction) {
     const read = tx ? tx.get.bind(tx) : this.store.get.bind(this.store);
-    const ref = await read<Credential>(`rideCredentials/${credentialHash}`);
+    const ref = await read<Credential>(`${COMMS_PATHS.credentials}/${credentialHash}`);
     ensure(ref, 401, 'INVALID_CREDENTIAL');
     const group = await read<Group>(this.groupPath(ref.groupId));
     this.live(group);
@@ -70,19 +71,19 @@ export class Groups {
     const credential = secret(); const memberId = randomUUID(); const groupId = randomUUID();
     const inviteToken = invitation();
     return this.store.transaction(async tx => {
-      const receipt = await tx.get<Receipt>(`rideReceipts/${receiptId}`);
+      const receipt = await tx.get<Receipt>(`${COMMS_PATHS.receipts}/${receiptId}`);
       if (receipt) {
         ensure(receipt.inputHash === inputHash, 409, 'IDEMPOTENCY_CONFLICT');
         const response = unseal<Admission>(receipt.ciphertext, installationSecret);
         await this.auth(response.credential, tx);
         return response;
       }
-      const existing = await tx.get<Credential>(`rideInstallations/${installationHash}`);
+      const existing = await tx.get<Credential>(`${COMMS_PATHS.installations}/${installationHash}`);
       const previous = existing ? await tx.get<Group>(this.groupPath(existing.groupId)) : undefined;
       ensure(!previous || previous.status !== 'active' || previous.expiresAt <= this.now() || previous.members[existing!.memberId]?.status !== 'active', 409, 'ALREADY_IN_GROUP');
       let group: Group;
       if (input.inviteToken) {
-        const invitationRef = await tx.get<{ groupId: string }>(`rideInvites/${hash(input.inviteToken)}`);
+        const invitationRef = await tx.get<{ groupId: string }>(`${COMMS_PATHS.invitations}/${hash(input.inviteToken)}`);
         ensure(invitationRef, 404, 'INVITE_UNAVAILABLE');
         const joined = await tx.get<Group>(this.groupPath(invitationRef.groupId));
         this.live(joined); group = joined;
@@ -101,15 +102,15 @@ export class Groups {
       group.revision++;
       const result: Admission = { groupId: group.id, memberId, credential, expiresAt: group.expiresAt, ...(!input.inviteToken ? { inviteToken } : {}) };
       tx.set(this.groupPath(group.id), group);
-      tx.set(`rideCredentials/${hash(credential)}`, { groupId: group.id, memberId });
-      tx.set(`rideInstallations/${installationHash}`, { groupId: group.id, memberId });
-      if (!input.inviteToken) tx.set(`rideInvites/${group.inviteHash}`, { groupId: group.id });
-      tx.set(`rideReceipts/${receiptId}`, { groupId: group.id, inputHash, ciphertext: seal(result, installationSecret) });
+      tx.set(`${COMMS_PATHS.credentials}/${hash(credential)}`, { groupId: group.id, memberId });
+      tx.set(`${COMMS_PATHS.installations}/${installationHash}`, { groupId: group.id, memberId });
+      if (!input.inviteToken) tx.set(`${COMMS_PATHS.invitations}/${group.inviteHash}`, { groupId: group.id });
+      tx.set(`${COMMS_PATHS.receipts}/${receiptId}`, { groupId: group.id, inputHash, ciphertext: seal(result, installationSecret) });
       return result;
     });
   }
   async resolve(inviteToken: string) {
-    const ref = await this.store.get<{ groupId: string }>(`rideInvites/${hash(inviteToken)}`);
+    const ref = await this.store.get<{ groupId: string }>(`${COMMS_PATHS.invitations}/${hash(inviteToken)}`);
     ensure(ref, 404, 'INVITE_UNAVAILABLE');
     const group = await this.store.get<Group>(this.groupPath(ref.groupId)); this.live(group);
     ensure(group.inviteHash === hash(inviteToken), 404, 'INVITE_UNAVAILABLE');
@@ -136,8 +137,8 @@ export class Groups {
     const inviteToken = invitation();
     await this.mutate(credential, (group, member, tx) => {
       ensure(group.ownerId === member.id, 403, 'OWNER_REQUIRED');
-      tx.delete(`rideInvites/${group.inviteHash}`); group.inviteHash = hash(inviteToken);
-      tx.set(`rideInvites/${group.inviteHash}`, { groupId: group.id });
+      tx.delete(`${COMMS_PATHS.invitations}/${group.inviteHash}`); group.inviteHash = hash(inviteToken);
+      tx.set(`${COMMS_PATHS.invitations}/${group.inviteHash}`, { groupId: group.id });
     });
     return { inviteToken };
   }
@@ -152,12 +153,12 @@ export class Groups {
       const target = this.active(group, targetId ?? member.id);
       if (targetId) ensure(group.ownerId === member.id && target.id !== member.id, 403, 'OWNER_REQUIRED');
       else ensure(group.ownerId !== member.id, 409, 'TRANSFER_OR_END_REQUIRED');
-      const installation = await tx.get<Credential>(`rideInstallations/${target.installationHash}`);
+      const installation = await tx.get<Credential>(`${COMMS_PATHS.installations}/${target.installationHash}`);
       target.status = targetId ? 'removed' : 'left';
       group.pendingAudio.push(target.id);
-      tx.delete(`rideCredentials/${target.credentialHash}`);
-      tx.delete(`rideReceipts/${target.receiptId}`);
-      if (installation?.groupId === group.id && installation.memberId === target.id) tx.delete(`rideInstallations/${target.installationHash}`);
+      tx.delete(`${COMMS_PATHS.credentials}/${target.credentialHash}`);
+      tx.delete(`${COMMS_PATHS.receipts}/${target.receiptId}`);
+      if (installation?.groupId === group.id && installation.memberId === target.id) tx.delete(`${COMMS_PATHS.installations}/${target.installationHash}`);
       return { groupId: group.id, memberId: target.id };
     });
     // Durable pendingAudio ensures an external provider failure is retried by maintenance.
@@ -220,13 +221,13 @@ export class Groups {
     const token = secret();
     await this.store.transaction(async tx => {
       const { group, member } = await this.auth(credential, tx);
-      tx.set(`rideTickets/${hash(token)}`, { groupId: group.id, memberId: member.id, credentialHash: member.credentialHash, expiresAt: Math.min(this.now() + 30_000, group.expiresAt) });
+      tx.set(`${COMMS_PATHS.tickets}/${hash(token)}`, { groupId: group.id, memberId: member.id, credentialHash: member.credentialHash, expiresAt: Math.min(this.now() + 30_000, group.expiresAt) });
     });
     return { ticket: token, expiresInMs: 30_000 };
   }
   async consumeTicket(token: string) {
     return this.store.transaction(async tx => {
-      const path = `rideTickets/${hash(token)}`;
+      const path = `${COMMS_PATHS.tickets}/${hash(token)}`;
       const ticket = await tx.get<Credential & { credentialHash: string; expiresAt: number }>(path);
       ensure(ticket && ticket.expiresAt > this.now(), 401, 'INVALID_TICKET');
       const group = await tx.get<Group>(this.groupPath(ticket.groupId)); this.live(group);
@@ -260,14 +261,14 @@ export class Groups {
   async cleanup(groupId: string) {
     const group = await this.store.transaction(async tx => {
       const current = await tx.get<Group>(this.groupPath(groupId));
-      const pending = await tx.get<Group>(`rideCleanup/${groupId}`);
+      const pending = await tx.get<Group>(`${COMMS_PATHS.cleanup}/${groupId}`);
       if (!current) return pending;
       if (current.status === 'active' && current.expiresAt > this.now()) return;
       current.status = 'ended'; current.cleanupAt = this.now(); current.revision++;
       tx.set(this.groupPath(groupId), current);
       // recursiveDelete may delete the parent before failing on a child document.
       // Keep a recovery record outside that tree until every delete has succeeded.
-      tx.set(`rideCleanup/${groupId}`, current); return current;
+      tx.set(`${COMMS_PATHS.cleanup}/${groupId}`, current); return current;
     });
     if (!group) return false;
     // Do not remove the durable cleanup marker until all external work succeeds.
@@ -275,27 +276,27 @@ export class Groups {
     await this.audio.end(group.id, Object.keys(group.members));
     await this.locations.clear(group.id);
     await this.store.transaction(async tx => {
-      const installations = await Promise.all(Object.values(group.members).map(m => tx.get<Credential>(`rideInstallations/${m.installationHash}`)));
-      tx.delete(`rideInvites/${group.inviteHash}`);
+      const installations = await Promise.all(Object.values(group.members).map(m => tx.get<Credential>(`${COMMS_PATHS.installations}/${m.installationHash}`)));
+      tx.delete(`${COMMS_PATHS.invitations}/${group.inviteHash}`);
       Object.values(group.members).forEach((m, i) => {
-        tx.delete(`rideCredentials/${m.credentialHash}`); tx.delete(`rideReceipts/${m.receiptId}`);
-        if (installations[i]?.groupId === group.id) tx.delete(`rideInstallations/${m.installationHash}`);
+        tx.delete(`${COMMS_PATHS.credentials}/${m.credentialHash}`); tx.delete(`${COMMS_PATHS.receipts}/${m.receiptId}`);
+        if (installations[i]?.groupId === group.id) tx.delete(`${COMMS_PATHS.installations}/${m.installationHash}`);
       });
     });
-    const tickets = await this.store.list('rideTickets', { filters: [{ field: 'groupId', op: '==', value: group.id }] });
+    const tickets = await this.store.list(COMMS_PATHS.tickets, { filters: [{ field: 'groupId', op: '==', value: group.id }] });
     for (const { path } of tickets) await this.store.transaction(async tx => { tx.delete(path); });
     await this.store.deleteTree(this.groupPath(group.id));
-    await this.store.transaction(async tx => { tx.delete(`rideCleanup/${groupId}`); });
+    await this.store.transaction(async tx => { tx.delete(`${COMMS_PATHS.cleanup}/${groupId}`); });
     return true;
   }
   async maintenance() {
     let cleaned = 0; let failed = 0;
-    const due = await this.store.list<Group>('rideGroups', { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
+    const due = await this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
     for (const { data } of due) { try { if (await this.cleanup(data.id)) cleaned++; } catch { failed++; } }
-    const unfinished = await this.store.list<Group>('rideCleanup', { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
+    const unfinished = await this.store.list<Group>(COMMS_PATHS.cleanup, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
     for (const { data } of unfinished) { try { if (await this.cleanup(data.id)) cleaned++; } catch { failed++; } }
     // Pending revocations also need recovery when the group has not expired.
-    const pending = await this.store.list<Group>('rideGroups', { filters: [{ field: 'pendingAudioCount', op: '>', value: 0 }], limit: 100 });
+    const pending = await this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'pendingAudioCount', op: '>', value: 0 }], limit: 100 });
     for (const { data } of pending) { try { await this.flushRevocations(data.id); } catch { failed++; } }
     // Cross-database writes can complete after Firestore cleanup. Sweep those orphans too.
     for (const groupId of await this.locations.expired(this.now())) {
@@ -305,7 +306,7 @@ export class Groups {
         else await this.locations.extendExpiry(groupId, group.expiresAt);
       } catch { failed++; }
     }
-    for (const collection of ['rideTickets', 'rideRates']) {
+    for (const collection of [COMMS_PATHS.tickets, COMMS_PATHS.rates]) {
       const expired = await this.store.list(collection, { filters: [{ field: 'expiresAt', op: '<=', value: this.now() }], limit: 500 });
       for (const { path } of expired) await this.store.transaction(async tx => {
         const current = await tx.get<{ expiresAt: number }>(path);
@@ -315,7 +316,7 @@ export class Groups {
     return { cleaned, failed };
   }
   async rate(key: string, limit: number, durationMs = 60_000) {
-    const now = this.now(); const path = `rideRates/${hash(key)}`;
+    const now = this.now(); const path = `${COMMS_PATHS.rates}/${hash(key)}`;
     await this.store.transaction(async tx => {
       const previous = await tx.get<{ count: number; expiresAt: number }>(path);
       const current = previous && previous.expiresAt > now ? previous : { count: 0, expiresAt: now + durationMs };

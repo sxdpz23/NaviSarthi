@@ -58,7 +58,7 @@ android {
         buildConfigField("String", "ROAD_FEATURES_MANIFEST_URL", "\"\"")
         buildConfigField("String", "MAP_FONTS_URL", "\"\"")
         // Public API origin only; credentials are generated on the phone, never embedded here.
-        val commsOrigin = providers.gradleProperty("commsApiUrl").orElse(providers.environmentVariable("COMMS_API_URL")).getOrElse("")
+        val commsOrigin = providers.gradleProperty("commsApiUrl").orElse(providers.environmentVariable("COMMS_API_URL")).getOrElse("https://navisarthi.onrender.com/")
         buildConfigField("String", "COMMS_API_URL", "\"${commsOrigin.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         // Independent NaviSarthi version sequence.
         versionCode = 41

@@ -5,6 +5,34 @@ text chat, current locations, realtime events, expiry cleanup, and optional Live
 No Firebase Authentication is used. This directory does not change the Android app,
 navigation ownership, package version, or existing account-sync database.
 
+## Service dashboard
+
+Open `/` for public aggregate counts of unexpired active rides, active rider
+memberships and authenticated WebSocket connections. Counts refresh every 15
+seconds, with a 10-second server cache. Membership does not mean a rider is online.
+
+The responsive dashboard uses blue/teal/amber gradients, locally hosted Instrument
+Sans and IBM Plex Mono fonts, and a structured event table with JSON download.
+Focus feedback, tab selection and view changes use short transitions, respecting
+the browser's reduced-motion preference. Tabs support arrow keys, Home and End.
+Fonts and their SIL licences ship in `public/fonts`; Docker copies those assets
+alongside the compiled server. Browser requests stay on the service's own origin.
+UI craft informed by Unslop by Damir Sokolovsky (@heydamir), CC BY 4.0.
+
+Set `ADMIN_PASSCODE` privately in the local ignored `.env` or Render environment
+variables to enable Logs and Errors. Never commit the passcode. Login issues a
+15-minute HttpOnly, SameSite=Strict cookie (also Secure in production); Lock
+revokes it. Login attempts are rate limited. Missing configuration disables access.
+
+Diagnostics contain operational metadata and safe error codes, excluding chat,
+positions, names, credentials, raw URLs, request bodies and provider error text.
+The latest 500 events and 200 errors can be viewed or downloaded as JSON. They
+belong to the current process, reset on restart, and are not historical Render
+logs. Admin access and its rate limits remain available during a database outage;
+counts then report unavailable. Startup failures still require platform logs.
+Admin access, limits and socket counts are per instance; use a single instance
+for this deployment. Maintenance remains separately protected by MAINTENANCE_KEY.
+
 ## Run locally
 
 Requires Node.js 22+ (Node.js 24 is used in the container).
@@ -22,7 +50,11 @@ and disables audio. All development data disappears on restart. To use the watch
 command with the environment file: `node --env-file=.env --import tsx --watch src/main.ts`.
 `npm run dev` expects variables already present in the environment.
 
-Checks: `npm run typecheck`, `npm test`, `npm run build`. Tests include actual local
+Checks: `npm run typecheck`, `npm test`, `npm run build`, `npm run test:runtime`.
+The runtime suite builds and launches an isolated memory-backed compiled server,
+checks a real HTTP ride flow and startup failure behaviour, and stops its own test
+processes. It never uses the credentials or data of a separately running service.
+Tests include actual local
 WebSocket connections, so the test process needs loopback networking permission.
 `npm run test:firebase` is a separate emulator integration suite (see below).
 
@@ -160,33 +192,44 @@ long requests; always implement client reconnection, even with session affinity.
 
 ## Firebase and production setup
 
-This implementation has **not been connected to the live Firebase project**. Local
-Firebase CLI credentials had expired during development. Database edition, instance
-and deployment region must therefore be confirmed before provisioning/deployment.
-Use a dedicated named native Firestore database and a dedicated RTDB instance; never
-deploy these rules over the existing account-sync database.
+The selected application database is **`navidb`, Standard edition, Singapore**.
+Comms is isolated under `features/comms`; future features can use sibling feature
+documents in the same database. The API URL provided for Render is
+`https://navisarthi.onrender.com/`; its `/healthz` endpoint returned HTTP 200 during
+this update. That health check is not a verification of credentials, database rules,
+audio or the deployed storage schema. No live database was migrated from this workstation.
 
 1. Confirm the target project, region, and native Firestore edition using the Firebase
-   console or authenticated CLI (`firebase firestore:databases:list`, then
-   `firebase firestore:databases:get <database-id>`). MongoDB-compatible databases
+   console or authenticated CLI (`npx -y firebase-tools@latest firestore:databases:list`, then
+   `npx -y firebase-tools@latest firestore:databases:get navidb`). MongoDB-compatible databases
    are not supported by this adapter. The adapter uses the Admin SDK's native
    transactions/queries/listeners; realtime subscriptions are required here.
 2. Configure `STORE=firebase`, `NODE_ENV=production`, `FIREBASE_PROJECT_ID`,
-   `FIRESTORE_DATABASE_ID`, `FIRESTORE_EDITION`, `FIREBASE_DATABASE_URL`,
+   `FIRESTORE_DATABASE_ID=navidb`, `FIRESTORE_EDITION=standard`, `FIREBASE_DATABASE_URL`,
    `HOST=0.0.0.0`, and `MAINTENANCE_KEY`. The server refuses memory storage in
    production and refuses the `(default)` Firestore database to protect existing data.
-3. Use Application Default Credentials: a dedicated Cloud Run service identity in
-   production, or a private service-account path outside this repo for local use.
-   Scope IAM to Groups resources where supported. Never put an Admin SDK key in
+3. On Render, upload the service-account JSON as a secret file named
+   `firebase-service-account.json` and set
+   `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json`.
+   On Cloud Run, a service identity can provide Application Default Credentials;
+   local use can point at a private service-account file outside this repo.
+   Scope IAM to the required resources where supported. Never put an Admin SDK key in
    the APK or commit one here. Admin SDK bypasses Security Rules: the API's credential
    and membership checks are the actual authorisation boundary.
 4. Review and deploy the **separate** prototype rules/index configuration in
    `firebase/`, after replacing the RTDB instance name in `firebase.example.json`.
    All direct client database access is denied; the RTDB expiry field is indexed.
-   Deploy only against the dedicated databases. No deployment is run automatically.
+   The Firestore sample targets `navidb`; it denies all direct client access, so do
+   not overwrite an existing client-access policy for other features without review.
+   All Comms queries use Standard's automatic single-field indexes. The index sample
+   has no collection-group exemptions: a generic `sessions` or `messages` exemption
+   would also affect future features with those collection IDs. Keep any future
+   application indexes in the shared configuration rather than replacing them with
+   this initial empty index sample. No deployment is run automatically.
 5. Generate a maintenance secret using a CSPRNG (32 random bytes, base64url), supply
-   it through Secret Manager, and have Cloud Scheduler call
-   `POST /internal/maintenance` with `X-Maintenance-Key` every minute. The endpoint
+   it through the hosting platform's secret environment, and have a scheduler call
+   `POST https://navisarthi.onrender.com/internal/maintenance` with `X-Maintenance-Key`
+   every minute. The endpoint
    returns 503 if cleanup work failed so the scheduler can retry and monitoring can
    alert. Do not log the secret in scheduler/proxy request headers.
 6. Terminate TLS at the trusted managed edge. Do not expose the container directly
@@ -194,10 +237,73 @@ deploy these rules over the existing account-sync database.
    The app does not trust forwarded IP headers, so a proxy deployment may aggregate
    users behind the proxy's source IP. Configure edge per-client limits accordingly;
    do not blindly enable trust for arbitrary `X-Forwarded-For` headers.
-7. Build the Docker image from this directory. Use Cloud Run timeout up to 3600s,
-   concurrency appropriate to expected sockets, and sufficient memory. Set CPU to
-   always allocated if relying on background intervals. The external scheduler is
-   still mandatory because instances may scale to zero.
+7. On Render: Root Directory `server`, Docker Build Context `.`, Dockerfile Path
+   `Dockerfile`, Health Check Path `/healthz`. Leave Docker Command blank.
+   Use the Docker image's `HOST=0.0.0.0`; respect Render's `PORT` environment.
+   A free service can sleep, so the external scheduler remains required for cleanup.
+   For Cloud Run, allow reconnects at its request timeout and configure CPU allocation
+   appropriately if also relying on background intervals.
+
+## Firestore layout and upgrading the initial deployment
+
+```text
+navidb (database)
+└── features (collection)
+    ├── comms (document: feature=comms, schemaVersion=2)
+    │   ├── sessions/{groupId}
+    │   │   ├── messages/{messageHash}
+    │   │   └── messageRates/{memberId}
+    │   ├── credentials/{credentialHash}
+    │   ├── installations/{installationHash}
+    │   ├── invitations/{invitationHash}
+    │   ├── receipts/{receiptHash}
+    │   ├── tickets/{ticketHash}
+    │   ├── rates/{rateHash}
+    │   └── cleanup/{groupId}
+    └── <future-feature> (sibling document with its own subcollections)
+```
+
+The server materialises only the metadata document at startup; subcollections appear
+when their first record is written. Do not create placeholder rides or credentials
+in the console. Expiry deletes only the relevant ride and its indexes; it never
+recursively deletes `features/comms`, `features`, the database or another feature.
+The metadata document persists after the last ride ends and contains no rider data.
+Realtime Database's `ridePositions` layout is unchanged, so existing position data
+does not require a cross-database move. HTTP routes and temporary credentials are unchanged.
+
+The first server version wrote the top-level collections `rideGroups`,
+`rideCredentials`, `rideInstallations`, `rideInvites`, `rideReceipts`, `rideCleanup`,
+`rideTickets` and `rideRates`. **The new server refuses to start if any of these still
+contain documents or orphan subcollections.** This prevents silently abandoning
+credentials or allowing an installation to join two rides across layouts. Even a
+visit to a rate-limited endpoint may have created a legacy rate bucket.
+
+For this first schema cutover, stop/suspend the previous revision and its maintenance
+caller before deploying, even if the database appears empty. A rolling deploy with
+the old writer still serving traffic could create a legacy record after the new
+revision's startup check. Normal rolling deploys are fine once every revision uses
+schema 2. If the database has no legacy records while the old writer is stopped,
+deploy the updated service: startup creates the namespace automatically. If startup
+reports legacy data, use the explicit migration:
+
+1. Stop/suspend the old service and any external maintenance caller first. Do not
+   run old and new revisions against the database during migration.
+2. Build this server with `npm ci` and `npm run build`. Supply its Firebase project,
+   `FIRESTORE_DATABASE_ID=navidb`, `FIRESTORE_EDITION=standard`, RTDB URL and private
+   service-account path through your environment. A local credential path points
+   to your downloaded private JSON, not Render's `/etc/secrets` path. Never commit it.
+3. Run `npm run migrate:firestore` for a **read-only dry-run**. It prints counts only.
+   If using a local `.env`, run `node --env-file=.env dist/migrate-main.js` instead.
+4. Review the counts, then run `npm run migrate:firestore -- --apply` (or
+   `node --env-file=.env dist/migrate-main.js --apply`). This atomically moves each
+   document, preserves IDs, encrypted retry receipts, credentials and message order,
+   includes orphaned subcollections, and refuses conflicting destination content.
+   It does not rotate identities or delete whole collections/databases. An interrupted
+   run is resumable by running the same command again while the service remains stopped.
+5. Redeploy/resume the new revision and restart the external maintenance caller.
+   Keep `FIRESTORE_DATABASE_ID=navidb` and `FIRESTORE_EDITION=standard` in Render.
+
+No migration command is run automatically by the app or from this development session.
 
 The backend uses 600 requests/minute/source IP and 180 requests/minute/credential,
 plus 5 creates/hour/source IP and 30 invitation resolves/joins/minute/source IP.
@@ -251,8 +357,11 @@ load, target deletion is within 15 minutes. Monitor backlog and failures; this i
 not a strict deletion SLA. Repeated calls safely drain larger backlogs. Monitor
 Firestore/RTDB/LiveKit costs and service-account permissions separately.
 
-Do not enable database backups/PITR, content exports, request-body logging or audio
-recording for Groups if the ride-end wipe promise is required. Provider-managed
+Do not retain Comms content in backups/PITR, content exports, request-body logs or
+audio recordings if the ride-end wipe promise is required. Database backups cover
+the shared `navidb` database; if a future feature needs backups, account for Comms
+retention separately rather than promising that deleting live records erases those
+backup copies. Provider-managed
 logs/retention need an independent review; this server cannot erase screenshots,
 external copies or provider infrastructure records. An offline phone must clear
 its local session before showing it again; the server cannot remotely erase a
@@ -266,13 +375,14 @@ after credential loss unless ownership was transferred beforehand.
 
 ## Emulator integration
 
-Use an installed Firebase CLI and Java version supported by that CLI (the installed
-Firebase CLI 15 requires Java 21+, while this workstation currently exposes JDK 17).
-No production
+Use an installed Firebase CLI and Java version supported by that CLI (Firebase CLI
+15 requires Java 21+). This workstation can use Android Studio's bundled JBR at
+`D:/Softwares/ProgramFiles/Android/Android Studio/jbr` by setting `JAVA_HOME` and
+putting its `bin` directory first on `PATH`. No production
 credentials are required for the demo project. From this directory:
 
 ```powershell
-firebase emulators:exec --config firebase/firebase.emulator.json --project demo-ride-groups "npm run test:firebase"
+npx -y firebase-tools@latest emulators:exec --only firestore,database --config firebase/firebase.emulator.json --project demo-ride-groups "npm run test:firebase"
 ```
 
 The integration suite refuses to run without both emulator host variables and

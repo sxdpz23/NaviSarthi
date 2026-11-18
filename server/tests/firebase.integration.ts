@@ -5,6 +5,8 @@ import { firebaseStores } from '../src/firebase.js';
 import { Groups, DAY } from '../src/groups.js';
 import { disabledAudio } from '../src/audio.js';
 import { secret } from '../src/crypto.js';
+import { COMMS_ROOT, COMMS_PATHS } from '../src/paths.js';
+import { assertNoLegacyCommsData, initialiseCommsNamespace, migrateLegacyComms } from '../src/migration.js';
 
 test('Firebase emulator: actual persistence, subscriptions, rules and cleanup', { timeout: 60_000 }, async t => {
   const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST;
@@ -12,13 +14,34 @@ test('Firebase emulator: actual persistence, subscriptions, rules and cleanup', 
   assert.match(firestoreHost ?? '', /^127\.0\.0\.1:\d+$/, 'Use the local Firestore emulator');
   assert.match(databaseHost ?? '', /^127\.0\.0\.1:\d+$/, 'Use the local RTDB emulator');
   const projectId = 'demo-ride-groups';
-  const stores = firebaseStores({ projectId, databaseId: 'groups', databaseURL: `https://${projectId}.firebaseio.com` });
+  const databaseNamespace = `${projectId}-default-rtdb`;
+  const stores = firebaseStores({ projectId, databaseId: 'navidb', databaseURL: `https://${databaseNamespace}.firebaseio.com` });
+  await assertNoLegacyCommsData(stores.store); await initialiseCommsNamespace(stores.store);
   const groups = new Groups(stores.store, stores.locations, disabledAudio);
+  const legacyId = randomUUID();
+  const futurePath = `features/garage/settings/${randomUUID()}`;
   let groupId: string | undefined;
   t.after(async () => {
     if (groupId) { await stores.locations.clear(groupId); await stores.store.deleteTree(groups.groupPath(groupId)); }
+    await stores.store.deleteTree(`rideGroups/${legacyId}`);
+    await stores.store.deleteTree(`rideCleanup/${legacyId}`);
+    await stores.store.deleteTree(`${COMMS_PATHS.sessions}/${legacyId}`);
+    await stores.store.deleteTree(`${COMMS_PATHS.cleanup}/${legacyId}`);
+    await stores.store.deleteTree(futurePath);
     await stores.store.close();
   });
+  await stores.store.transaction(async tx => {
+    tx.set(futurePath, { keep: true });
+    tx.set(`rideGroups/${legacyId}/messages/one`, { seq: 1, text: 'Legacy child without parent' });
+    tx.set(`rideCleanup/${legacyId}`, { id: legacyId });
+  });
+  await assert.rejects(assertNoLegacyCommsData(stores.store));
+  assert.equal((await migrateLegacyComms(stores.store)).documents, 2);
+  assert.equal((await migrateLegacyComms(stores.store, true)).moved, 2);
+  await assertNoLegacyCommsData(stores.store);
+  assert.equal((await stores.store.get<any>(`${COMMS_PATHS.sessions}/${legacyId}/messages/one`))?.seq, 1);
+  await stores.store.deleteTree(`${COMMS_PATHS.sessions}/${legacyId}`);
+  await stores.store.deleteTree(`${COMMS_PATHS.cleanup}/${legacyId}`);
   const installation = secret(); const requestId = randomUUID();
   const input = { nickname: 'Lead', name: 'Emulator ride', expiresAt: Date.now() + DAY };
   const owner = await groups.admit(installation, requestId, input); groupId = owner.groupId;
@@ -30,16 +53,24 @@ test('Firebase emulator: actual persistence, subscriptions, rules and cleanup', 
   await groups.position(rider.credential, { lat: 12, lng: 77, accuracyM: 5, sharingId });
   assert.equal((await groups.snapshot(owner.credential)).positions[rider.memberId]?.lat, 12);
   await groups.ticket(rider.credential);
-  const firestoreDenied = await fetch(`http://${firestoreHost}/v1/projects/${projectId}/databases/groups/documents/rideGroups/${groupId}`);
+  assert.deepEqual(await stores.store.get(COMMS_ROOT), { feature: 'comms', schemaVersion: 2 });
+  const firestoreDenied = await fetch(`http://${firestoreHost}/v1/projects/${projectId}/databases/navidb/documents/${groups.groupPath(groupId)}`);
   assert.equal(firestoreDenied.status, 403, 'Unauthenticated clients must not read group documents');
-  const rtdbDenied = await fetch(`http://${databaseHost}/ridePositions/${groupId}.json?ns=${projectId}`);
+  const rtdbDenied = await fetch(`http://${databaseHost}/ridePositions/${groupId}.json?ns=${databaseNamespace}`);
   assert.equal(rtdbDenied.status, 401, 'Unauthenticated clients must not read shared locations');
-  let changed = false;
-  const stop = stores.store.watch(groups.groupPath(groupId), () => { changed = true; }, () => { throw new Error('Firestore listener failed'); });
+  let changed = false; let ready = false; let firstSnapshot: () => void = () => {};
+  const subscribed = new Promise<void>(resolve => { firstSnapshot = resolve; });
+  const stop = stores.store.watch(groups.groupPath(groupId), () => {
+    if (!ready) { ready = true; firstSnapshot(); } else changed = true;
+  }, firstSnapshot);
+  t.after(stop);
+  await subscribed;
   await groups.extend(owner.credential, Date.now() + 2 * DAY);
-  await new Promise(resolve => setTimeout(resolve, 500)); stop(); assert.equal(changed, true);
+  for (let attempt = 0; !changed && attempt < 30; attempt++) await new Promise(resolve => setTimeout(resolve, 100));
+  stop(); assert.equal(changed, true);
   assert.equal((await groups.end(owner.credential)).cleanupPending, false);
   assert.equal(await stores.store.get(groups.groupPath(groupId)), undefined);
   assert.deepEqual(await stores.locations.get(groupId), {});
+  assert.deepEqual(await stores.store.get(futurePath), { keep: true });
   await assert.rejects(groups.auth(rider.credential));
 });
