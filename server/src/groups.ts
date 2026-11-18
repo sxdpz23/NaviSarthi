@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { hash, invitation, secret, seal, unseal } from './crypto.js';
-import { ensure } from './errors.js';
+import { ApiError, ensure, maintenanceErrorCode } from './errors.js';
 import type { Store, Transaction, Locations } from './store.js';
 import type { Audio } from './audio.js';
 import { COMMS_PATHS } from './paths.js';
@@ -290,16 +290,20 @@ export class Groups {
     return true;
   }
   async maintenance() {
+    const run = async <T>(stage: string, operation: () => Promise<T>): Promise<T> => {
+      try { return await operation(); }
+      catch (error) { throw new ApiError(503, maintenanceErrorCode(stage, error)); }
+    };
     let cleaned = 0; let failed = 0;
-    const due = await this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
+    const due = await run('FIRESTORE_DUE', () => this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 }));
     for (const { data } of due) { try { if (await this.cleanup(data.id)) cleaned++; } catch { failed++; } }
-    const unfinished = await this.store.list<Group>(COMMS_PATHS.cleanup, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 });
+    const unfinished = await run('FIRESTORE_JOURNAL', () => this.store.list<Group>(COMMS_PATHS.cleanup, { filters: [{ field: 'cleanupAt', op: '<=', value: this.now() }], limit: 100 }));
     for (const { data } of unfinished) { try { if (await this.cleanup(data.id)) cleaned++; } catch { failed++; } }
     // Pending revocations also need recovery when the group has not expired.
-    const pending = await this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'pendingAudioCount', op: '>', value: 0 }], limit: 100 });
+    const pending = await run('FIRESTORE_AUDIO', () => this.store.list<Group>(COMMS_PATHS.sessions, { filters: [{ field: 'pendingAudioCount', op: '>', value: 0 }], limit: 100 }));
     for (const { data } of pending) { try { await this.flushRevocations(data.id); } catch { failed++; } }
     // Cross-database writes can complete after Firestore cleanup. Sweep those orphans too.
-    for (const groupId of await this.locations.expired(this.now())) {
+    for (const groupId of await run('RTDB_EXPIRY', () => this.locations.expired(this.now()))) {
       try {
         const group = await this.store.get<Group>(this.groupPath(groupId));
         if (!group || group.status !== 'active' || group.expiresAt <= this.now()) await this.locations.clear(groupId);
@@ -307,11 +311,11 @@ export class Groups {
       } catch { failed++; }
     }
     for (const collection of [COMMS_PATHS.tickets, COMMS_PATHS.rates]) {
-      const expired = await this.store.list(collection, { filters: [{ field: 'expiresAt', op: '<=', value: this.now() }], limit: 500 });
-      for (const { path } of expired) await this.store.transaction(async tx => {
+      const expired = await run('FIRESTORE_EPHEMERAL_QUERY', () => this.store.list(collection, { filters: [{ field: 'expiresAt', op: '<=', value: this.now() }], limit: 500 }));
+      for (const { path } of expired) await run('FIRESTORE_EPHEMERAL_DELETE', () => this.store.transaction(async tx => {
         const current = await tx.get<{ expiresAt: number }>(path);
         if (current && current.expiresAt <= this.now()) tx.delete(path);
-      });
+      }));
     }
     return { cleaned, failed };
   }

@@ -197,7 +197,11 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
       void groups.maintenance().then(result => {
         if (result.failed || result.cleaned) journal.record(result.failed ? 'error' : 'info', 'maintenance', result);
         if (options.logger && result.failed) console.error(JSON.stringify({ event: 'maintenance_failed', count: result.failed }));
-      }).catch(() => { journal.record('error', 'maintenance', { code: 'MAINTENANCE_FAILED' }); if (options.logger) console.error(JSON.stringify({ event: 'maintenance_failed' })); }).finally(() => { running = false; });
+      }).catch((error: unknown) => {
+        const code = error instanceof ApiError && error.code.startsWith('MAINTENANCE_') ? error.code : 'MAINTENANCE_FAILED';
+        journal.record('error', 'maintenance', { code });
+        if (options.logger) console.error(JSON.stringify({ event: 'maintenance_failed', code }));
+      }).finally(() => { running = false; });
     }, 60_000);
     timer.unref();
   }
