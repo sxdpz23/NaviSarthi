@@ -57,9 +57,12 @@ android {
         buildConfigField("String", "FLOCK_MANIFEST_URL", "\"\"")
         buildConfigField("String", "ROAD_FEATURES_MANIFEST_URL", "\"\"")
         buildConfigField("String", "MAP_FONTS_URL", "\"\"")
+        // Public API origin only; credentials are generated on the phone, never embedded here.
+        val commsOrigin = providers.gradleProperty("commsApiUrl").orElse(providers.environmentVariable("COMMS_API_URL")).getOrElse("")
+        buildConfigField("String", "COMMS_API_URL", "\"${commsOrigin.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         // Independent NaviSarthi version sequence.
-        versionCode = 40
-        versionName = "0.6.9"
+        versionCode = 41
+        versionName = "0.7.0"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for
@@ -151,6 +154,9 @@ dependencies {
     implementation(navigationLibs.kotlinx.serialization.json)
     implementation(navigationLibs.androidx.datastore.preferences)
     implementation(navigationLibs.okhttp)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("io.livekit:livekit-android:2.30.0")
     implementation(navigationLibs.rhino.runtime)
 
     ksp(navigationLibs.hilt.compiler)

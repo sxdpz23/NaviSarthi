@@ -66,6 +66,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.maplibre.android.geometry.LatLng as MLLatLng
 import org.maplibre.android.geometry.LatLngBounds as MLLatLngBounds
 
@@ -1350,6 +1352,14 @@ fun NavigationMapView(
         }
     }
     var styleRef by remember { mutableStateOf<Style?>(null) }
+    val commsRepository = remember(context) { com.sxdpz23.navisarthi.comms.CommsRepository.get(context) }
+    val commsRiders by remember(commsRepository) {
+        commsRepository.state.map { com.sxdpz23.navisarthi.comms.commsMapRiders(it) }.distinctUntilChanged()
+    }.collectAsState(emptyList())
+    LaunchedEffect(styleRef, commsRiders) {
+        val currentStyle = styleRef ?: return@LaunchedEffect
+        runCatching { com.sxdpz23.navisarthi.comms.applyCommsMapOverlay(currentStyle, commsRiders) }
+    }
     val navPuck = remember { NavPuck() }
     val turnDeclutter = remember { TurnDeclutter() }
     // The cross-street bubbles this map hid because the camera left the car (ids, to put back).

@@ -1,0 +1,12 @@
+{
+  "firestore": [
+    { "database": "groups", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
+  ],
+  "database": { "rules": "database.rules.json" },
+  "emulators": {
+    "firestore": { "host": "127.0.0.1", "port": 8085 },
+    "database": { "host": "127.0.0.1", "port": 9005 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}

@@ -45,6 +45,7 @@ import kotlin.math.cos
  * Main owns MapLibre, the stream worker draws the latest immutable offscreen snapshot. */
 class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit = {}) : AutoCloseable {
     private val context = context.applicationContext
+    private val comms = com.sxdpz23.navisarthi.comms.CommsRepository.get(context)
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val renderQueue = DeferredMapRender({ work -> main.post { work() } }, ::renderLatest)
@@ -127,6 +128,16 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
                 point(current, frame.destLat, frame.destLng)?.let { p ->
                     fill.color = Color.WHITE; canvas.drawCircle(p.x, p.y, 10f, fill)
                     fill.color = Color.rgb(234, 67, 53); canvas.drawCircle(p.x, p.y, 7f, fill)
+                }
+            }
+            for (rider in com.sxdpz23.navisarthi.comms.commsMapRiders(comms.state.value)) {
+                point(current, rider.position.lat, rider.position.lng)?.let { p ->
+                    fill.color = if (rider.stale) Color.GRAY else Color.rgb(62, 175, 164)
+                    canvas.drawCircle(p.x, p.y, 7f, fill)
+                    text.color = Color.WHITE
+                    text.setShadowLayer(2f, 0f, 1f, Color.BLACK)
+                    canvas.drawText(rider.nickname.take(16), p.x, p.y - 11f, text)
+                    text.clearShadowLayer()
                 }
             }
             if (!frame.arrived && frame.riderLat != null && frame.riderLng != null) {

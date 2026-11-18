@@ -56,7 +56,7 @@ sealed class Screen(val route: String) {
     object Pod      : Screen("pod")
     object Garage   : Screen("garage")
     object Rides    : Screen("rides")
-    object Groups   : Screen("groups")
+    object Comms    : Screen("comms")
     object NavigationSettings : Screen("navigation_settings")
     object Settings : Screen("settings")
 }
@@ -120,11 +120,19 @@ fun AppNavigation(
         GlassTab(consoleRoute, NaviSarthiIcons.Gauge, if (pod) "Pod" else "Dash"),
         GlassTab(Screen.Nav.route, NaviSarthiIcons.Navi, "Nav"),
     ) + (if (garageEnabled) listOf(GlassTab(Screen.Garage.route, NaviSarthiIcons.Wrench, "Garage")) else emptyList()) + listOf(
-        GlassTab(Screen.Groups.route, NaviSarthiIcons.HelmetIntercom, "Groups"),
+        GlassTab(Screen.Comms.route, NaviSarthiIcons.HelmetIntercom, "Comms"),
         GlassTab(Screen.Settings.route, NaviSarthiIcons.Gear, "Settings"),
     )
     fun rank(route: String?) = tabs.indexOfFirst { it.route == route }.coerceAtLeast(0)
     val activity = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
+    val commsSession = remember(activity) { com.sxdpz23.navisarthi.comms.CommsRepository.get(activity) }
+    DisposableEffect(activity, commsSession) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) commsSession.onAppForeground()
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose { activity.lifecycle.removeObserver(observer) }
+    }
     val navigationViewModel: com.sxdpz23.navisarthi.navigation.ui.map.MapViewModel = viewModel(viewModelStoreOwner = activity)
     val pageMotion = com.sxdpz23.navisarthi.navigation.ui.PageTransitions.enabled.value
     val backdrop = rememberGraphicsLayer()
@@ -224,7 +232,17 @@ fun AppNavigation(
                     )
                 }
 
-                composable(Screen.Groups.route) { GroupsScreen() }
+                composable(Screen.Comms.route) { CommsScreen(onOpenMap = {
+                    com.sxdpz23.navisarthi.dash.nav.NavDisplaySession.showPhone()
+                    navigateTab(Screen.Nav.route)
+                }) }
+                composable("groups") {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Screen.Comms.route) {
+                            popUpTo("groups") { inclusive = true }; launchSingleTop = true
+                        }
+                    }
+                }
 
                 composable(Screen.Rides.route) {
                     RidesScreen()

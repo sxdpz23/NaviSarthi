@@ -1,0 +1,27 @@
+{
+  "versionName": "0.7.0",
+  "versionCode": 41,
+  "applicationId": "com.navisarthi.app",
+  "apk": "NaviSarthi-0.7.0.apk",
+  "bytes": 186069100,
+  "sha256": "6a854f29f8029a6d92e2518466e8a085461073d0b7f061fc8e9bb7c029654fae",
+  "releaseDebuggable": false,
+  "signatureVerified": true,
+  "signerSha256": "46271167e0a7da2e66ef669e6ff2025588b54dceea349a67c2bd36a03afc95b6",
+  "sameSigningCertificateAs069": true,
+  "zipIntegrityVerified": true,
+  "zipAlignment16KiBVerified": true,
+  "abis": [
+    "arm64-v8a"
+  ],
+  "clientContractTests": {
+    "tests": 7,
+    "note": "Passed on the final client source before the version-only 0.7.0 bump",
+    "errors": 0,
+    "failures": 0
+  },
+  "lint": "Deferred per project preference",
+  "commsBackendConfigured": false,
+  "deviceVisualAndPhysicalConsoleValidation": "Pending; no device installation or bike ride performed",
+  "verifiedAt": "2026-11-18T18:47:55.8347330+05:30"
+}

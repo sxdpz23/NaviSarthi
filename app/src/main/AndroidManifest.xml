@@ -49,6 +49,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <uses-permission android:name="android.car.permission.CAR_INFO" />
@@ -154,6 +157,7 @@
             </intent-filter>
         </activity-alias>
         <service android:name=".pod.PodKeepAliveService" android:exported="false" android:foregroundServiceType="connectedDevice|location" />
+        <service android:name=".comms.CommsService" android:exported="false" android:foregroundServiceType="location|microphone" />
         <service android:name=".dash.DashKeepAliveService" android:exported="false" android:foregroundServiceType="connectedDevice|location" />
         <!-- Notification listener: grants MediaSessionManager access (now-playing → dash TLV 05 0d)
              and reads CATEGORY_CALL notifications (caller name → dash TLV 05 22). User must enable it
