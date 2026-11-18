@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+ <key>CFBundleDevelopmentRegion</key><string>en</string>
+ <key>CFBundleDisplayName</key><string>NaviSarthi</string>
+ <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+ <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+ <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+ <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+ <key>CFBundlePackageType</key><string>APPL</string>
+ <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+ <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+ <key>LSRequiresIPhoneOS</key><true/>
+ <key>UILaunchScreen</key><dict/>
+ <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+ <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+ <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string><string>UIInterfaceOrientationPortraitUpsideDown</string></array>
+ <key>NSLocationWhenInUseUsageDescription</key><string>Show your location, guide your ride and record routes you start.</string>
+ <key>NSLocationAlwaysAndWhenInUseUsageDescription</key><string>Continue a navigation or ride recording you started when the phone is locked.</string>
+ <key>NSBluetoothAlwaysUsageDescription</key><string>Connect to your motorcycle’s Tripper Pod for navigation guidance.</string>
+ <key>NSMicrophoneUsageDescription</key><string>Talk to riders in an audio room you explicitly join.</string>
+ <key>NSAppleMusicUsageDescription</key><string>Show and control the Music app's current track on your motorcycle console when you enable music controls.</string>
+ <key>NSCameraUsageDescription</key><string>Scan a ride invitation QR code.</string>
+ <key>NSLocalNetworkUsageDescription</key><string>Exchange navigation control and video packets with your Tripper Dash on its Wi-Fi.</string>
+ <key>UIBackgroundModes</key><array><string>location</string><string>bluetooth-central</string><string>audio</string><string>processing</string></array>
+ <key>BGTaskSchedulerPermittedIdentifiers</key><array><string>$(PRODUCT_BUNDLE_IDENTIFIER).drive-backup</string><string>$(PRODUCT_BUNDLE_IDENTIFIER).projection</string></array>
+ <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>com.navisarthi.ios.navigation</string><key>CFBundleURLSchemes</key><array><string>navisarthi</string></array></dict></array>
+ <key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>GPX route</string><key>CFBundleTypeRole</key><string>Viewer</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>com.topografix.gpx</string></array></dict></array>
+ <key>UTImportedTypeDeclarations</key><array><dict><key>UTTypeIdentifier</key><string>com.topografix.gpx</string><key>UTTypeDescription</key><string>GPX route</string><key>UTTypeConformsTo</key><array><string>public.xml</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>gpx</string></array><key>public.mime-type</key><array><string>application/gpx+xml</string></array></dict></dict></array>
+ <key>ITSAppUsesNonExemptEncryption</key><false/>
+ <key>FirebaseMessagingAutoInitEnabled</key><false/>
+</dict></plist>

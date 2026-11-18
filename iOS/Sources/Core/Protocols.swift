@@ -1,6 +1,17 @@
 import Foundation
 
 public enum WireError: Error { case malformed, oversized, invalidPIN }
+public enum ConsoleMusicCommand: Equatable { case previous, next, toggle }
+public enum ConsoleMediaWire {
+    public static func command(_ code:UInt8) -> ConsoleMusicCommand? {
+        switch code { case 0x0a:return .previous; case 0x09:return .next; case 0x05:return .toggle; default:return nil }
+    }
+    public static func nowPlaying(album:String,title:String,artist:String) -> [UInt8] {
+        func field(_ text:String) -> [UInt8] { text.replacingOccurrences(of:"\0",with:" ").unicodeScalars.prefix(19).map { UInt8(exactly:$0.value) ?? 0xff } }
+        return field(album) + [0] + field(title) + [0] + field(artist)
+    }
+    public static func navigationExit(_ tlv:TLV) -> Bool { tlv.type == 9 && tlv.sub == 0 && tlv.value == [0x12] }
+}
 
 public struct TLV: Equatable {
     public let type: UInt8

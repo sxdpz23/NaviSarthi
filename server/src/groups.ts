@@ -24,6 +24,7 @@ interface Receipt { groupId: string; inputHash: string; ciphertext: string }
 export interface Message { id: string; memberId: string; text: string; seq: number; sentAt: number }
 export class Groups {
   private readonly locationLimits: RequestLimiter;
+  private readonly locationRoutes = new Map<string, Credential>();
   constructor(readonly store: Store, readonly locations: Locations, readonly audio: Audio, readonly now: () => number = Date.now) {
     this.locationLimits = new RequestLimiter(now);
   }
@@ -134,11 +135,13 @@ export class Groups {
     });
   }
   async extend(credential: string, expiresAt: number) {
-    return this.mutate(credential, group => {
+    const groupId = await this.mutate(credential, group => {
       ensure(expiresAt >= group.expiresAt && expiresAt <= group.createdAt + 14 * DAY, 400, 'INVALID_EXTENSION');
       group.expiresAt = group.cleanupAt = expiresAt;
-      return { expiresAt };
+      return group.id;
     });
+    await this.locations.extendExpiry(groupId, expiresAt);
+    return { expiresAt };
   }
   async rotate(credential: string) {
     const inviteToken = invitation();
@@ -161,6 +164,7 @@ export class Groups {
       if (targetId) ensure(group.ownerId === member.id && target.id !== member.id, 403, 'OWNER_REQUIRED');
       else ensure(group.ownerId !== member.id, 409, 'TRANSFER_OR_END_REQUIRED');
       const installation = await tx.get<Credential>(`${COMMS_PATHS.installations}/${target.installationHash}`);
+      await this.disableLocation(group, target.id);
       target.status = targetId ? 'removed' : 'left';
       group.pendingAudio.push(target.id);
       tx.delete(`${COMMS_PATHS.credentials}/${target.credentialHash}`);
@@ -173,8 +177,9 @@ export class Groups {
     catch { return { ok: true, cleanupPending: true }; }
   }
   async end(credential: string) {
-    const groupId = await this.mutate(credential, (group, member) => {
+    const groupId = await this.mutate(credential, async (group, member) => {
       ensure(group.ownerId === member.id, 403, 'OWNER_REQUIRED');
+      await this.locations.transact(group.id, state => ({ ...state, closed: true, positions: {}, expiresAt: group.expiresAt }));
       group.status = 'ended'; group.cleanupAt = this.now(); return group.id;
     });
     try { await this.cleanup(groupId); return { ok: true, cleanupPending: false }; }
@@ -204,25 +209,76 @@ export class Groups {
   }
   async startLocation(credential: string) {
     const sharingId = randomUUID();
-    return this.mutate(credential, (_group, member) => { member.sharingId = sharingId; return { sharingId }; });
+    const route = await this.mutate(credential, async (group, member) => {
+      await this.enableLocation(group, member, sharingId, group.revision + 1);
+      member.sharingId = sharingId;
+      return { groupId: group.id, memberId: member.id };
+    });
+    this.rememberLocationRoute(hash(credential), route);
+    return { sharingId };
+  }
+  private rememberLocationRoute(key: string, route: Credential) {
+    if (this.locationRoutes.size >= 10_000) this.locationRoutes.delete(this.locationRoutes.keys().next().value!);
+    this.locationRoutes.set(key, route);
+  }
+  private async enableLocation(group: Group, member: Member, sharingId: string, revision: number) {
+    let enabled = false;
+    await this.locations.transact(group.id, state => {
+      const previous = state.access?.[member.id];
+      enabled = !state.closed && group.expiresAt > this.now() &&
+        (!previous || previous.revision < revision || previous.sharingId === sharingId);
+      if (!enabled) return state;
+      return {
+        ...state, expiresAt: Math.max(state.expiresAt ?? 0, group.expiresAt),
+        access: { ...state.access, [member.id]: { revision: Math.max(previous?.revision ?? 0, revision), credentialHash: member.credentialHash, sharingId } },
+      };
+    });
+    ensure(enabled, 409, 'LOCATION_SHARING_STOPPED');
+  }
+  private async disableLocation(group: Group, memberId: string) {
+    await this.locations.transact(group.id, state => {
+      if (state.closed || (state.access?.[memberId]?.revision ?? -1) > group.revision + 1) return state;
+      const positions = { ...state.positions };
+      delete positions[memberId];
+      return {
+        ...state, positions, expiresAt: Math.max(state.expiresAt ?? 0, group.expiresAt),
+        access: { ...state.access, [memberId]: { revision: group.revision + 1 } },
+      };
+    });
   }
   async position(credential: string, position: { lat: number; lng: number; accuracyM: number; sharingId: string } | null) {
     if (!position) {
-      const previous = await this.mutate(credential, (group, member) => {
-        const sharingId = member.sharingId; member.sharingId = null;
-        return { groupId: group.id, memberId: member.id, sharingId };
+      await this.mutate(credential, async (group, member) => {
+        await this.disableLocation(group, member.id);
+        member.sharingId = null;
       });
-      if (previous.sharingId) await this.locations.set(previous.groupId, previous.memberId, null, undefined, previous.sharingId);
       return;
     }
-    const { group, member } = await this.auth(credential);
-    ensure(member.sharingId === position.sharingId, 409, 'LOCATION_SHARING_STOPPED');
-    this.locationLimits.check(member.id, 1, 1000);
-    await this.locations.set(group.id, member.id, { ...position, receivedAt: this.now() }, group.expiresAt);
-    try {
-      const current = await this.auth(credential);
-      ensure(current.member.sharingId === position.sharingId, 409, 'LOCATION_SHARING_STOPPED');
-    } catch (e) { await this.locations.set(group.id, member.id, null, undefined, position.sharingId); throw e; }
+    const key = hash(credential);
+    let route = this.locationRoutes.get(key);
+    if (!route) {
+      route = await this.store.transaction(async tx => {
+        const { group, member } = await this.authHash(key, tx);
+        ensure(member.sharingId === position.sharingId, 409, 'LOCATION_SHARING_STOPPED');
+        // Restore routing after restart and bootstrap sharing started before rollout.
+        await this.enableLocation(group, member, position.sharingId, group.revision);
+        return { groupId: group.id, memberId: member.id };
+      });
+      this.rememberLocationRoute(key, route);
+    }
+    const { groupId, memberId } = route;
+    this.locationLimits.check(memberId, 1, 1000);
+    let authorized = false;
+    const receivedAt = this.now();
+    await this.locations.transact(groupId, state => {
+      const access = state.access?.[memberId];
+      authorized = !state.closed && (state.expiresAt ?? 0) > this.now() &&
+        access?.credentialHash === key && access.sharingId === position.sharingId;
+      const previous = state.positions?.[memberId];
+      if (!authorized || (previous && previous.receivedAt > receivedAt)) return state;
+      return { ...state, positions: { ...state.positions, [memberId]: { ...position, receivedAt } } };
+    });
+    ensure(authorized, 409, 'LOCATION_SHARING_STOPPED');
   }
   async ticket(credential: string) {
     const token = secret();

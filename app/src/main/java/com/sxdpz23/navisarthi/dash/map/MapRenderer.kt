@@ -507,15 +507,33 @@ class MapRenderer internal constructor(private val tiles: TileProvider, private 
             return
         }
 
+        val riderDistanceLabel = navigationMap?.riderDistanceLabel(f)
+        val pillRight = w * .95f
+        val pillBottom = h - 7f
+        val pillHeight = 30f
+        val pillGap = 6f
         f.accessoryBatteryLabel?.let { label ->
             val iconWidth = if (f.accessoryBatteryIcon != null) 26f else 0f
             val halfWidth = (batteryTextPaint.measureText(label) + iconWidth) / 2f + 13f
-            val right = w * .95f
-            pillRect.set(right - halfWidth * 2f, h - 37f, right, h - 7f)
+            val bottom = pillBottom - if (riderDistanceLabel != null) pillHeight + pillGap else 0f
+            pillRect.set(pillRight - halfWidth * 2f, bottom - pillHeight, pillRight, bottom)
             canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
             f.accessoryBatteryIcon?.let { drawAccessoryIcon(canvas, it, pillRect.left + 23f, pillRect.centerY()) }
             val baseline = pillRect.centerY() - (batteryTextPaint.ascent() + batteryTextPaint.descent()) / 2f
             canvas.drawText(label, pillRect.centerX() + iconWidth / 2f, baseline, batteryTextPaint)
+        }
+
+        riderDistanceLabel?.let { label ->
+            val display = android.text.TextUtils.ellipsize(
+                label, android.text.TextPaint(etaSmallPaint), w * .68f,
+                android.text.TextUtils.TruncateAt.END,
+            ).toString()
+            val half = etaSmallPaint.measureText(display) / 2f + 12f
+            pillRect.set(pillRight - half * 2f, pillBottom - pillHeight, pillRight, pillBottom)
+            canvas.drawRoundRect(pillRect, 14f, 14f, etaBgPaint)
+            canvas.drawRoundRect(pillRect, 14f, 14f, etaBorderPaint)
+            val baseline = pillRect.centerY() - (etaSmallPaint.ascent() + etaSmallPaint.descent()) / 2f
+            canvas.drawText(display, pillRect.centerX(), baseline, etaSmallPaint)
         }
 
         // ── Standby when nothing to show (dark text on the light map bg) ──

@@ -18,7 +18,15 @@ export interface Store {
   close(): Promise<void>;
 }
 export interface Position { lat: number; lng: number; accuracyM: number; receivedAt: number; sharingId: string }
+export interface LocationAccess { revision: number; credentialHash?: string; sharingId?: string }
+export interface RideLocationState {
+  expiresAt?: number;
+  closed?: boolean;
+  access?: Record<string, LocationAccess>;
+  positions?: Record<string, Position>;
+}
 export interface Locations {
+  transact(groupId: string, update: (state: RideLocationState) => RideLocationState): Promise<void>;
   get(groupId: string): Promise<Record<string, Position>>;
   set(groupId: string, memberId: string, value: Position | null, expiresAt?: number, onlySharingId?: string): Promise<void>;
   expired(now: number): Promise<string[]>;
@@ -80,10 +88,18 @@ export class MemoryStore implements Store {
   async close() {}
 }
 export class MemoryLocations implements Locations {
+  private access = new Map<string, RideLocationState>();
   private data = new Map<string, Record<string, Position>>();
   private expiries = new Map<string, number>();
   private listeners = new Map<string, Set<() => void>>();
   async get(id: string) { return structuredClone(this.data.get(id) ?? {}); }
+  async transact(id: string, update: (state: RideLocationState) => RideLocationState) {
+    const next = update(structuredClone({ ...this.access.get(id), expiresAt: this.expiries.get(id), positions: this.data.get(id) }));
+    this.access.set(id, { closed: next.closed, access: next.access });
+    if (next.expiresAt !== undefined) this.expiries.set(id, next.expiresAt);
+    this.data.set(id, next.positions ?? {});
+    for (const cb of this.listeners.get(id) ?? []) queueMicrotask(cb);
+  }
   async set(id: string, member: string, value: Position | null, expiresAt?: number, onlySharingId?: string) {
     const positions = this.data.get(id) ?? {};
     if (!value && onlySharingId && positions[member]?.sharingId !== onlySharingId) return;
@@ -94,7 +110,7 @@ export class MemoryLocations implements Locations {
   }
   async expired(now: number) { return [...this.expiries].filter(([, expiry]) => expiry <= now).slice(0, 100).map(([id]) => id); }
   async extendExpiry(id: string, expiresAt: number) { if (this.data.has(id)) this.expiries.set(id, expiresAt); }
-  async clear(id: string) { this.data.delete(id); this.expiries.delete(id); for (const cb of this.listeners.get(id) ?? []) queueMicrotask(cb); }
+  async clear(id: string) { this.access.delete(id); this.data.delete(id); this.expiries.delete(id); for (const cb of this.listeners.get(id) ?? []) queueMicrotask(cb); }
   watch(id: string, changed: () => void) {
     const set = this.listeners.get(id) ?? new Set(); this.listeners.set(id, set); set.add(changed);
     return () => { set.delete(changed); if (!set.size) this.listeners.delete(id); };

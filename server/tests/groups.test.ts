@@ -175,6 +175,7 @@ test('stopping location rejects queued publishes; old sharing runs cannot clear 
   const first = await f.groups.startLocation(owner.credential);
   await f.groups.position(owner.credential, { lat: 1, lng: 2, accuracyM: 3, sharingId: first.sharingId });
   await f.groups.position(owner.credential, null);
+  f.advance(1000);
   await assert.rejects(f.groups.position(owner.credential, { lat: 4, lng: 5, accuracyM: 3, sharingId: first.sharingId }), code('LOCATION_SHARING_STOPPED'));
   const second = await f.groups.startLocation(owner.credential); f.advance(1000);
   await f.groups.position(owner.credential, { lat: 6, lng: 7, accuracyM: 3, sharingId: second.sharingId });

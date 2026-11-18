@@ -46,6 +46,36 @@ import kotlin.math.cos
 class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit = {}) : AutoCloseable {
     private val context = context.applicationContext
     private val comms = com.sxdpz23.navisarthi.comms.CommsRepository.get(context)
+    private var distanceRiderId: String? = null
+    private var distanceSwitchAt = 0L
+
+    fun riderDistanceLabel(frame: MapRenderer.Frame): String? {
+        if (frame.gpsLost) return null
+        val latitude = frame.riderLat ?: return null
+        val longitude = frame.riderLng ?: return null
+        val riders = com.sxdpz23.navisarthi.comms.commsMapRiders(comms.state.value).sortedBy { it.id }
+        if (riders.isEmpty()) {
+            distanceRiderId = null
+            return null
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        var index = riders.indexOfFirst { it.id == distanceRiderId }
+        if (index < 0) {
+            index = 0
+            distanceSwitchAt = now + 30_000
+        } else if (now >= distanceSwitchAt) {
+            index = (index + 1) % riders.size
+            distanceSwitchAt = now + 30_000
+        }
+        val rider = riders[index]
+        distanceRiderId = rider.id
+        val result = FloatArray(1)
+        android.location.Location.distanceBetween(latitude, longitude, rider.position.lat, rider.position.lng, result)
+        val meters = result[0]
+        val distance = if (meters < 1000f) "${meters.toInt()} m"
+            else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1000f)
+        return "${rider.nickname.take(8)} · $distance"
+    }
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val renderQueue = DeferredMapRender({ work -> main.post { work() } }, ::renderLatest)
@@ -132,8 +162,10 @@ class NavDashMapRenderer(context: Context, private val onFrameReady: () -> Unit 
             }
             for (rider in com.sxdpz23.navisarthi.comms.commsMapRiders(comms.state.value)) {
                 point(current, rider.position.lat, rider.position.lng)?.let { p ->
-                    fill.color = if (rider.stale) Color.GRAY else Color.rgb(62, 175, 164)
+                    fill.color = rider.color
+                    fill.alpha = if (rider.stale) 115 else 255
                     canvas.drawCircle(p.x, p.y, 7f, fill)
+                    fill.alpha = 255
                     text.color = Color.WHITE
                     text.setShadowLayer(2f, 0f, 1f, Color.BLACK)
                     canvas.drawText(rider.nickname.take(16), p.x, p.y - 11f, text)

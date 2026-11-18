@@ -29,6 +29,12 @@ export function firebaseStores(config: { projectId: string; databaseId: string; 
     async close() { await db.terminate(); await deleteApp(app); },
   };
   const locations: Locations = {
+    async transact(id, update) {
+      await rtdb.ref(`ridePositions/${id}`).transaction(current => {
+        const next = update(current ?? {});
+        return Object.keys(next).length ? next : null;
+      }, undefined, false);
+    },
     async get(id) { return (await rtdb.ref(`ridePositions/${id}/positions`).get()).val() ?? {}; },
     async set(id, member, value, expiresAt, onlySharingId) {
       if (!value) {

@@ -140,11 +140,11 @@ test('WebSockets isolate unrelated groups and resume messages by sequence', asyn
   assert.equal((await next('snapshot')).group.id, a.groupId);
   assert.deepEqual((await next('messages')).messages.map((m: any) => m.text), ['Resume here']);
 });
-test('GPS updates to three connected riders make four document reads each and no Firestore writes or chat queries', { timeout: 5000 }, async t => {
+test('GPS updates to connected riders do not use Firestore after location sharing starts', { timeout: 5000 }, async t => {
   const { app, groups, create, advance } = await fixture(t);
   const owner = await create();
-  const riders = [owner, ...await Promise.all(['Two', 'Three'].map(nickname =>
-    groups.admit(secret(), randomUUID(), { nickname, inviteToken: owner.inviteToken })))];
+  const riders = [owner, ...await Promise.all(Array.from({ length: 9 }, (_, i) =>
+    groups.admit(secret(), randomUUID(), { nickname: `Rider ${i + 2}`, inviteToken: owner.inviteToken })))];
   const address = await app.listen({ port: 0, host: '127.0.0.1' });
   const sharing = await Promise.all(riders.map(rider => groups.startLocation(rider.credential)));
   const feeds = await Promise.all(riders.map(async rider => {
@@ -181,7 +181,7 @@ test('GPS updates to three connected riders make four document reads each and no
       while (snapshot.positions[rider.memberId]?.lat !== 12 + i);
     }));
   }
-  assert.equal(reads, 48);
+  assert.equal(reads, 0);
   assert.equal(queries, 0);
   assert.equal(transactions, 0);
 });

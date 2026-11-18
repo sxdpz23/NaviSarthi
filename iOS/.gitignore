@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+.validation/
+GoogleService-Info.plist
+__pycache__/
+*.ipa
+*.xcarchive/
+*.dSYM/

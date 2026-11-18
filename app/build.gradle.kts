@@ -61,8 +61,8 @@ android {
         val commsOrigin = providers.gradleProperty("commsApiUrl").orElse(providers.environmentVariable("COMMS_API_URL")).getOrElse("https://navisarthi.onrender.com/")
         buildConfigField("String", "COMMS_API_URL", "\"${commsOrigin.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         // Independent NaviSarthi version sequence.
-        versionCode = 42
-        versionName = "0.7.1"
+        versionCode = 43
+        versionName = "0.7.2"
 
         // Test-channel telemetry: ride/connection diagnostics upload to Firestore so logs can be
         // pulled remotely (no adb) while iterating on test builds. MUST be flipped to "false" for
