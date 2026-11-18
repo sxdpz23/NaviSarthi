@@ -4,6 +4,7 @@ import { ApiError, ensure, maintenanceErrorCode } from './errors.js';
 import type { Store, Transaction, Locations } from './store.js';
 import type { Audio } from './audio.js';
 import { COMMS_PATHS } from './paths.js';
+import { RequestLimiter } from './request-limiter.js';
 
 export const DAY = 86_400_000;
 export interface Member {
@@ -22,7 +23,10 @@ interface Admission { groupId: string; memberId: string; credential: string; inv
 interface Receipt { groupId: string; inputHash: string; ciphertext: string }
 export interface Message { id: string; memberId: string; text: string; seq: number; sentAt: number }
 export class Groups {
-  constructor(readonly store: Store, readonly locations: Locations, readonly audio: Audio, readonly now: () => number = Date.now) {}
+  private readonly locationLimits: RequestLimiter;
+  constructor(readonly store: Store, readonly locations: Locations, readonly audio: Audio, readonly now: () => number = Date.now) {
+    this.locationLimits = new RequestLimiter(now);
+  }
   groupPath(id: string) { return `${COMMS_PATHS.sessions}/${id}`; }
   private live(group: Group | undefined): asserts group is Group {
     ensure(group && group.status === 'active' && group.expiresAt > this.now(), 410, 'SESSION_ENDED');
@@ -61,8 +65,11 @@ export class Groups {
     const { group, member } = await this.authHash(credentialHash);
     const positions = await this.locations.get(group.id);
     const current = await this.authHash(credentialHash); // Recheck after external I/O, including removal/expiry.
-    const visible = Object.fromEntries(Object.entries(positions).filter(([id, p]) => current.group.members[id]?.status === 'active' && current.group.members[id]?.sharingId === p.sharingId && p.receivedAt > this.now() - 120_000));
-    return { group: this.publicGroup(current.group), memberId: member.id, positions: visible, serverTime: this.now() };
+    return this.snapshotView(current.group, member.id, positions);
+  }
+  snapshotView(group: Group, memberId: string, positions: Awaited<ReturnType<Locations['get']>>) {
+    const visible = Object.fromEntries(Object.entries(positions).filter(([id, p]) => group.members[id]?.status === 'active' && group.members[id]?.sharingId === p.sharingId && p.receivedAt > this.now() - 120_000));
+    return { group: this.publicGroup(group), memberId, positions: visible, serverTime: this.now() };
   }
   async admit(installationSecret: string, requestId: string, input: { nickname: string; name?: string; expiresAt?: number; inviteToken?: string }): Promise<Admission> {
     const installationHash = hash(installationSecret);
@@ -210,7 +217,7 @@ export class Groups {
     }
     const { group, member } = await this.auth(credential);
     ensure(member.sharingId === position.sharingId, 409, 'LOCATION_SHARING_STOPPED');
-    await this.rate(`location:${group.id}:${member.id}`, 1, 1000);
+    this.locationLimits.check(member.id, 1, 1000);
     await this.locations.set(group.id, member.id, { ...position, receivedAt: this.now() }, group.expiresAt);
     try {
       const current = await this.auth(credential);

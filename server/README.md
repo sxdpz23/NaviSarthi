@@ -306,9 +306,11 @@ reports legacy data, use the explicit migration:
 No migration command is run automatically by the app or from this development session.
 
 The backend uses 600 requests/minute/source IP and 180 requests/minute/credential,
-plus 5 creates/hour/source IP and 30 invitation resolves/joins/minute/source IP.
-Rate buckets are stored transactionally so multiple API instances cannot bypass
-them. Counts are intentionally conservative initial defaults, not capacity claims.
+enforced in memory per server instance to avoid writing Firestore on every HTTP
+request. These transport counters reset on restart. Use a shared edge limiter if
+deploying multiple instances. Operation-specific limits, including 5 creates/hour
+and 30 invitation resolves/joins/minute/source IP, remain transactional across API
+instances. Counts are intentionally conservative initial defaults.
 
 I've set up prototype Security Rules to keep the data in Firestore safe. They are
 designed to be secure for server-only Groups access by denying every direct client

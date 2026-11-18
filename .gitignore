@@ -50,6 +50,12 @@ node_modules/
 # Machine-local Claude Code settings — not for the public repo.
 .claude/settings.local.json
 
+# Codex / ChatGPT local workspace state and conversation attachments.
+/.codex/
+/.codex-*/
+/.chatgpt/
+/.chatgpt-*/
+
 # Keep NaviSarthi milestone plans in source control.
 !/version plans/
 !/version plans/**

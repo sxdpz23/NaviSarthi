@@ -3,11 +3,12 @@ import websocket from '@fastify/websocket';
 import helmet from '@fastify/helmet';
 import { timingSafeEqual } from 'node:crypto';
 import { z, ZodError } from 'zod';
-import { Groups } from './groups.js';
+import { Groups, type Group } from './groups.js';
 import { ApiError, ensure } from './errors.js';
 import { hash } from './crypto.js';
 import { registerAdmin } from './admin.js';
 import { OperationsLog } from './operations.js';
+import { RequestLimiter } from './request-limiter.js';
 
 const secretSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const id = z.string().uuid();
@@ -26,6 +27,7 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
   // Operational metadata only: never raw URLs, bodies, headers, credentials or QR values.
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024, trustProxy: false, requestTimeout: 15_000 });
   const journal = options.operationsLog ?? new OperationsLog(groups.now);
+  const requestLimits = new RequestLimiter(groups.now);
   const errors = new WeakMap<FastifyRequest, string>();
   const authenticatedSockets = new Set<import('ws').WebSocket>();
   await app.register(helmet);
@@ -36,11 +38,11 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
     ensure(!request.url.includes('?'), 400, 'QUERY_NOT_SUPPORTED');
     const route = request.routeOptions.url;
     if (route === '/' || route?.startsWith('/admin/')) return;
-    await groups.rate(`ip:${request.ip}`, 600);
+    requestLimits.check(`ip:${request.ip}`, 600);
     if (request.headers.authorization) {
       const token = bearer(request.headers.authorization);
-      await groups.auth(token);
-      await groups.rate(`member:${hash(token)}`, 180);
+      if (route !== '/v1/location' || request.method !== 'PUT') await groups.auth(token);
+      requestLimits.check(`member:${hash(token)}`, 180);
     }
   });
   app.addHook('onResponse', async (request, reply) => {
@@ -64,6 +66,10 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
     }
     // Intentionally exclude exception messages, which can contain provider payloads or URLs.
     const providerCode = (error as { code?: unknown })?.code;
+    if (providerCode === 8) {
+      errors.set(request, 'UPSTREAM_RPC_8');
+      return reply.header('Retry-After', '60').code(503).send({ error: 'SERVICE_CAPACITY_EXCEEDED' });
+    }
     errors.set(request, typeof providerCode === 'number' && Number.isInteger(providerCode) && providerCode >= 0 && providerCode <= 16 ? `UPSTREAM_RPC_${providerCode}` : 'INTERNAL_ERROR');
     if (options.logger) console.error(JSON.stringify({ event: 'request_failed', category: 'internal' }));
     return reply.code(503).send({ error: 'SERVICE_UNAVAILABLE' });
@@ -122,45 +128,89 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
   });
 
   const sockets = new Set<import('ws').WebSocket>();
+  type RideListener = { update: (group: Group | undefined) => void; close: () => void };
+  type RideWatch = {
+    listeners: Set<RideListener>; stop: () => void; ready: boolean; group?: Group;
+  };
+  const rideWatches = new Map<string, RideWatch>();
+  function watchRide(id: string, listener: RideListener) {
+    let watch = rideWatches.get(id);
+    if (!watch) {
+      const entry: RideWatch = { listeners: new Set(), stop: () => {}, ready: false };
+      entry.stop = groups.store.watch(groups.groupPath(id), data => {
+        entry.group = data as Group | undefined;
+        entry.ready = true;
+        for (const subscriber of entry.listeners) subscriber.update(entry.group);
+      }, () => {
+        entry.ready = false;
+        for (const subscriber of entry.listeners) subscriber.close();
+      });
+      rideWatches.set(id, entry);
+      watch = entry;
+    }
+    const entry = watch;
+    entry.listeners.add(listener);
+    if (entry.ready) listener.update(entry.group);
+    return () => {
+      entry.listeners.delete(listener);
+      if (!entry.listeners.size) { entry.stop(); rideWatches.delete(id); }
+    };
+  }
   app.get('/v1/events', { websocket: true }, (socket, request) => {
     sockets.add(socket);
     let identity: Awaited<ReturnType<Groups['consumeTicket']>> | undefined;
+    let ride: Group | undefined;
     let authenticating = false; let busy = false; let dirty = false; let cursor = 0;
     let unwatchGroup = () => {}; let unwatchPositions = () => {};
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const close = () => socket.close(4001, 'Session unavailable');
     const authTimer = setTimeout(close, 5000);
     let alive = true;
+    let heartbeats = 0;
     socket.on('pong', () => { alive = true; });
     const heartbeat = setInterval(() => {
       if (!alive) { socket.terminate(); return; }
-      alive = false; socket.ping(); void refresh();
+      alive = false; socket.ping();
+      send({ type: 'heartbeat' });
+      // Membership watchers handle revocation immediately. Periodically revalidate
+      // credentials without repeating the full database query on every ping.
+      if (++heartbeats % 4 === 0 && identity) {
+        void groups.authHash(identity.credentialHash).then(() => refresh(), close);
+      }
     }, 15_000);
     const send = (value: unknown) => {
       if (socket.readyState !== 1) return;
       if (socket.bufferedAmount > 256 * 1024) { socket.close(4008, 'Reconnect and resume'); return; }
       socket.send(JSON.stringify(value));
     };
+    function authorizedRide() {
+      if (!identity || !ride || ride.status !== 'active' || ride.expiresAt <= groups.now()) return;
+      const member = ride.members[identity.memberId];
+      if (member?.status === 'active' && member.credentialHash === identity.credentialHash) return ride;
+    }
     async function refresh() {
-      if (!identity || socket.readyState !== 1) return;
+      if (!identity || !authorizedRide() || socket.readyState !== 1) return;
       if (busy) { dirty = true; return; }
       busy = true;
       try {
         do {
           dirty = false;
-          const snapshot = await groups.snapshotHash(identity.credentialHash);
-          const rows = await groups.store.list(`${groups.groupPath(identity.groupId)}/messages`, {
-            filters: [{ field: 'seq', op: '>', value: cursor }], order: 'seq', limit: 100,
-          });
-          await groups.authHash(identity.credentialHash);
+          const positions = await groups.locations.get(identity.groupId);
+          const current = authorizedRide();
+          if (!current || socket.readyState !== 1) return;
+          const snapshot = groups.snapshotView(current, identity.memberId, positions);
           send({ type: 'snapshot', ...snapshot });
-          if (rows.length) {
-            send({ type: 'messages', messages: rows.map(r => r.data) });
-            cursor = rows.at(-1)!.data.seq;
-            if (rows.length === 100) dirty = true;
+          if (current.messageSeq > cursor) {
+            const rows = await groups.store.list(`${groups.groupPath(identity.groupId)}/messages`, {
+              filters: [{ field: 'seq', op: '>', value: cursor }], order: 'seq', limit: 100,
+            });
+            if (!authorizedRide() || socket.readyState !== 1) return;
+            if (rows.length) {
+              send({ type: 'messages', messages: rows.map(r => r.data) });
+              cursor = rows.at(-1)!.data.seq;
+              if (rows.length === 100) dirty = true;
+            }
           }
-          clearTimeout(deadline);
-          deadline = setTimeout(close, Math.max(0, snapshot.group.expiresAt - groups.now()));
         } while (dirty && socket.readyState === 1);
       } catch { close(); }
       finally { busy = false; }
@@ -175,7 +225,17 @@ export async function buildApp(groups: Groups, options: { maintenanceKey?: strin
           clearTimeout(authTimer);
           if (socket.readyState !== 1) return;
           authenticatedSockets.add(socket); journal.record('info', 'websocket_open');
-          unwatchGroup = groups.store.watch(groups.groupPath(identity.groupId), () => { void refresh(); }, close);
+          unwatchGroup = watchRide(identity.groupId, {
+            update(group) {
+              ride = group;
+              const current = authorizedRide();
+              if (!current) { close(); return; }
+              clearTimeout(deadline);
+              deadline = setTimeout(close, Math.max(0, current.expiresAt - groups.now()));
+              void refresh();
+            },
+            close,
+          });
           unwatchPositions = groups.locations.watch(identity.groupId, () => { void refresh(); }, close);
           await refresh();
         } catch { close(); }

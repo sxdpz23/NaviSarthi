@@ -22,7 +22,7 @@ export function firebaseStores(config: { projectId: string; databaseId: string; 
       const snapshot = await query.get();
       return snapshot.docs.map(doc => ({ path: doc.ref.path, data: doc.data() as T }));
     },
-    watch: (path, changed, failed) => db.doc(path).onSnapshot(changed, failed),
+    watch: (path, changed, failed) => db.doc(path).onSnapshot(snapshot => changed(snapshot.data()), failed),
     async listDocuments(collection) { return (await db.collection(collection).listDocuments()).map(doc => doc.path); },
     async listCollections(document) { return (await db.doc(document).listCollections()).map(collection => collection.path); },
     async deleteTree(path: string) { await db.recursiveDelete(db.doc(path)); },

@@ -13,7 +13,7 @@ export interface Store {
   /** Includes missing parent documents that still have subcollections (migration safety). */
   listDocuments(collection: string): Promise<string[]>;
   listCollections(document: string): Promise<string[]>;
-  watch(path: string, changed: () => void, failed: () => void): () => void;
+  watch(path: string, changed: (data: RecordData | undefined) => void, failed: () => void): () => void;
   deleteTree(path: string): Promise<void>;
   close(): Promise<void>;
 }
@@ -60,9 +60,11 @@ export class MemoryStore implements Store {
     if (query.order) rows.sort((a, b) => a[1][query.order!] - b[1][query.order!]);
     return rows.slice(0, query.limit ?? rows.length).map(([path, data]) => ({ path, data: structuredClone(data) as T }));
   }
-  watch(path: string, changed: () => void): () => void {
-    const set = this.listeners.get(path) ?? new Set(); this.listeners.set(path, set); set.add(changed);
-    return () => { set.delete(changed); if (!set.size) this.listeners.delete(path); };
+  watch(path: string, changed: (data: RecordData | undefined) => void): () => void {
+    const notify = () => changed(structuredClone(this.records.get(path)));
+    const set = this.listeners.get(path) ?? new Set(); this.listeners.set(path, set); set.add(notify);
+    queueMicrotask(() => { if (set.has(notify)) notify(); });
+    return () => { set.delete(notify); if (!set.size) this.listeners.delete(path); };
   }
   async listDocuments(collection: string) {
     const depth = collection.split('/').length + 1;

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <cache-path name="comms_invitations" path="comms-invitations/" />
     <!-- App-private files (invoices + documents) exposed to external viewers via FileProvider. -->
     <files-path name="invoices" path="invoices/" />
     <files-path name="documents" path="documents/" />

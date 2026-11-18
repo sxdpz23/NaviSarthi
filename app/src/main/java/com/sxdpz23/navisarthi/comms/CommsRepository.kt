@@ -98,6 +98,7 @@ class CommsRepository private constructor(private val context: Context) {
             "TRANSFER_OR_END_REQUIRED" -> "Choose another organiser before leaving, or end the ride."
             "RATE_LIMITED", "MESSAGE_RATE_LIMIT" -> "Please wait a minute before trying again."
             "AUDIO_NOT_CONFIGURED" -> "Audio is not available for this ride yet."
+            "SERVICE_CAPACITY_EXCEEDED" -> "Comms server capacity is exhausted. Chat and locations will retry automatically. Existing ride audio can continue."
             "LOCATION_SHARING_STOPPED" -> "Location sharing has stopped. Enable it again to share."
             "MESSAGE_LIMIT" -> "This ride has reached its chat limit."
             "ADMISSION_LIMIT" -> "This ride cannot accept more new memberships."
@@ -165,8 +166,7 @@ class CommsRepository private constructor(private val context: Context) {
         if (SystemClock.elapsedRealtime() >= deadline) {
             clear("Your ride has ended. Comms data has been cleared.")
         } else if (stored?.admission != null) {
-            // Hide the cached session until its membership has been checked on foreground entry.
-            mutable.update { it.copy(snapshot = null, connected = false) }
+            mutable.update { it.copy(connected = false) }
             connect()
         }
     }
@@ -225,11 +225,14 @@ class CommsRepository private constructor(private val context: Context) {
                     backoff = 1000
                     while (isActive && !done.isCompleted && SystemClock.elapsedRealtime() - lastEvent < 45_000) delay(1000)
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { failure(e) }
+                catch (e: Exception) {
+                    failure(e)
+                    if (e is CommsApiException && (e.status == 429 || e.code == "SERVICE_CAPACITY_EXCEEDED")) backoff = 60_000
+                }
                 finally { currentSocket?.cancel() }
                 if (epoch != connectionEpoch || sessionGeneration != generation) break
                 mutable.update { it.copy(connected = false) }
-                delay(backoff); backoff = (backoff * 2).coerceAtMost(15_000)
+                delay(backoff); backoff = (backoff * 2).coerceAtMost(if (backoff >= 60_000) 120_000 else 15_000)
             }
         }
     }
@@ -363,6 +366,7 @@ class CommsRepository private constructor(private val context: Context) {
         mutable.update { it.copy(sharing = false, ownPosition = null) }
     }
     private fun clear(message: String? = null) {
+        java.io.File(context.cacheDir, "comms-invitations").listFiles()?.forEach { it.delete() }
         generation++; connection?.cancel(); socket?.cancel(); connection = null; socket = null
         stopLocalMedia(); context.stopService(Intent(context, CommsService::class.java))
         stored = null; vault.clear(); cursor = 0; deadline = Long.MAX_VALUE; scannedInvitation = null; serverAnchorMs = 0L

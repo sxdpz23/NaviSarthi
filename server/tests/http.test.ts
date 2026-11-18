@@ -24,6 +24,28 @@ async function fixture(t: TestContext) {
 }
 const auth = (credential: string) => ({ authorization: `Bearer ${credential}` });
 
+test('session reconnect checks do not write transport rate counters to Firestore', async t => {
+  const { app, create, groups } = await fixture(t);
+  const owner = await create();
+  let writes = 0;
+  const transaction = groups.store.transaction.bind(groups.store);
+  groups.store.transaction = async run => { writes++; return transaction(run); };
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await app.inject({ url: '/v1/session', headers: auth(owner.credential) })).statusCode, 200);
+  }
+  assert.equal(writes, 0);
+});
+
+test('resource exhaustion reports capacity failure with retry guidance without leaking provider payloads', async t => {
+  const { app, create, groups } = await fixture(t);
+  const owner = await create();
+  groups.store.get = async () => { throw Object.assign(new Error('private provider details'), { code: 8 }); };
+  const response = await app.inject({ url: '/v1/session', headers: auth(owner.credential) });
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['retry-after'], '60');
+  assert.deepEqual(response.json(), { error: 'SERVICE_CAPACITY_EXCEEDED' });
+});
+
 test('HTTP create and session work with our credential only, without Firebase Auth', async t => {
   const { app, create } = await fixture(t); const owner = await create();
   const snapshot = await app.inject({ url: '/v1/session', headers: auth(owner.credential) });
@@ -117,6 +139,51 @@ test('WebSockets isolate unrelated groups and resume messages by sequence', asyn
   socket.send(JSON.stringify({ type: 'auth', ticket: (await groups.ticket(a.credential)).ticket, afterSeq: 1 }));
   assert.equal((await next('snapshot')).group.id, a.groupId);
   assert.deepEqual((await next('messages')).messages.map((m: any) => m.text), ['Resume here']);
+});
+test('GPS updates to three connected riders make four document reads each and no Firestore writes or chat queries', { timeout: 5000 }, async t => {
+  const { app, groups, create, advance } = await fixture(t);
+  const owner = await create();
+  const riders = [owner, ...await Promise.all(['Two', 'Three'].map(nickname =>
+    groups.admit(secret(), randomUUID(), { nickname, inviteToken: owner.inviteToken })))];
+  const address = await app.listen({ port: 0, host: '127.0.0.1' });
+  const sharing = await Promise.all(riders.map(rider => groups.startLocation(rider.credential)));
+  const feeds = await Promise.all(riders.map(async rider => {
+    const ticket = await groups.ticket(rider.credential);
+    const socket = new WebSocket(address.replace('http', 'ws') + '/v1/events');
+    t.after(() => socket.terminate());
+    const next = inbox(socket);
+    await once(socket, 'open');
+    socket.send(JSON.stringify({ type: 'auth', ticket: ticket.ticket }));
+    await next('snapshot');
+    return next;
+  }));
+  let reads = 0;
+  let queries = 0;
+  let transactions = 0;
+  const get = groups.store.get.bind(groups.store);
+  const list = groups.store.list.bind(groups.store);
+  const transaction = groups.store.transaction.bind(groups.store);
+  groups.store.get = path => { reads++; return get(path); };
+  groups.store.list = (path, query) => { queries++; return list(path, query); };
+  groups.store.transaction = run => { transactions++; return transaction(run); };
+  for (let i = 0; i < 12; i++) {
+    advance(5000);
+    const index = i % riders.length;
+    const rider = riders[index];
+    const result = await app.inject({
+      method: 'PUT', url: '/v1/location', headers: auth(rider.credential),
+      payload: { lat: 12 + i, lng: 77, accuracyM: 5, ...sharing[index] },
+    });
+    assert.equal(result.statusCode, 200);
+    await Promise.all(feeds.map(async next => {
+      let snapshot;
+      do { snapshot = await next('snapshot'); }
+      while (snapshot.positions[rider.memberId]?.lat !== 12 + i);
+    }));
+  }
+  assert.equal(reads, 48);
+  assert.equal(queries, 0);
+  assert.equal(transactions, 0);
 });
 test('LiveKit credentials allow only microphone publishing in the scoped opaque room', async () => {
   const audio = new LiveKitAudio('wss://example.livekit.cloud', 'test-api-key', 'test-secret-not-a-real-provider-credential');
