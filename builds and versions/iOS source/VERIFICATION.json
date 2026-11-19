@@ -1,13 +1,15 @@
 {
   "artifact": "NaviSarthi-iOS-source.zip",
-  "sha256": "782a4cead704de64932ae8fa1b4f1e8864f7819a2a6a0734af950d1b0d42a9e9",
-  "files": 39,
+  "sha256": "9830139fd51a72c142a5f2401cfa4fed574bfd2f825ee6d9ee14ae1b3304bfdf",
+  "files": 56,
   "zipIntegrity": "passed",
   "projectChecks": "passed",
   "compiled": false,
   "signed": false,
-  "swiftSyntax": "passed: grammar only",
+  "swiftSyntax": "passed: Swift grammar only, not compiler or type checking",
   "audioSDKLinked": false,
+  "shareTargetConfigured": false,
+  "pushSDKLinked": false,
   "swiftTestsExecuted": false,
   "hardwareValidated": false,
   "featureParity": "partial; see iOS/docs/PARITY.md"

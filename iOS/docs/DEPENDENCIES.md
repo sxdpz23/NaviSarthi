@@ -47,3 +47,11 @@ References:
 - [Official SDK source](https://github.com/livekit/client-sdk-swift)
 - [Firebase Auth REST](https://firebase.google.com/docs/reference/rest/auth)
 - [Firestore REST authentication and owner rules](https://firebase.google.com/docs/firestore/use-rest-api)
+
+Additional optional Mac helpers: setup-sharing-macos.sh embeds the Share Extension;
+setup-google-macos.sh configures native OAuth; setup-push-macos.sh links FirebaseCore
+and FirebaseMessaging using the latest stable release reported at execution time,
+adds the public iOS configuration plist and declares Push capability. Retain the
+resolved SDK versions and repeat verification. APNs/private signing keys belong
+outside source. No SDK or native helper has been resolved/executed on Windows.
+prepare-macos.sh composes these based on supplied environment variables.
