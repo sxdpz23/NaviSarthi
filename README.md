@@ -24,4 +24,8 @@ See [version plans](<version plans/README.md>) for requirements, version milesto
 
 ## Attribution
 
+See [NaviSarthi branding and rights](BRANDING.md) for the policy on the project
+name and original brand artwork. Software rights remain governed by the
+applicable upstream licences and notices.
+
 Derived from Northstar, copyright 2026 Aditya Dasika, under Apache-2.0. Navigation also includes adapted Vela source under GPL-3.0; see [navigation provenance and modifications](docs/navigation-upstream.md) and the bundled license/notices. See LICENSE and NOTICE for preserved upstream and third-party attribution. Independent project, not affiliated with Royal Enfield or Google.
