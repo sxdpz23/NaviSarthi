@@ -12,7 +12,7 @@ import org.maplibre.geojson.Point
 
 data class CommsMapRider(val id: String, val nickname: String, val position: CommsPosition, val stale: Boolean, val color: Int)
 
-private object RiderColors {
+internal object RiderColors {
     private val palette = intArrayOf(
         0xFF55D6BE.toInt(), 0xFFFF9B71.toInt(), 0xFFA78BFA.toInt(), 0xFF7DD3FC.toInt(),
         0xFFF472B6.toInt(), 0xFFD4E157.toInt(), 0xFFFFC857.toInt(), 0xFF81C784.toInt(),

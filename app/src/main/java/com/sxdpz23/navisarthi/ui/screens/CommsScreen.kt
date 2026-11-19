@@ -7,9 +7,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -31,9 +33,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.sxdpz23.navisarthi.comms.*
@@ -108,7 +116,7 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
 
     Column(
         Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 112.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ScreenHeader(title = "Comms", hint = "Ride chat, location and audio")
         state.error?.let { message ->
@@ -178,20 +186,37 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
                         Text("Ends ${commsDate(group.expiresAt)}", color = TextMid, fontSize = 12.sp)
                     }
                     IconButton(onClick = { management = true }) { Icon(Icons.Outlined.MoreHoriz, "Ride settings", tint = TextHi) }
+                    if (state.audio == CommsAudioState.CONNECTED || state.audio == CommsAudioState.RECONNECTING) {
+                        IconButton(onClick = repo::toggleMute, enabled = state.audio == CommsAudioState.CONNECTED) {
+                            Icon(
+                                if (state.muted) Icons.Outlined.MicOff else Icons.Outlined.Mic,
+                                if (state.muted) "Unmute microphone" else "Mute microphone",
+                                tint = if (state.audio != CommsAudioState.CONNECTED) TextDis else if (state.muted) Gold else TextHi,
+                            )
+                        }
+                    }
                     if (owner) IconButton(onClick = { invitation = true }) { Icon(Icons.Outlined.QrCode, "Show ride QR", tint = TextHi) }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                     NaviSarthiBtn(if (state.sharing) "Stop sharing" else "Share location", {
                         if (state.sharing) repo.stopSharing() else startMedia(CommsService.START_LOCATION)
                     }, modifier = Modifier.weight(1f), size = BtnSize.Sm, variant = BtnVariant.Secondary, enabled = state.sharing || state.connected)
-                    NaviSarthiBtn(if (state.audio == CommsAudioState.OFF) "Join audio" else "Leave audio", {
-                        if (state.audio == CommsAudioState.OFF) startMedia(CommsService.JOIN_AUDIO) else repo.leaveAudio()
-                    }, modifier = Modifier.weight(1f), size = BtnSize.Sm, variant = BtnVariant.Secondary,
-                        enabled = state.audio != CommsAudioState.OFF || (group.audioAvailable && state.connected))
-                }
-                if (state.audio != CommsAudioState.OFF) Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(when (state.audio) { CommsAudioState.CONNECTING -> "Joining audio…"; CommsAudioState.RECONNECTING -> "Audio reconnecting…"; else -> "${state.audioParticipants} in audio" }, color = TextMid, modifier = Modifier.weight(1f))
-                    TextButton(onClick = repo::toggleMute, enabled = state.audio == CommsAudioState.CONNECTED) { Text(if (state.muted) "Unmute" else "Mute", color = Gold) }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (state.audio != CommsAudioState.OFF) {
+                            Text(
+                                when (state.audio) {
+                                    CommsAudioState.CONNECTING -> "Joining audio…"
+                                    CommsAudioState.RECONNECTING -> "Audio reconnecting…"
+                                    else -> "${state.audioParticipants} in audio"
+                                },
+                                color = TextMid, fontSize = 12.sp,
+                            )
+                        }
+                        NaviSarthiBtn(if (state.audio == CommsAudioState.OFF) "Join audio" else "Leave audio", {
+                            if (state.audio == CommsAudioState.OFF) startMedia(CommsService.JOIN_AUDIO) else repo.leaveAudio()
+                        }, modifier = Modifier.fillMaxWidth(), size = BtnSize.Sm, variant = BtnVariant.Secondary,
+                            enabled = state.audio != CommsAudioState.OFF || (group.audioAvailable && state.connected))
+                    }
                 }
                 Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Chat", "Riders").forEachIndexed { index, label ->
@@ -200,7 +225,7 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
                             Modifier.weight(1f).selectable(selected, role = Role.Tab, onClick = { tab = index }),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Box(Modifier.heightIn(min = 44.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                            Box(Modifier.heightIn(min = 44.dp).padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
                                 Text(label, color = if (selected) TextHi else TextMid, style = MaterialTheme.typography.labelLarge)
                             }
                             HorizontalDivider(thickness = 2.dp, color = if (selected) Gold else Line)
@@ -219,28 +244,64 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
     if (management && state.snapshot != null) {
         val snapshot = state.snapshot!!; val group = snapshot.group
         var days by remember(group.expiresAt) { mutableIntStateOf(ceil((group.expiresAt - group.createdAt).toDouble() / COMMS_DAY_MS).toInt().coerceIn(1, 14)) }
-        AlertDialog(onDismissRequest = { management = false }, title = { Text("Ride settings") }, text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Extend ride to day $days of 14")
-                        Slider(days.toFloat(), { days = it.toInt() }, valueRange = 1f..14f, steps = 12)
-                        Text(commsDate(group.createdAt + days * COMMS_DAY_MS), style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { repo.extend(days); management = false }, enabled = group.createdAt + days * COMMS_DAY_MS > group.expiresAt && !state.busy) { Text("Extend ride") }
+        val glassShape = RoundedCornerShape(24.dp)
+        Dialog(onDismissRequest = { management = false }) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color(0xF032343A), Color(0xE6191B20))), glassShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.17f), glassShape)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("Ride settings", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Extend ride to day $days of 14", color = Color(0xFFD8DBDF))
+                            Slider(days.toFloat(), { days = it.toInt() }, valueRange = 1f..14f, steps = 12)
+                            Text(commsDate(group.createdAt + days * COMMS_DAY_MS), color = Color(0xFFD8DBDF), style = MaterialTheme.typography.bodySmall)
+                            FilledTonalButton(
+                                modifier = Modifier.align(Alignment.End),
+                                onClick = { repo.extend(days); management = false },
+                                enabled = group.createdAt + days * COMMS_DAY_MS > group.expiresAt && !state.busy,
+                                shape = RoundedCornerShape(14.dp),
+                            ) { Text("Extend ride") }
+                        }
                     }
-                }
-                if (group.ownerId == snapshot.memberId) items(group.members.filter { it.id != snapshot.memberId }, key = { it.id }) { member ->
-                    Column {
-                        Text(member.nickname)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { repo.transfer(member.id); management = false }) { Text("Make organiser") }
-                            TextButton(onClick = { repo.remove(member.id); management = false }) { Text("Remove", color = Alert) }
+                    if (group.ownerId == snapshot.memberId) items(group.members.filter { it.id != snapshot.memberId }, key = { it.id }) { member ->
+                        Column {
+                            Text(member.nickname, color = Color.White)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(onClick = { repo.transfer(member.id); management = false }, shape = RoundedCornerShape(14.dp)) { Text("Make organiser") }
+                                OutlinedButton(onClick = { repo.remove(member.id); management = false }, shape = RoundedCornerShape(14.dp)) { Text("Remove", color = Color(0xFFFFB4AB)) }
+                            }
                         }
                     }
                 }
-                item { TextButton(onClick = { management = false; confirmLeave = true }) { Text(if (group.ownerId == snapshot.memberId) "End ride for everyone" else "Leave ride", color = Alert) } }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val openConfirmation = { management = false; confirmLeave = true }
+                    if (group.ownerId == snapshot.memberId) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = openConfirmation,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9C242C), contentColor = Color.White),
+                        ) { Text("End ride for everyone", textAlign = TextAlign.Center) }
+                    } else {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = openConfirmation,
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66FFB4AB)),
+                        ) { Text("Leave ride", color = Color(0xFFFFB4AB), textAlign = TextAlign.Center) }
+                    }
+                    FilledTonalButton(onClick = { management = false }, shape = RoundedCornerShape(14.dp)) { Text("Done") }
+                }
             }
-        }, confirmButton = { TextButton(onClick = { management = false }) { Text("Done") } })
+        }
     }
     if (confirmLeave && state.snapshot != null) {
         val owner = state.snapshot!!.group.ownerId == state.snapshot!!.memberId
@@ -278,20 +339,58 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
     var draft by remember { mutableStateOf("") }
     val list = rememberLazyListState()
     LaunchedEffect(state.messages.lastOrNull()?.seq) { if (state.messages.isNotEmpty()) list.animateScrollToItem(state.messages.lastIndex) }
-    val names = state.snapshot!!.group.members.associate { it.id to it.nickname }
+    val snapshot = state.snapshot!!
+    val names = snapshot.group.members.associate { it.id to it.nickname }
+    val colors = remember(snapshot.group.id, snapshot.group.members) { RiderColors.forMembers(snapshot.group) }
+    var timestampMessage by remember(snapshot.group.id) { mutableStateOf<String?>(null) }
+    var timestampTap by remember(snapshot.group.id) { mutableIntStateOf(0) }
+    LaunchedEffect(timestampTap) {
+        if (timestampMessage != null) {
+            delay(3500)
+            timestampMessage = null
+        }
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (state.messages.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("No messages yet", color = TextMid) }
-        else LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
-            items(state.messages, key = { it.seq }) { message ->
-                val own = message.memberId == state.snapshot.memberId
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = if (own) Alignment.End else Alignment.Start) {
+        else LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(vertical = 4.dp)) {
+            itemsIndexed(state.messages, key = { _, message -> message.seq }) { index, message ->
+                val own = message.memberId == snapshot.memberId
+                val bubbleShape = RoundedCornerShape(16.dp)
+                val previous = state.messages.getOrNull(index - 1)
+                val gap = when {
+                    previous == null -> 0.dp
+                    previous.memberId == message.memberId -> 4.dp
+                    else -> 8.dp
+                }
+                Column(
+                    Modifier.fillMaxWidth().padding(top = gap),
+                    horizontalAlignment = if (own) Alignment.End else Alignment.Start,
+                ) {
                     Column(
-                        Modifier.widthIn(max = 310.dp).background(if (own) GoldTint else Surf1, RoundedCornerShape(14.dp)).padding(12.dp),
+                        Modifier.widthIn(max = 310.dp),
+                        horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text(if (own) "You" else names[message.memberId] ?: "Former rider", color = TextMid, fontSize = 11.sp)
-                        Text(message.text, color = TextHi)
-                        Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.sentAt)), color = TextMid, fontSize = 12.sp)
+                        if (!own) {
+                            Text(
+                                names[message.memberId] ?: "Former rider",
+                                color = colors[message.memberId]?.let { Color(it) } ?: TextMid,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        Text(
+                            message.text,
+                            color = TextHi,
+                            modifier = Modifier.clip(bubbleShape).background(if (own) GoldTint else Surf1)
+                                .clickable(onClickLabel = "Show message time") {
+                                    timestampMessage = message.id
+                                    timestampTap++
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                        if (timestampMessage == message.id) {
+                            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.sentAt)), color = TextMid, fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -301,7 +400,7 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
             TextButton(onClick = repo::retryMessage, enabled = state.connected && !state.busy) { Text("Retry message", color = Gold) }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.imePadding()) {
-            OutlinedTextField(draft, { draft = it.take(2000) }, modifier = Modifier.weight(1f), placeholder = { Text("Message the ride") }, maxLines = 3, enabled = state.pendingMessage == null)
+            OutlinedTextField(draft, { draft = it.take(2000) }, modifier = Modifier.weight(1f), placeholder = { Text("Message the ride") }, shape = RoundedCornerShape(28.dp), maxLines = 3, enabled = state.pendingMessage == null)
             IconButton(onClick = { repo.send(draft); draft = "" }, enabled = state.connected && !state.busy && state.pendingMessage == null && draft.isNotBlank()) {
                 Icon(Icons.Outlined.Send, "Send message", tint = if (state.connected && draft.isNotBlank()) Gold else TextDis)
             }
@@ -321,7 +420,7 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
         items(snapshot.group.members, key = { it.id }) { member ->
             val position = snapshot.positions[member.id]
             val age = position?.let { (now - it.receivedAt).coerceAtLeast(0) }
-            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(member.nickname + if (member.id == snapshot.memberId) " · You" else "", color = TextHi, fontWeight = FontWeight.SemiBold)
                 val own = state.ownPosition?.takeIf { now - it.receivedAt < 30_000 }
                 val distance = if (position != null && own != null && member.id != snapshot.memberId) commsDistanceMeters(own, position) else null
@@ -346,19 +445,31 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
     val scope = rememberCoroutineScope()
     var sharing by remember { mutableStateOf(false) }
     var shareError by remember { mutableStateOf<String?>(null) }
-    val bitmap = remember(token) { token?.let {
-        val json = "{\"v\":1,\"type\":\"navisarthi-ride\",\"inviteToken\":\"$it\"}"
-        val matrix = QRCodeWriter().encode(json, BarcodeFormat.QR_CODE, 640, 640, mapOf(EncodeHintType.MARGIN to 3))
-        Bitmap.createBitmap(640, 640, Bitmap.Config.ARGB_8888).apply {
-            setPixels(IntArray(640 * 640) { i -> if (matrix[i % 640, i / 640]) android.graphics.Color.BLACK else android.graphics.Color.WHITE }, 0, 640, 0, 0, 640, 640)
+    val accent = Gold.toArgb()
+    val bitmap = remember(token, accent) { token?.let { renderRideQr(context, it, accent) } }
+    val glass = Brush.verticalGradient(listOf(Color(0xEE292C31), Color(0xE5141619)))
+    val shape = RoundedCornerShape(16.dp)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        SideEffect {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.apply {
+                addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                setDimAmount(0.8f)
+            }
         }
-    } }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Invite riders") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            bitmap?.let { Image(it.asImageBitmap(), "Ride invitation QR. Anyone with this code can join.", Modifier.fillMaxWidth().aspectRatio(1f).background(Color.White)) }
-            Text(if (token == null) "Create a fresh invitation for this ride." else "Anyone with this QR can join immediately. Only show it to riders you want in the group.")
-            bitmap?.let { image ->
-                TextButton(enabled = enabled && !sharing, onClick = {
+        Column(
+            Modifier.padding(horizontal = 32.dp, vertical = 16.dp).widthIn(max = 360.dp)
+                .fillMaxWidth().verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                Modifier.align(Alignment.End).background(glass, shape)
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), shape).padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(enabled = bitmap != null && enabled && !sharing, onClick = {
+                    val image = bitmap ?: return@IconButton
+
                     scope.launch {
                         sharing = true
                         shareError = null
@@ -383,11 +494,33 @@ fun CommsScreen(vm: CommsViewModel = viewModel(), onOpenMap: () -> Unit) {
                             sharing = false
                         }
                     }
-                }) { Text(if (sharing) "Preparing image…" else "Share QR image") }
+                }) { Icon(Icons.Outlined.Share, "Share QR image", tint = Color.White.copy(alpha = if (bitmap != null && enabled && !sharing) 1f else 0.38f)) }
+                IconButton(onClick = onRotate, enabled = enabled && !sharing) {
+                    Icon(Icons.Outlined.Refresh, if (token == null) "Create invitation" else "Replace invitation",
+                        tint = Color.White.copy(alpha = if (enabled && !sharing) 1f else 0.38f))
+                }
+                IconButton(onClick = onDismiss) { Icon(Icons.Outlined.KeyboardArrowDown, "Close invitation", tint = Color.White) }
             }
-            shareError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            TextButton(onClick = onRotate, enabled = enabled) { Text(if (token == null) "Create invitation" else "Replace invitation") }
+            bitmap?.let {
+                Spacer(Modifier.height(16.dp))
+                Image(it.asImageBitmap(), "Ride invitation QR", Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(20.dp)))
+            }
+            Spacer(Modifier.height(16.dp))
+            Column(
+                Modifier.fillMaxWidth().background(glass, shape)
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), shape).padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("Invite friends", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (token == null) "Create a fresh invitation for this ride." else "Anyone with this QR can join immediately. Only show it to riders you want in the group.",
+                    color = Color(0xFFD8DBDF), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+                )
+                shareError?.let { Text(it, color = Color(0xFFFFB4AB), textAlign = TextAlign.Center) }
+            }
         }
-    }, confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } })
+    }
 }
+
 private fun commsDate(time: Long): String = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(time))

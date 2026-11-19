@@ -1,0 +1,13 @@
+{
+  "versionName": "0.7.3",
+  "versionCode": 44,
+  "applicationId": "com.navisarthi.app",
+  "apk": "NaviSarthi-0.7.3.apk",
+  "bytes": 186118296,
+  "sha256": "8becc5c42984e912e9b2364774602f612a9217b59ad71bbb6848f0d468bcf9e6",
+  "signatureVerified": true,
+  "signerSha256": "46271167e0a7da2e66ef669e6ff2025588b54dceea349a67c2bd36a03afc95b6",
+  "sameSigningCertificateAs072": true,
+  "zipAlignment16KiBVerified": true,
+  "deviceVerification": "Pending"
+}

@@ -21,7 +21,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.UUID
 
-/** Process-scoped ride session. No Firebase Auth, navigation controller or persistent message cache. */
+/** Process-scoped ride session backed by an encrypted cache for the active ride's chat. */
 class CommsRepository private constructor(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val origin = runCatching { commsOrigin(BuildConfig.COMMS_API_URL, BuildConfig.DEBUG) }.getOrDefault("")
@@ -52,7 +52,13 @@ class CommsRepository private constructor(private val context: Context) {
             else {
                 deadline = SystemClock.elapsedRealtime() + (expires - System.currentTimeMillis()).coerceAtMost(14 * COMMS_DAY_MS)
                 mutable.update { it.copy(hasSession = saved.admission != null, pendingAdmission = saved.pending != null, invitation = saved.admission?.inviteToken) }
-                if (saved.admission != null) connect()
+                saved.admission?.let { admission ->
+                    vault.readChat(admission)?.let { chat ->
+                        cursor = chat.cursor
+                        mutable.update { it.copy(messages = chat.messages) }
+                    }
+                    connect()
+                }
             }
         }
         scope.launch {
@@ -237,9 +243,20 @@ class CommsRepository private constructor(private val context: Context) {
         }
     }
     private fun appendMessages(messages: List<CommsMessage>) {
+        if (messages.isEmpty()) return
         // Advance only from the realtime stream's ordered catch-up, not from a send response.
-        if (messages.isNotEmpty()) cursor = maxOf(cursor, messages.maxOf { it.seq })
-        mutable.update { it.copy(messages = mergeCommsMessages(it.messages, messages)) }
+        val current = state.value.messages
+        val merged = mergeCommsMessages(current, messages)
+        val nextCursor = maxOf(cursor, messages.maxOf { it.seq })
+        if (current == merged && cursor == nextCursor) return
+        cursor = nextCursor
+        mutable.update { it.copy(messages = merged) }
+        cacheChat(merged)
+    }
+    private fun cacheChat(messages: List<CommsMessage>) {
+        val admission = stored?.admission ?: return
+        // A failed cache write must not interrupt the live chat.
+        runCatching { vault.writeChat(CachedCommsChat(admission.groupId, admission.memberId, cursor, messages)) }
     }
     fun send(text: String) = action {
         val trimmed = text.trim(); require(trimmed.length in 1..2000)
@@ -251,7 +268,10 @@ class CommsRepository private constructor(private val context: Context) {
     private suspend fun sendPending() {
         val pending = state.value.pendingMessage ?: return
         val message = commsJson.decodeFromJsonElement<CommsMessage>(call("v1/messages", payload = buildJsonObject { put("id", pending.id); put("text", pending.text) }))
-        mutable.update { it.copy(messages = mergeCommsMessages(it.messages, listOf(message)), pendingMessage = null) }
+        val current = state.value.messages
+        val merged = mergeCommsMessages(current, listOf(message))
+        mutable.update { it.copy(messages = merged, pendingMessage = null) }
+        if (merged != current) cacheChat(merged)
     }
     fun extend(daysFromCreation: Int) = action {
         val group = state.value.snapshot?.group ?: return@action

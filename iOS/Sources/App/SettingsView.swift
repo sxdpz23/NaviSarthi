@@ -7,6 +7,7 @@ import NaviSarthiCore
 import AuthenticationServices
 import Security
 import BackgroundTasks
+import UserNotifications
 #if canImport(FirebaseCore) && canImport(FirebaseMessaging)
 import FirebaseCore
 import FirebaseMessaging

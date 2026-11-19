@@ -22,6 +22,12 @@ const val COMMS_DAY_MS = 86_400_000L
 }
 @Serializable data class CommsPreview(val name: String, val expiresAt: Long, val memberCount: Int, val capacity: Int)
 @Serializable data class CommsQr(val v: Int, val type: String, val inviteToken: String)
+@Serializable internal data class CachedCommsChat(
+    val groupId: String,
+    val memberId: String,
+    val cursor: Long,
+    val messages: List<CommsMessage>,
+)
 @Serializable internal data class PendingAdmission(val requestId: String, val path: String, val body: String, val expiresAt: Long)
 @Serializable internal data class StoredComms(
     val origin: String, val installationSecret: String,
